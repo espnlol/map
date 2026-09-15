@@ -5,6 +5,8 @@ import type {
   AppTab,
   BoundaryShape,
   Coordinates,
+  Dispensary,
+  Product,
   ProductCategory,
   SortOption,
   StrainLineage,
@@ -21,6 +23,18 @@ function toggleInArray<T>(arr: T[], value: T): T[] {
   return arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value]
 }
 
+function genId(prefix: string): string {
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+/** So a newly-added (or re-priced) product never gets silently hidden by
+ * a price filter ceiling/floor set before it existed — widens (never
+ * narrows) the current range to cover it. */
+function widenRangeFor(current: [number, number], prices: number[]): [number, number] {
+  if (prices.length === 0) return current
+  return [Math.min(current[0], ...prices), Math.max(current[1], ...prices)]
+}
+
 const FULL_PRICE_RANGE = minMaxPrice(products)
 
 export interface AppState extends FilterState {
@@ -32,6 +46,14 @@ export interface AppState extends FilterState {
    * dispensary picks. The Menu tab's filters + results stay gated behind
    * this until they hit "Continue" on the Map tab — see confirmSelection. */
   boundaryConfirmed: boolean
+
+  /** Dispensaries/products added through the Manage tab. Saved only in
+   * this browser (persist middleware -> localStorage) — there's no
+   * shared backend, by design (see README). Merged with the built-in
+   * demo/imported catalog everywhere via useAllDispensaries/useAllProducts
+   * (src/store/useCombinedData.ts) rather than kept separate. */
+  userDispensaries: Dispensary[]
+  userProducts: Product[]
 
   setActiveTab: (t: AppTab) => void
   confirmSelection: () => void
@@ -57,13 +79,25 @@ export interface AppState extends FilterState {
   resetProductFilters: () => void
 
   toggleFavorite: (productId: string) => void
+
+  /** Returns the new dispensary's id. */
+  addUserDispensary: (d: Omit<Dispensary, 'id' | 'source'>) => string
+  updateUserDispensary: (id: string, patch: Partial<Omit<Dispensary, 'id'>>) => void
+  /** Also removes that dispensary's own user-added products, drops it from
+   * selection/favorites, so nothing dangles pointing at a deleted id. */
+  removeUserDispensary: (id: string) => void
+
+  /** Returns the new product's id. */
+  addUserProduct: (p: Omit<Product, 'id'>) => string
+  updateUserProduct: (id: string, patch: Partial<Omit<Product, 'id'>>) => void
+  removeUserProduct: (id: string) => void
 }
 
 export const FULL_PRICE_RANGE_CONST = FULL_PRICE_RANGE
 
 export const useAppStore = create<AppState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       selectedDispensaryIds: [],
       categories: [],
       accessorySubtypes: [],
@@ -81,6 +115,8 @@ export const useAppStore = create<AppState>()(
       favorites: [],
       activeTab: 'map',
       boundaryConfirmed: false,
+      userDispensaries: [],
+      userProducts: [],
 
       setActiveTab: (t) => set({ activeTab: t }),
       confirmSelection: () => set({ boundaryConfirmed: true }),
@@ -93,7 +129,8 @@ export const useAppStore = create<AppState>()(
       clearDispensarySelection: () => set({ selectedDispensaryIds: [], boundaryConfirmed: false }),
       setBoundary: (b) =>
         set((s) => {
-          const allowed = new Set(dispensariesInBoundary(dispensaries, b).map((d) => d.id))
+          const allDispensaries = [...dispensaries, ...s.userDispensaries]
+          const allowed = new Set(dispensariesInBoundary(allDispensaries, b).map((d) => d.id))
           return {
             boundary: b,
             selectedDispensaryIds: s.selectedDispensaryIds.filter((id) => allowed.has(id)),
@@ -130,20 +167,66 @@ export const useAppStore = create<AppState>()(
           terpeneRange: DEFAULT_TERPENE_RANGE,
         }),
       resetProductFilters: () =>
-        set({
+        set((s) => ({
           categories: [],
           accessorySubtypes: [],
           sizesG: [],
-          priceRange: FULL_PRICE_RANGE,
+          priceRange: minMaxPrice([...products, ...s.userProducts]),
           strainIds: [],
           brandIds: [],
           lineages: [],
           thcRange: DEFAULT_THC_RANGE,
           terpeneRange: DEFAULT_TERPENE_RANGE,
-        }),
+        })),
 
       toggleFavorite: (productId) =>
         set((s) => ({ favorites: toggleInArray(s.favorites, productId) })),
+
+      addUserDispensary: (d) => {
+        const id = genId('user-disp')
+        const dispensary: Dispensary = { ...d, id, source: 'user-added' }
+        set((s) => ({ userDispensaries: [...s.userDispensaries, dispensary] }))
+        return id
+      },
+      updateUserDispensary: (id, patch) =>
+        set((s) => ({
+          userDispensaries: s.userDispensaries.map((d) => (d.id === id ? { ...d, ...patch } : d)),
+        })),
+      removeUserDispensary: (id) => {
+        const productIds = new Set(
+          get()
+            .userProducts.filter((p) => p.dispensaryId === id)
+            .map((p) => p.id),
+        )
+        set((s) => ({
+          userDispensaries: s.userDispensaries.filter((d) => d.id !== id),
+          userProducts: s.userProducts.filter((p) => p.dispensaryId !== id),
+          selectedDispensaryIds: s.selectedDispensaryIds.filter((sid) => sid !== id),
+          favorites: s.favorites.filter((fid) => !productIds.has(fid)),
+        }))
+      },
+
+      addUserProduct: (p) => {
+        const id = genId('user-prod')
+        set((s) => ({
+          userProducts: [...s.userProducts, { ...p, id }],
+          priceRange: widenRangeFor(
+            s.priceRange,
+            p.sizes.map((sz) => sz.price),
+          ),
+        }))
+        return id
+      },
+      updateUserProduct: (id, patch) =>
+        set((s) => ({
+          userProducts: s.userProducts.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+          priceRange: patch.sizes ? widenRangeFor(s.priceRange, patch.sizes.map((sz) => sz.price)) : s.priceRange,
+        })),
+      removeUserProduct: (id) =>
+        set((s) => ({
+          userProducts: s.userProducts.filter((p) => p.id !== id),
+          favorites: s.favorites.filter((fid) => fid !== id),
+        })),
     }),
     {
       name: 'leafmap-storage',
@@ -151,6 +234,8 @@ export const useAppStore = create<AppState>()(
         favorites: state.favorites,
         selectedDispensaryIds: state.selectedDispensaryIds,
         boundary: state.boundary,
+        userDispensaries: state.userDispensaries,
+        userProducts: state.userProducts,
       }),
     },
   ),

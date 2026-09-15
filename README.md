@@ -51,6 +51,18 @@ Leafly/Weedmaps-style menu browsing rather than an embed of either.
   Clicking a pin opens a popup with dispensary info and a live 3-item
   menu preview, with its own "View full menu →" shortcut straight into
   the (already-confirmed) Menu tab for just that location.
+- **Manage tab — add your own dispensaries and menus.** A real in-app
+  form (not a scraper, not fabricated data) lets you add a dispensary —
+  pick its exact location by clicking/dragging a pin on a map, plus
+  name/address/phone/hours/website/license — and build a real menu for
+  it, product by product, using the same category/size/THC%/terpene%
+  fields as the demo catalog. Saved to **this browser only**
+  (`localStorage`, via the Zustand store — see below), and merged into
+  every other feature automatically: it shows up as a pin on the Map
+  tab, in the dispensary list/search/filters, in the Menu tab once
+  selected, and can be favorited. See
+  [Adding your own dispensaries](#adding-your-own-dispensaries-manage-tab)
+  below.
 
 ## Stack
 
@@ -87,7 +99,14 @@ src/
     brands.ts / strains.ts # reference data
     generateProducts.ts    # deterministic (seeded) catalog generator
     index.ts                # <- swap this module out for real API calls
-  store/useAppStore.ts      # Zustand store: filters, selection, favorites
+  store/
+    useAppStore.ts            # Zustand store: filters, selection, favorites,
+                                # AND userDispensaries/userProducts (Manage tab)
+    useCombinedData.ts         # merges the static catalog + userDispensaries/
+                                # userProducts — every screen reads through
+                                # this instead of importing ../data directly,
+                                # so anything added via Manage shows up
+                                # everywhere the demo catalog already does
   utils/
     geo.ts                  # haversine distance + point-in-polygon
     filters.ts               # scoping/filtering/sorting, the unlock rule
@@ -97,12 +116,18 @@ src/
                               # Leaflet is used directly instead of
                               # react-leaflet to avoid version churn and to
                               # get first-class Leaflet.Draw support
+    map/LocationPickerMap.tsx # minimal single-marker click/drag map used by
+                               # the "add a dispensary" form to set coords
     filters/FilterPanel.tsx  # all filter UI, including the lock/unlock state
     products/                # ProductCard / ProductGrid
+    manage/
+      DispensaryForm.tsx      # add/edit a dispensary (incl. LocationPickerMap)
+      ProductForm.tsx         # add/edit a menu item, category-aware sizing
   pages/
     MapPage.tsx               # search-area controls + dispensary picker + map
     MenuPage.tsx               # filters + results grid
     FavoritesPage.tsx
+    ManagePage.tsx             # add/edit your own dispensaries + their menus
 ```
 
 The dispensary "in scope" for the menu is computed as: the map boundary
@@ -179,6 +204,45 @@ that serves the exact same route by calling the exact same
 `api/_menuHandler.ts` code Vercel's function calls — one implementation,
 two ways of running it, rather than a second copy that could drift out
 of sync with the real one.
+
+## Adding your own dispensaries (Manage tab)
+
+The **Manage** tab is a real, working "add your own data" flow — for
+when you want to track a specific dispensary (yours, or one you
+actually shop at) with its real menu, without waiting on an import
+script or public dataset to cover it.
+
+- **Add a dispensary**: name, address/city/state/zip, phone, hours,
+  website, license number, and an exact location picked by clicking (or
+  dragging the marker) on an embedded map — not a geocoded guess.
+- **Build its menu**: add products one at a time with the same
+  category/subtype/size/price/THC%/terpene% fields the demo catalog
+  uses (including the exact cartridge/rosin/flower unit sizes from the
+  feature checklist above), plus a free-text brand name and an optional
+  strain.
+- **Saved to this browser only.** There's no server-side database here
+  — it's `localStorage`, via `userDispensaries`/`userProducts` in
+  `useAppStore.ts` (persisted the same way favorites already are). It
+  won't sync across devices or be visible to anyone else, and clearing
+  your browser's site data clears it too.
+- **Fully merged, not a separate silo.** Everything added here flows
+  through `useCombinedData.ts`, so it appears as a real pin on the Map
+  tab, in the dispensary list/search/sort, counts toward the
+  progressive-filter unlock, is selectable/favoritable, and shows up in
+  the Menu tab's filters and results exactly like the built-in catalog.
+  Adding a product priced outside the current price-filter range
+  automatically widens that filter so it isn't silently hidden.
+- **Map popups render it instantly, with no network request** — a
+  serverless function can't see your browser's `localStorage`, so a
+  Manage-added dispensary's popup is built straight from local state
+  instead of calling `/api/menu` (which only knows the built-in
+  catalog). Built-in/imported dispensaries still fetch `/api/menu` as
+  described above; this is purely a "which data source" branch, not a
+  different feature.
+
+This is the honest way to add real data without scraping: you're
+typing in what you actually know, not this app inventing it or pulling
+it from a site that prohibits automated access.
 
 ## Bringing in a different region (e.g. statewide data)
 

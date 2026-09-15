@@ -1,5 +1,6 @@
-import { brandById, strainById, dispensaryById } from '../../data'
+import { brandById, strainById } from '../../data'
 import { useAppStore } from '../../store/useAppStore'
+import { useDispensaryById, nameFromBrandLookup } from '../../store/useCombinedData'
 import { HeartIcon, MapPinIcon } from '../Icons'
 import { formatPrice } from '../../utils/format'
 import { ACCESSORY_SUBTYPES, LINEAGE_LABEL, type Product } from '../../types'
@@ -15,8 +16,13 @@ export function ProductCard({
   const isFavorite = useAppStore((s) => s.favorites.includes(product.id))
   const toggleFavorite = useAppStore((s) => s.toggleFavorite)
   const sizesG = useAppStore((s) => s.sizesG)
+  const dispensaryById = useDispensaryById()
 
-  const brand = brandById.get(product.brandId)
+  // Products added via Manage store a plain brand-name string in
+  // brandId (there's no separate "add a brand" step), so this falls
+  // back to displaying that string directly when it's not one of the
+  // built-in Brand records.
+  const brandName = nameFromBrandLookup(product.brandId)
   const strain = product.strainId ? strainById.get(product.strainId) : undefined
   const dispensary = dispensaryById.get(product.dispensaryId)
   const price = representativePrice(product, sizesG)
@@ -56,7 +62,7 @@ export function ProductCard({
             </span>
           )}
         </div>
-        {brand && <p className="text-xs text-stone-500 dark:text-stone-400">{brand.name}</p>}
+        <p className="text-xs text-stone-500 dark:text-stone-400">{brandName}</p>
 
         <div className="flex flex-wrap gap-1">
           {strain && (

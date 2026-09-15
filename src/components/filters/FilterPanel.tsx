@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
-import { useAppStore, FULL_PRICE_RANGE_CONST } from '../../store/useAppStore'
-import { dispensaries, brands, strains } from '../../data'
+import { useAppStore } from '../../store/useAppStore'
+import { useAllDispensaries, useFullPriceRange } from '../../store/useCombinedData'
+import { brands, strains } from '../../data'
 import {
   ACCESSORY_SUBTYPES,
   LINEAGE_LABEL,
@@ -16,6 +17,8 @@ import { formatPrice } from '../../utils/format'
 const ALL_SIZES_G = [0.5, 1, 2, 3, 3.5, 4, 7, 14, 28]
 
 export function FilterPanel() {
+  const dispensaries = useAllDispensaries()
+  const fullPriceRange = useFullPriceRange()
   const categories = useAppStore((s) => s.categories)
   const toggleCategory = useAppStore((s) => s.toggleCategory)
   const accessorySubtypes = useAppStore((s) => s.accessorySubtypes)
@@ -44,7 +47,7 @@ export function FilterPanel() {
   const selectedDispensaryIds = useAppStore((s) => s.selectedDispensaryIds)
   const scoped = useMemo(
     () => effectiveDispensaryIds(dispensaries, boundary, selectedDispensaryIds),
-    [boundary, selectedDispensaryIds],
+    [dispensaries, boundary, selectedDispensaryIds],
   )
   const unlocked = detailFiltersUnlocked(scoped.length)
 
@@ -121,8 +124,8 @@ export function FilterPanel() {
         <div className="mt-4">
           <p className="mb-1.5 text-xs text-stone-500 dark:text-stone-400">Price</p>
           <DualRangeSlider
-            min={FULL_PRICE_RANGE_CONST[0]}
-            max={FULL_PRICE_RANGE_CONST[1]}
+            min={fullPriceRange[0]}
+            max={fullPriceRange[1]}
             step={1}
             value={priceRange}
             onChange={setPriceRange}

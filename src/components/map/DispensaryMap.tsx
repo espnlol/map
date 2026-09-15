@@ -71,6 +71,12 @@ export interface DispensaryMapProps {
   drawMode: 'none' | 'shape'
   /** "View full menu" was clicked in a dispensary's popup */
   onViewMenu: (id: string) => void
+  /** Pre-built menu responses for dispensaries added through the Manage
+   * tab, keyed by dispensary id. A serverless function can't see this
+   * browser's localStorage, so these render straight from local state
+   * instead of hitting /api/menu (which only knows the built-in
+   * catalog) — see MapPage.tsx for where this gets built. */
+  localMenus: Map<string, MenuApiResponse>
 }
 
 function wrapPopup(inner: string): string {
@@ -164,6 +170,7 @@ export function DispensaryMap({
   onPickCenter,
   drawMode,
   onViewMenu,
+  localMenus,
 }: DispensaryMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<L.Map | null>(null)
@@ -323,6 +330,18 @@ export function DispensaryMap({
         // "Outside search area" has nothing to fetch or click through.
         if (!popup || !visible) return
 
+        // Dispensaries added via Manage only exist in this browser's
+        // localStorage — a serverless function has no access to that, so
+        // /api/menu would 404 for them. Render straight from local state
+        // instead of a network round trip nobody could ever answer.
+        const local = localMenus.get(d.id)
+        if (local) {
+          popup.setContent(buildMenuPopupHtml(d, visible, dist, local))
+          const btn = popup.getElement()?.querySelector('.leafmap-view-menu-btn')
+          btn?.addEventListener('click', () => onViewMenuRef.current(d.id), { once: true })
+          return
+        }
+
         // Abort the UI update if the user closes the popup while the
         // fetch is still in flight, rather than setContent()-ing a
         // popup nobody's looking at anymore.
@@ -350,7 +369,7 @@ export function DispensaryMap({
 
       marker.addTo(layer)
     }
-  }, [dispensaries, selectedIds, visibleIds, referencePoint])
+  }, [dispensaries, selectedIds, visibleIds, referencePoint, localMenus])
 
   // --- sync circle overlay (radius boundary) ---
   useEffect(() => {

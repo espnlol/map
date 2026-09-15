@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
-import { dispensaries, products } from '../data'
 import { useAppStore } from '../store/useAppStore'
+import { useAllDispensaries, useAllProducts } from '../store/useCombinedData'
 import { effectiveDispensaryIds, filterProducts, type FilterState } from '../utils/filters'
 import { FilterPanel } from '../components/filters/FilterPanel'
 import { ProductGrid } from '../components/products/ProductGrid'
@@ -8,6 +8,8 @@ import { Card, PrimaryButton } from '../components/ui'
 import { MapPinIcon } from '../components/Icons'
 
 export function MenuPage() {
+  const dispensaries = useAllDispensaries()
+  const products = useAllProducts()
   const boundaryConfirmed = useAppStore((s) => s.boundaryConfirmed)
   const setActiveTab = useAppStore((s) => s.setActiveTab)
   const boundary = useAppStore((s) => s.boundary)
@@ -25,7 +27,7 @@ export function MenuPage() {
 
   const scoped = useMemo(
     () => effectiveDispensaryIds(dispensaries, boundary, selectedDispensaryIds),
-    [boundary, selectedDispensaryIds],
+    [dispensaries, boundary, selectedDispensaryIds],
   )
 
   const filtered = useMemo(() => {
@@ -44,6 +46,7 @@ export function MenuPage() {
     }
     return filterProducts(products, scoped, filters)
   }, [
+    products,
     scoped,
     selectedDispensaryIds,
     categories,
@@ -60,7 +63,7 @@ export function MenuPage() {
 
   const scopedDispensaryNames = useMemo(
     () => dispensaries.filter((d) => scoped.includes(d.id)).map((d) => d.name),
-    [scoped],
+    [dispensaries, scoped],
   )
 
   if (!boundaryConfirmed) {

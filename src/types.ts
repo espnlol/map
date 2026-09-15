@@ -104,8 +104,11 @@ export interface Dispensary {
   /** Where this listing came from. Undefined/'demo' = the built-in sample
    * catalog. 'openstreetmap' = imported via scripts/import-osm-dispensaries.mjs,
    * meaning the name/address/location are real but the product catalog
-   * generated for it (see data/generateProducts.ts) is still synthetic. */
-  source?: 'demo' | 'openstreetmap'
+   * generated for it (see data/generateProducts.ts) is still synthetic.
+   * 'user-added' = entered by hand via the Manage tab and saved to this
+   * browser only (src/store/useAppStore.ts's userDispensaries) — both the
+   * listing and its menu are whatever the person who added it entered. */
+  source?: 'demo' | 'openstreetmap' | 'user-added'
 }
 
 export interface Brand {
@@ -145,7 +148,7 @@ export interface Product {
   description: string
 }
 
-export type AppTab = 'map' | 'menu' | 'favorites'
+export type AppTab = 'map' | 'menu' | 'favorites' | 'manage'
 
 export type SortOption =
   | 'price-desc'

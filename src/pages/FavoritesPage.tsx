@@ -1,9 +1,10 @@
 import { useMemo } from 'react'
-import { products } from '../data'
 import { useAppStore } from '../store/useAppStore'
+import { useAllProducts } from '../store/useCombinedData'
 import { ProductGrid } from '../components/products/ProductGrid'
 
 export function FavoritesPage() {
+  const products = useAllProducts()
   const favorites = useAppStore((s) => s.favorites)
   const favoriteSet = useMemo(() => new Set(favorites), [favorites])
   const favoriteOrder = useMemo(() => new Map(favorites.map((id, i) => [id, i])), [favorites])
@@ -12,7 +13,7 @@ export function FavoritesPage() {
       products
         .filter((p) => favoriteSet.has(p.id))
         .sort((a, b) => (favoriteOrder.get(b.id) ?? 0) - (favoriteOrder.get(a.id) ?? 0)),
-    [favoriteSet, favoriteOrder],
+    [products, favoriteSet, favoriteOrder],
   )
 
   return (

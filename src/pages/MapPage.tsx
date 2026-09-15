@@ -1,7 +1,13 @@
 import { useMemo, useState } from 'react'
-import { dispensaries } from '../data'
 import { useAppStore } from '../store/useAppStore'
+import { useAllDispensaries } from '../store/useCombinedData'
 import { DispensaryMap } from '../components/map/DispensaryMap'
+// Runtime import (not type-only): reuses the exact same Product[] -> wire
+// -format conversion /api/menu uses server-side, so a Manage-added
+// dispensary's popup (rendered from local state, since a serverless
+// function can't see this browser's localStorage) matches the real
+// endpoint's shape/logic instead of a second copy that could drift.
+import { productsToMenuResponse, type MenuApiResponse } from '../../api/_menuData'
 import { DETAIL_UNLOCK_THRESHOLD, dispensariesInBoundary, effectiveDispensaryIds } from '../utils/filters'
 import { distanceMiles, formatDistance } from '../utils/geo'
 import { Card, GhostButton, PrimaryButton, SectionHeading } from '../components/ui'
@@ -12,6 +18,7 @@ type Mode = 'none' | 'radius' | 'shape'
 type DispensarySort = 'name' | 'distance' | 'rating'
 
 export function MapPage() {
+  const dispensaries = useAllDispensaries()
   const boundary = useAppStore((s) => s.boundary)
   const setBoundary = useAppStore((s) => s.setBoundary)
   const selectedDispensaryIds = useAppStore((s) => s.selectedDispensaryIds)
@@ -22,6 +29,8 @@ export function MapPage() {
   const setUserLocation = useAppStore((s) => s.setUserLocation)
   const confirmSelection = useAppStore((s) => s.confirmSelection)
   const setActiveTab = useAppStore((s) => s.setActiveTab)
+  const userDispensaries = useAppStore((s) => s.userDispensaries)
+  const userProducts = useAppStore((s) => s.userProducts)
 
   // "Draw" (any-shape polygon) is the primary way to search, so it's the
   // default the first time someone lands here with no boundary set yet.
@@ -34,16 +43,28 @@ export function MapPage() {
   const [search, setSearch] = useState('')
   const [dispSort, setDispSort] = useState<DispensarySort>('name')
 
-  const visibleDispensaries = useMemo(() => dispensariesInBoundary(dispensaries, boundary), [boundary])
+  const visibleDispensaries = useMemo(
+    () => dispensariesInBoundary(dispensaries, boundary),
+    [dispensaries, boundary],
+  )
   const visibleIds = useMemo(() => new Set(visibleDispensaries.map((d) => d.id)), [visibleDispensaries])
   const selectedIds = useMemo(() => new Set(selectedDispensaryIds), [selectedDispensaryIds])
   const effective = useMemo(
     () => effectiveDispensaryIds(dispensaries, boundary, selectedDispensaryIds),
-    [boundary, selectedDispensaryIds],
+    [dispensaries, boundary, selectedDispensaryIds],
   )
 
   const referencePoint: Coordinates | null =
     userLocation ?? (boundary?.kind === 'circle' ? boundary.center : null)
+
+  const localMenus = useMemo(() => {
+    const map = new Map<string, MenuApiResponse>()
+    for (const d of userDispensaries) {
+      const items = userProducts.filter((p) => p.dispensaryId === d.id)
+      map.set(d.id, productsToMenuResponse(d.id, d.name, items))
+    }
+    return map
+  }, [userDispensaries, userProducts])
 
   function goToMenu() {
     confirmSelection()
@@ -70,7 +91,7 @@ export function MapPage() {
       if (dispSort === 'rating') return (b.rating ?? -1) - (a.rating ?? -1)
       return a.name.localeCompare(b.name)
     })
-  }, [search, referencePoint, dispSort])
+  }, [dispensaries, search, referencePoint, dispSort])
 
   function chooseMode(next: Mode) {
     setPickingCenter(false)
@@ -331,6 +352,7 @@ export function MapPage() {
           onPickCenter={handlePickCenter}
           drawMode={mode === 'shape' ? 'shape' : 'none'}
           onViewMenu={handleViewMenu}
+          localMenus={localMenus}
         />
       </Card>
     </div>
