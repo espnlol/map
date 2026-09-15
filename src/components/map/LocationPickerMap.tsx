@@ -24,10 +24,8 @@ export interface LocationPickerMapProps {
 }
 
 /** A minimal, single-purpose map: click anywhere to place (or drag to
- * fine-tune) one marker. Deliberately separate from DispensaryMap.tsx,
- * which has a lot of unrelated concerns (every dispensary's pin, the
- * boundary draw tool, selection) that a "pick where your dispensary is"
- * form control has no business depending on. */
+ * fine-tune) one marker. The only map left in the app — used solely by
+ * DispensaryForm (Manage tab) to pick a real dispensary's coordinates. */
 export function LocationPickerMap({ value, onChange }: LocationPickerMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<L.Map | null>(null)

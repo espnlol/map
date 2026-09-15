@@ -3,21 +3,14 @@ import { persist } from 'zustand/middleware'
 import type {
   AccessorySubtype,
   AppTab,
-  BoundaryShape,
-  Coordinates,
   Dispensary,
   Product,
   ProductCategory,
   SortOption,
   StrainLineage,
 } from '../types'
-import {
-  DEFAULT_THC_RANGE,
-  DEFAULT_TERPENE_RANGE,
-  dispensariesInBoundary,
-  type FilterState,
-} from '../utils/filters'
-import { dispensaries, minMaxPrice, products } from '../data'
+import { DEFAULT_THC_RANGE, DEFAULT_TERPENE_RANGE, type FilterState } from '../utils/filters'
+import { minMaxPrice, products } from '../data'
 
 function toggleInArray<T>(arr: T[], value: T): T[] {
   return arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value]
@@ -38,14 +31,8 @@ function widenRangeFor(current: [number, number], prices: number[]): [number, nu
 const FULL_PRICE_RANGE = minMaxPrice(products)
 
 export interface AppState extends FilterState {
-  boundary: BoundaryShape
-  userLocation: Coordinates | null
   favorites: string[]
   activeTab: AppTab
-  /** Whether the user has explicitly confirmed their map search area/
-   * dispensary picks. The Menu tab's filters + results stay gated behind
-   * this until they hit "Continue" on the Map tab — see confirmSelection. */
-  boundaryConfirmed: boolean
 
   /** Dispensaries/products added through the Manage tab. Saved only in
    * this browser (persist middleware -> localStorage) — there's no
@@ -56,12 +43,9 @@ export interface AppState extends FilterState {
   userProducts: Product[]
 
   setActiveTab: (t: AppTab) => void
-  confirmSelection: () => void
   toggleDispensary: (id: string) => void
   setSelectedDispensaries: (ids: string[]) => void
   clearDispensarySelection: () => void
-  setBoundary: (b: BoundaryShape) => void
-  setUserLocation: (c: Coordinates | null) => void
 
   toggleCategory: (c: ProductCategory) => void
   setCategories: (c: ProductCategory[]) => void
@@ -110,34 +94,16 @@ export const useAppStore = create<AppState>()(
       thcRange: DEFAULT_THC_RANGE,
       terpeneRange: DEFAULT_TERPENE_RANGE,
 
-      boundary: null,
-      userLocation: null,
       favorites: [],
-      activeTab: 'map',
-      boundaryConfirmed: false,
+      activeTab: 'menu',
       userDispensaries: [],
       userProducts: [],
 
       setActiveTab: (t) => set({ activeTab: t }),
-      confirmSelection: () => set({ boundaryConfirmed: true }),
       toggleDispensary: (id) =>
-        set((s) => ({
-          selectedDispensaryIds: toggleInArray(s.selectedDispensaryIds, id),
-          boundaryConfirmed: false,
-        })),
-      setSelectedDispensaries: (ids) => set({ selectedDispensaryIds: ids, boundaryConfirmed: false }),
-      clearDispensarySelection: () => set({ selectedDispensaryIds: [], boundaryConfirmed: false }),
-      setBoundary: (b) =>
-        set((s) => {
-          const allDispensaries = [...dispensaries, ...s.userDispensaries]
-          const allowed = new Set(dispensariesInBoundary(allDispensaries, b).map((d) => d.id))
-          return {
-            boundary: b,
-            selectedDispensaryIds: s.selectedDispensaryIds.filter((id) => allowed.has(id)),
-            boundaryConfirmed: false,
-          }
-        }),
-      setUserLocation: (c) => set({ userLocation: c }),
+        set((s) => ({ selectedDispensaryIds: toggleInArray(s.selectedDispensaryIds, id) })),
+      setSelectedDispensaries: (ids) => set({ selectedDispensaryIds: ids }),
+      clearDispensarySelection: () => set({ selectedDispensaryIds: [] }),
 
       toggleCategory: (c) => {
         set((s) => ({
@@ -233,7 +199,6 @@ export const useAppStore = create<AppState>()(
       partialize: (state) => ({
         favorites: state.favorites,
         selectedDispensaryIds: state.selectedDispensaryIds,
-        boundary: state.boundary,
         userDispensaries: state.userDispensaries,
         userProducts: state.userProducts,
       }),

@@ -1,20 +1,102 @@
 import { useMemo, useState } from 'react'
 import { useAppStore } from '../../store/useAppStore'
 import { useAllDispensaries, useFullPriceRange } from '../../store/useCombinedData'
-import { brands, strains } from '../../data'
+import { brands, strains, terpenes } from '../../data'
 import {
   ACCESSORY_SUBTYPES,
   LINEAGE_LABEL,
   PRODUCT_CATEGORIES,
   SORT_OPTIONS,
+  type Strain,
   type StrainLineage,
 } from '../../types'
 import { DETAIL_UNLOCK_THRESHOLD, detailFiltersUnlocked, effectiveDispensaryIds } from '../../utils/filters'
 import { Card, Chip, DualRangeSlider, SectionHeading } from '../ui'
-import { LockIcon } from '../Icons'
+import { ChevronDownIcon, LockIcon } from '../Icons'
 import { formatPrice } from '../../utils/format'
 
 const ALL_SIZES_G = [0.5, 1, 2, 3, 3.5, 4, 7, 14, 28]
+
+const LINEAGE_BADGE: Record<StrainLineage, string> = {
+  indica: 'bg-purple-100 text-purple-700 dark:bg-purple-950/50 dark:text-purple-300',
+  sativa: 'bg-orange-100 text-orange-700 dark:bg-orange-950/50 dark:text-orange-300',
+  hybrid: 'bg-teal-100 text-teal-700 dark:bg-teal-950/50 dark:text-teal-300',
+}
+
+/** Everything a strain search should be able to match on — name, effects,
+ * and flavors — so searching "relaxed" or "citrus" surfaces strains the
+ * same way a Leafly-style strain search does, not just an exact name. */
+function strainSearchText(s: Strain): string {
+  return [s.name, ...s.effects, ...s.flavors].join(' ').toLowerCase()
+}
+
+function StrainResult({ strain, active, onToggle }: { strain: Strain; active: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className={`w-full rounded-lg border px-2.5 py-1.5 text-left transition-colors ${
+        active
+          ? 'border-leaf-500 bg-leaf-50 dark:bg-leaf-950/40'
+          : 'border-stone-200 hover:border-leaf-300 dark:border-stone-700'
+      }`}
+    >
+      <span className="flex items-center gap-1.5">
+        <span className="text-sm font-medium text-stone-800 dark:text-stone-100">{strain.name}</span>
+        <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${LINEAGE_BADGE[strain.lineage]}`}>
+          {LINEAGE_LABEL[strain.lineage]}
+        </span>
+      </span>
+      <span className="mt-0.5 block truncate text-[11px] text-stone-500 dark:text-stone-400">
+        {strain.effects.slice(0, 3).join(' · ')}
+      </span>
+      <span className="block truncate text-[11px] text-stone-400 dark:text-stone-500">
+        {strain.flavors.slice(0, 3).join(' · ')}
+      </span>
+    </button>
+  )
+}
+
+/** "What do terpenes do?" reference — general aroma/flavor/effect info,
+ * not tied to any specific product (products only carry a total terpene
+ * %, not a breakdown by compound), shown next to the terpene% filter it's
+ * most relevant to. */
+function TerpeneGuide() {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="mt-3 rounded-lg border border-stone-200 dark:border-stone-700">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between px-2.5 py-2 text-left text-xs font-medium text-stone-600 dark:text-stone-300"
+      >
+        What do terpenes do &amp; taste like?
+        <ChevronDownIcon
+          width={14}
+          height={14}
+          className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+      {open && (
+        <div className="max-h-52 space-y-2.5 overflow-y-auto border-t border-stone-200 px-2.5 py-2.5 dark:border-stone-700">
+          <p className="text-[11px] text-stone-400">
+            General reference — commonly-reported aroma &amp; effects for the terpenes found across
+            cannabis, not a breakdown of any specific product.
+          </p>
+          {terpenes.map((t) => (
+            <div key={t.id} className="text-xs">
+              <p className="font-semibold text-stone-700 dark:text-stone-200">
+                {t.name} <span className="font-normal text-stone-400">· {t.aroma.join(', ')}</span>
+              </p>
+              <p className="text-stone-500 dark:text-stone-400">{t.effects.join('; ')}</p>
+              <p className="text-[10px] text-stone-400">Also in: {t.alsoFoundIn.join(', ')}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export function FilterPanel() {
   const dispensaries = useAllDispensaries()
@@ -43,22 +125,19 @@ export function FilterPanel() {
   const resetDetailFilters = useAppStore((s) => s.resetDetailFilters)
   const resetProductFilters = useAppStore((s) => s.resetProductFilters)
 
-  const boundary = useAppStore((s) => s.boundary)
   const selectedDispensaryIds = useAppStore((s) => s.selectedDispensaryIds)
   const scoped = useMemo(
-    () => effectiveDispensaryIds(dispensaries, boundary, selectedDispensaryIds),
-    [dispensaries, boundary, selectedDispensaryIds],
+    () => effectiveDispensaryIds(dispensaries, selectedDispensaryIds),
+    [dispensaries, selectedDispensaryIds],
   )
   const unlocked = detailFiltersUnlocked(scoped.length)
 
   const [strainSearch, setStrainSearch] = useState('')
-  const visibleStrains = useMemo(
-    () =>
-      strains
-        .filter((s) => s.name.toLowerCase().includes(strainSearch.trim().toLowerCase()))
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    [strainSearch],
-  )
+  const visibleStrains = useMemo(() => {
+    const q = strainSearch.trim().toLowerCase()
+    const list = q ? strains.filter((s) => strainSearchText(s).includes(q)) : strains
+    return [...list].sort((a, b) => a.name.localeCompare(b.name))
+  }, [strainSearch])
 
   const relevantBrands = useMemo(() => {
     const list =
@@ -169,8 +248,8 @@ export function FilterPanel() {
           <div className="flex flex-col items-center gap-2 py-8 text-center">
             <LockIcon className="text-stone-400" />
             <p className="max-w-[220px] text-sm text-stone-500 dark:text-stone-400">
-              Narrow your search to {DETAIL_UNLOCK_THRESHOLD} or fewer dispensaries on the Map tab to
-              unlock strain, brand, THC% &amp; terpene% filters.
+              Check {DETAIL_UNLOCK_THRESHOLD} or fewer dispensaries above to unlock strain, brand, THC%
+              &amp; terpene% filters.
             </p>
             <p className="text-xs text-stone-400">Currently searching {scoped.length} dispensaries.</p>
           </div>
@@ -188,21 +267,26 @@ export function FilterPanel() {
             </div>
 
             <div>
-              <p className="mb-1.5 text-xs text-stone-500 dark:text-stone-400">Strain</p>
+              <p className="mb-1.5 text-xs text-stone-500 dark:text-stone-400">
+                Strain search — by name, effect, or flavor
+              </p>
               <input
                 value={strainSearch}
                 onChange={(e) => setStrainSearch(e.target.value)}
-                placeholder="Search strains…"
+                placeholder="Try “relaxed”, “citrus”, or a strain name…"
                 className="mb-2 w-full rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-sm dark:border-stone-600 dark:bg-stone-800"
               />
-              <div className="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto pr-1">
+              <div className="max-h-56 space-y-1.5 overflow-y-auto pr-1">
                 {visibleStrains.map((s) => (
-                  <Chip key={s.id} active={strainIds.includes(s.id)} onClick={() => toggleStrain(s.id)}>
-                    {s.name}
-                  </Chip>
+                  <StrainResult
+                    key={s.id}
+                    strain={s}
+                    active={strainIds.includes(s.id)}
+                    onToggle={() => toggleStrain(s.id)}
+                  />
                 ))}
                 {visibleStrains.length === 0 && (
-                  <p className="text-xs text-stone-400">No strains match “{strainSearch}”.</p>
+                  <p className="text-xs text-stone-400">No strains match "{strainSearch}".</p>
                 )}
               </div>
             </div>
@@ -240,6 +324,7 @@ export function FilterPanel() {
                 onChange={setTerpeneRange}
                 formatValue={(n) => `${n}%`}
               />
+              <TerpeneGuide />
             </div>
           </div>
         )}

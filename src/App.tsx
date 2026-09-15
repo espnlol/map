@@ -1,4 +1,3 @@
-import { MapPage } from './pages/MapPage'
 import { MenuPage } from './pages/MenuPage'
 import { FavoritesPage } from './pages/FavoritesPage'
 import { ManagePage } from './pages/ManagePage'
@@ -7,7 +6,6 @@ import { HeartIcon, MapPinIcon } from './components/Icons'
 import type { AppTab } from './types'
 
 const TABS: { id: AppTab; label: string }[] = [
-  { id: 'map', label: 'Map' },
   { id: 'menu', label: 'Menu' },
   { id: 'favorites', label: 'Favorites' },
   { id: 'manage', label: 'Manage' },
@@ -60,7 +58,6 @@ export default function App() {
         </nav>
       </header>
       <main>
-        {tab === 'map' && <MapPage />}
         {tab === 'menu' && <MenuPage />}
         {tab === 'favorites' && <FavoritesPage />}
         {tab === 'manage' && <ManagePage />}

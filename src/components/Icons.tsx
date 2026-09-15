@@ -42,15 +42,6 @@ export function XIcon(props: SVGProps<SVGSVGElement>) {
   )
 }
 
-export function CrosshairIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <svg {...base(props)} stroke="currentColor" strokeWidth={1.8}>
-      <circle cx="12" cy="12" r="7" />
-      <path d="M12 2v3M12 19v3M2 12h3M19 12h3" strokeLinecap="round" />
-    </svg>
-  )
-}
-
 export function LockIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base(props)} stroke="currentColor" strokeWidth={1.8}>
@@ -79,18 +70,3 @@ export function StarIcon({ filled, ...props }: SVGProps<SVGSVGElement> & { fille
   )
 }
 
-export function DrawIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <svg {...base(props)} stroke="currentColor" strokeWidth={1.8}>
-      <path d="M4 16 15 5l4 4L8 20H4v-4z" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-export function CircleIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <svg {...base(props)} stroke="currentColor" strokeWidth={1.8}>
-      <circle cx="12" cy="12" r="8" />
-    </svg>
-  )
-}

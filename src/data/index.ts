@@ -1,6 +1,7 @@
 import { dispensaries } from './dispensaries'
 import { brands } from './brands'
 import { strains } from './strains'
+import { terpenes } from './terpenes'
 import { generateProducts } from './generateProducts'
 import type { Brand, Dispensary, Product, Strain } from '../types'
 
@@ -10,7 +11,7 @@ import type { Brand, Dispensary, Product, Strain } from '../types'
 // component, since everything downstream consumes these same exports.
 export const products: Product[] = generateProducts(dispensaries)
 
-export { dispensaries, brands, strains }
+export { dispensaries, brands, strains, terpenes }
 
 export const dispensaryById = new Map<string, Dispensary>(dispensaries.map((d) => [d.id, d]))
 export const brandById = new Map<string, Brand>(brands.map((b) => [b.id, b]))

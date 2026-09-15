@@ -2,17 +2,13 @@ import { useMemo } from 'react'
 import { useAppStore } from '../store/useAppStore'
 import { useAllDispensaries, useAllProducts } from '../store/useCombinedData'
 import { effectiveDispensaryIds, filterProducts, type FilterState } from '../utils/filters'
+import { DispensaryPicker } from '../components/filters/DispensaryPicker'
 import { FilterPanel } from '../components/filters/FilterPanel'
 import { ProductGrid } from '../components/products/ProductGrid'
-import { Card, PrimaryButton } from '../components/ui'
-import { MapPinIcon } from '../components/Icons'
 
 export function MenuPage() {
   const dispensaries = useAllDispensaries()
   const products = useAllProducts()
-  const boundaryConfirmed = useAppStore((s) => s.boundaryConfirmed)
-  const setActiveTab = useAppStore((s) => s.setActiveTab)
-  const boundary = useAppStore((s) => s.boundary)
   const selectedDispensaryIds = useAppStore((s) => s.selectedDispensaryIds)
   const categories = useAppStore((s) => s.categories)
   const accessorySubtypes = useAppStore((s) => s.accessorySubtypes)
@@ -26,8 +22,8 @@ export function MenuPage() {
   const terpeneRange = useAppStore((s) => s.terpeneRange)
 
   const scoped = useMemo(
-    () => effectiveDispensaryIds(dispensaries, boundary, selectedDispensaryIds),
-    [dispensaries, boundary, selectedDispensaryIds],
+    () => effectiveDispensaryIds(dispensaries, selectedDispensaryIds),
+    [dispensaries, selectedDispensaryIds],
   )
 
   const filtered = useMemo(() => {
@@ -66,27 +62,10 @@ export function MenuPage() {
     [dispensaries, scoped],
   )
 
-  if (!boundaryConfirmed) {
-    return (
-      <div className="mx-auto max-w-2xl p-4">
-        <Card className="flex flex-col items-center gap-3 p-10 text-center">
-          <MapPinIcon width={28} height={28} className="text-stone-400" />
-          <h2 className="text-lg font-semibold text-stone-800 dark:text-stone-100">
-            Pick a search area first
-          </h2>
-          <p className="text-sm text-stone-500 dark:text-stone-400">
-            Draw a shape (any polygon), set a radius, or check off dispensaries on the Map tab,
-            then hit Continue there to unlock the menu and filters here.
-          </p>
-          <PrimaryButton onClick={() => setActiveTab('map')}>Go to Map</PrimaryButton>
-        </Card>
-      </div>
-    )
-  }
-
   return (
     <div className="mx-auto flex max-w-[1600px] flex-col gap-4 p-4 lg:flex-row">
-      <div className="w-full lg:w-80 lg:shrink-0">
+      <div className="flex w-full flex-col gap-4 lg:w-80 lg:shrink-0">
+        <DispensaryPicker />
         <FilterPanel />
       </div>
       <div className="min-w-0 flex-1">
@@ -96,29 +75,21 @@ export function MenuPage() {
             across <strong className="text-stone-900 dark:text-stone-50">{scoped.length}</strong>{' '}
             {scoped.length === 1 ? 'dispensary' : 'dispensaries'}
           </span>
-          <div className="flex items-center gap-3">
-            {scoped.length > 0 && scoped.length <= 5 && (
-              <span
-                className="max-w-[280px] truncate text-xs text-stone-400"
-                title={scopedDispensaryNames.join(', ')}
-              >
-                {scopedDispensaryNames.join(' · ')}
-              </span>
-            )}
-            <button
-              onClick={() => setActiveTab('map')}
-              className="whitespace-nowrap text-xs text-leaf-700 underline hover:text-leaf-800 dark:text-leaf-400"
+          {scoped.length > 0 && scoped.length <= 5 && (
+            <span
+              className="max-w-[280px] truncate text-xs text-stone-400"
+              title={scopedDispensaryNames.join(', ')}
             >
-              Edit area
-            </button>
-          </div>
+              {scopedDispensaryNames.join(' · ')}
+            </span>
+          )}
         </div>
         <ProductGrid
           products={filtered}
-          emptyTitle={scoped.length === 0 ? 'No dispensaries in range' : 'No products match your filters'}
+          emptyTitle={scoped.length === 0 ? 'No dispensaries selected' : 'No products match your filters'}
           emptyHint={
             scoped.length === 0
-              ? 'Go to the Map tab and widen your search area or selection.'
+              ? 'Check off a dispensary on the left to see its menu.'
               : 'Try widening the price range or clearing a filter.'
           }
         />

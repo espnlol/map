@@ -19,8 +19,17 @@ Leafly/Weedmaps-style menu browsing rather than an embed of either.
 - **Category-correct sizing:** cartridges offer 0.5g / 1g / 2g; rosin
   offers 0.5g / 1g / 2g / 3g / 4g; other concentrates 0.5g / 1g / 2g;
   flower 1g / 3.5g / 7g / 14g / 28g.
-- **Multi-dispensary search:** select any combination of locations at
-  once; the menu merges their catalogs.
+- **Multi-dispensary search:** check off any combination of locations in
+  the dispensary picker; the menu merges their catalogs.
+- **Strain search** — search strains by name, by effect ("relaxed",
+  "energetic"), or by flavor ("citrus", "berry"), the way a strain
+  explorer like Leafly's works, not just a plain name filter. Each result
+  shows its lineage (indica/sativa/hybrid) and top effects/flavors right
+  in the list. See [Strain search & terpene guide](#strain-search--terpene-guide).
+- **Terpene guide** — a "What do terpenes do & taste like?" dropdown next
+  to the terpene% filter explaining the aroma, commonly-reported effects,
+  and everyday sources (e.g. myrcene → earthy/mango, often linked to
+  relaxation) of the terpenes found across cannabis.
 - **THC% / terpene% range filters**, plus a **price high→low** sort
   (and low→high, THC%, terpene%, name — since a sort dropdown makes the
   reverse direction essentially free).
@@ -31,26 +40,10 @@ Leafly/Weedmaps-style menu browsing rather than an embed of either.
 - **Accessories category** with grinders, lighters, dab rigs, bongs,
   nectar collectors, batteries, rolling papers, pre-rolled cones, and an
   "other" catch-all.
-- **Dispensary map** (Leaflet + OpenStreetMap) with a **distance/radius**
-  setting *and* a **custom-shape draw tool** (polygon/rectangle) so you're
-  not limited to a circle — trace along specific roads or a neighborhood
-  instead. You can draw **more than one shape at once** (e.g. two
-  non-adjacent neighborhoods) — a dispensary in any of them counts —
-  and delete just one shape via the map's edit toolbar without losing
-  the others.
 - **Progressive filter disclosure:** strain, brand, THC%, and terpene%
-  filters stay locked (with an explanation) until you've narrowed your
-  search to 5 or fewer dispensaries, exactly as requested — narrowing
-  can happen either by drawing/radius-filtering the map or by checking
-  dispensaries directly.
-- **Confirm-gated search flow:** the Map tab is the primary flow (Draw —
-  any-shape polygon, not just a circle — is the default tool), and the
-  Menu tab's filters/results stay locked behind a "Continue to menu →"
-  button on the Map tab until you explicitly confirm your area/selection.
-  Any further change to the boundary or dispensary picks re-locks it.
-  Clicking a pin opens a popup with dispensary info and a live 3-item
-  menu preview, with its own "View full menu →" shortcut straight into
-  the (already-confirmed) Menu tab for just that location.
+  filters stay locked (with an explanation) until you've checked 5 or
+  fewer dispensaries in the picker — exactly as requested, so you narrow
+  by location first and only then see the finer-grained controls.
 - **Manage tab — add your own dispensaries and menus.** A real in-app
   form (not a scraper, not fabricated data) lets you add a dispensary —
   pick its exact location by clicking/dragging a pin on a map, plus
@@ -58,21 +51,21 @@ Leafly/Weedmaps-style menu browsing rather than an embed of either.
   it, product by product, using the same category/size/THC%/terpene%
   fields as the demo catalog. Saved to **this browser only**
   (`localStorage`, via the Zustand store — see below), and merged into
-  every other feature automatically: it shows up as a pin on the Map
-  tab, in the dispensary list/search/filters, in the Menu tab once
-  selected, and can be favorited. See
+  every other feature automatically: it shows up in the dispensary
+  picker/search/filters, in the Menu tab once selected, and can be
+  favorited. See
   [Adding your own dispensaries](#adding-your-own-dispensaries-manage-tab)
   below.
 
 ## Stack
 
 React 18 + TypeScript + Vite, Tailwind CSS, Zustand (state +
-`localStorage` persistence for favorites/selection), and Leaflet +
-Leaflet.Draw for the map — no API key required since it renders on
-OpenStreetMap tiles. The app itself is a static SPA; the one exception is
-a single small `/api/menu` serverless function (see below) that the map
-popup fetches from — there's no database or persistent server behind it,
-just this app's own already-bundled demo data served over HTTP too.
+`localStorage` persistence for favorites/selection). The app is a plain
+static SPA — no backend, no serverless functions, nothing to deploy but
+`dist/`. Leaflet is still a dependency, but only for the small
+click-to-place location picker in the Manage tab's "add a dispensary"
+form (see below) — there's no dispensary map or Leaflet.Draw anymore
+(see [Removed: the dispensary map](#removed-the-dispensary-map)).
 
 ## Running it
 
@@ -87,16 +80,12 @@ npm run typecheck
 ## Architecture
 
 ```
-api/
-  menu.ts          # Vercel serverless function: GET /api/menu?dispensaryId=...
-  _menuData.ts      # pure data-shaping logic (no req/res types) — reused, not duplicated
-  _menuHandler.ts   # URL parsing + response writing, shared by menu.ts AND vite.config.ts's
-                     # local dev/preview middleware, so localhost behaves like production
 src/
   types.ts                 # domain types + fixed size/category enums
   data/
     dispensaries.ts        # sample locations (Denver, CO metro)
-    brands.ts / strains.ts # reference data
+    brands.ts / strains.ts # reference data — strains include effects/flavors
+    terpenes.ts             # terpene reference data (aroma/effects/sources)
     generateProducts.ts    # deterministic (seeded) catalog generator
     index.ts                # <- swap this module out for real API calls
   store/
@@ -108,102 +97,71 @@ src/
                                 # so anything added via Manage shows up
                                 # everywhere the demo catalog already does
   utils/
-    geo.ts                  # haversine distance + point-in-polygon
     filters.ts               # scoping/filtering/sorting, the unlock rule
   components/
-    map/DispensaryMap.tsx    # imperative Leaflet wrapper (markers, radius
-                              # circle, draw toolbar) — framework-agnostic
-                              # Leaflet is used directly instead of
-                              # react-leaflet to avoid version churn and to
-                              # get first-class Leaflet.Draw support
-    map/LocationPickerMap.tsx # minimal single-marker click/drag map used by
-                               # the "add a dispensary" form to set coords
-    filters/FilterPanel.tsx  # all filter UI, including the lock/unlock state
+    map/LocationPickerMap.tsx # the only map left — minimal single-marker
+                               # click/drag map used by the "add a
+                               # dispensary" form to set real coordinates
+    filters/
+      DispensaryPicker.tsx    # search + checkbox list — the "which
+                                # locations" scope control (no map)
+      FilterPanel.tsx          # product filters + the gated strain/brand/
+                                # potency card (strain search, terpene guide)
     products/                # ProductCard / ProductGrid
     manage/
       DispensaryForm.tsx      # add/edit a dispensary (incl. LocationPickerMap)
       ProductForm.tsx         # add/edit a menu item, category-aware sizing
   pages/
-    MapPage.tsx               # search-area controls + dispensary picker + map
-    MenuPage.tsx               # filters + results grid
+    MenuPage.tsx               # DispensaryPicker + FilterPanel + results grid
     FavoritesPage.tsx
     ManagePage.tsx             # add/edit your own dispensaries + their menus
 ```
 
-The dispensary "in scope" for the menu is computed as: the map boundary
-(circle or drawn shape) narrows the field first, then explicit checkbox
-picks narrow further within it. Once that scoped count is between 1 and 5,
-`detailFiltersUnlocked()` (in `utils/filters.ts`) flips on the strain/
-brand/THC%/terpene% controls — change `DETAIL_UNLOCK_THRESHOLD` there to
-adjust the cutoff.
+The dispensary "in scope" for the menu is whatever's checked in the
+`DispensaryPicker` list — with nothing checked, every known dispensary is
+in scope. Once that scoped count is between 1 and
+`DETAIL_UNLOCK_THRESHOLD` (5), `detailFiltersUnlocked()` (in
+`utils/filters.ts`) flips on the strain/brand/THC%/terpene% controls in
+`FilterPanel`. `activeTab` lives in the Zustand store (not component
+state), and the whole Menu tab is always live — there's no separate
+"confirm your search" gate to click through first.
 
-`boundaryConfirmed` (in the Zustand store) is the separate gate behind the
-Menu tab itself: `confirmSelection()` sets it, and any action that changes
-scope (`setBoundary`, `toggleDispensary`, `setSelectedDispensaries`,
-`clearDispensarySelection`) resets it — so the only way to see menus is to
-explicitly hit Continue after picking an area, and any further edit
-re-locks it. `activeTab` also lives in the store (not component state) so
-that a map popup's "View full menu" button can set a single-dispensary
-selection, confirm it, and switch tabs all in one action.
+## Removed: the dispensary map
 
-Two bugs worth knowing about if you touch `DispensaryMap.tsx` again:
-- Dispensary **selection is sidebar-checkbox-only, never a marker click**.
-  A marker click that also mutated `selectedIds` would change this
-  component's own effect dependencies, tearing down and rebuilding every
-  marker (including the one whose popup was mid-open) from the very click
-  that opened it — killing the popup before it rendered. Caught via an
-  actual Playwright click test, not by inspection.
-- `leaflet-draw`'s polygon/rectangle `showArea` live-measurement tooltip
-  throws (`ReferenceError: type is not defined` inside its own bundled
-  `GeometryUtil.readableArea`) on every mouse-move while drawing — a
-  bug in the library, not this code. It's turned off here; the shape
-  still draws and finalizes fine either way, just without a running
-  area readout.
+Earlier versions of this app had a **Map** tab (Leaflet + OpenStreetMap
+pins, a radius/circle search, and a custom polygon/rectangle draw tool
+for "not just a circle" area search). That's been removed entirely, along
+with the `/api/menu` serverless endpoint that existed solely to feed its
+popup. Multi-location search still works exactly as before — it's a
+checkbox list (`DispensaryPicker`) instead of pins on a map — but
+"search a geographic area" and "sort/filter by distance" are gone with
+it; there's currently no replacement for those two specifically. The
+Manage tab's "add a dispensary" form still shows a small map
+(`LocationPickerMap.tsx`) purely to let you click/drag a pin to set a new
+dispensary's real coordinates — that's unrelated to the removed feature.
 
-## The /api/menu endpoint
+## Strain search & terpene guide
 
-The map popup's menu section is fetched from a real JSON endpoint rather
-than read out of an in-memory prop:
+Both are **general reference info, not live or per-product lab data**,
+and neither is pulled from Leafly or any other commercial platform —
+"using Leafly's system" here means the search *pattern* (search by name,
+effect, or flavor; see tagged results) rather than any of Leafly's actual
+data or code.
 
-```
-GET /api/menu?dispensaryId=<id>
-200 -> { dispensaryId, dispensaryName, totalCount, items: [{ id, name, category, brand, strain, thcPercent, terpenePercent, sizes }] }
-400 -> { error } — missing dispensaryId
-404 -> { error } — no dispensary with that id
-```
-
-Clicking a pin binds a "Loading menu…" popup immediately, then fetches
-this endpoint and swaps in the real content (a 3-item price preview + a
-real total item count) once it resolves, or an error state if the fetch
-fails — including an abort guard (`popupclose` listener) so closing the
-popup mid-fetch doesn't try to update content nobody's looking at
-anymore.
-
-This is a **real, working HTTP endpoint**, not a simulated delay over
-data that was already in memory — open your browser's network tab while
-clicking a pin and you'll see the actual request. What it serves,
-though, is still this app's own synthetic demo catalog
-(`src/data/generateProducts.ts`), just now reachable over HTTP as well
-as by direct import — it does not change anything about what data is
-real vs. synthetic (see the callout at the top of this file).
-
-**Why a real endpoint at all**, given the app already had this data in
-memory: because "click a marker, fetch its menu from a JSON endpoint"
-is a real, common architecture (this is exactly how you'd wire up a
-genuine backend later — swap what's inside `api/_menuData.ts` for a
-real database/POS call and nothing on the client needs to change), and
-because it needed to actually be demonstrated working, not just
-described.
-
-**Why it works identically in `npm run dev`/`npm run preview` and on a
-real Vercel deploy**: Vercel auto-deploys any `api/*.ts` file as its own
-serverless function with zero config — reachable at `/api/menu` once
-deployed, no `vercel.json` needed. Locally, there's no Vercel runtime to
-do that, so `vite.config.ts` registers a small dev-server middleware
-that serves the exact same route by calling the exact same
-`api/_menuHandler.ts` code Vercel's function calls — one implementation,
-two ways of running it, rather than a second copy that could drift out
-of sync with the real one.
+- **Strain effects/flavors** (`src/data/strains.ts`) are the
+  commonly-reported characteristics for each real strain genetic — the
+  kind of thing you'd see on a seed bank listing or dispensary placard —
+  not a lab assay of any specific product on the menu. `Product.strainId`
+  links a menu item to one of these; the strain's own effects/flavors are
+  what the search matches against and what a result tag shows.
+- **The terpene guide** (`src/data/terpenes.ts`) is general, widely-known
+  aromatic-chemistry background (aroma, commonly-reported effects, other
+  foods/plants that share the compound) for the terpenes most often
+  discussed in cannabis. Products only carry a single overall
+  `terpenePercent` number, not a breakdown by compound, so the guide is
+  shown as a dropdown next to the terpene% filter rather than attached to
+  individual products — there's no per-product terpene-type data in this
+  app to attach it to.
 
 ## Adding your own dispensaries (Manage tab)
 
@@ -226,19 +184,12 @@ script or public dataset to cover it.
   won't sync across devices or be visible to anyone else, and clearing
   your browser's site data clears it too.
 - **Fully merged, not a separate silo.** Everything added here flows
-  through `useCombinedData.ts`, so it appears as a real pin on the Map
-  tab, in the dispensary list/search/sort, counts toward the
-  progressive-filter unlock, is selectable/favoritable, and shows up in
-  the Menu tab's filters and results exactly like the built-in catalog.
-  Adding a product priced outside the current price-filter range
-  automatically widens that filter so it isn't silently hidden.
-- **Map popups render it instantly, with no network request** — a
-  serverless function can't see your browser's `localStorage`, so a
-  Manage-added dispensary's popup is built straight from local state
-  instead of calling `/api/menu` (which only knows the built-in
-  catalog). Built-in/imported dispensaries still fetch `/api/menu` as
-  described above; this is purely a "which data source" branch, not a
-  different feature.
+  through `useCombinedData.ts`, so it appears in the dispensary
+  picker/search/sort, counts toward the progressive-filter unlock, is
+  selectable/favoritable, and shows up in the Menu tab's filters and
+  results exactly like the built-in catalog. Adding a product priced
+  outside the current price-filter range automatically widens that
+  filter so it isn't silently hidden.
 
 This is the honest way to add real data without scraping: you're
 typing in what you actually know, not this app inventing it or pulling
@@ -246,7 +197,10 @@ it from a site that prohibits automated access.
 
 ## Bringing in a different region (e.g. statewide data)
 
-The map now frames itself around whatever's actually in `src/data/dispensaries.ts` (via Leaflet `fitBounds`) instead of being hardcoded to Denver — importing a different city, or an entire state's worth of locations, is immediately visible without editing any map code.
+The dispensary picker and every filter just read whatever's in
+`src/data/dispensaries.ts` — importing a different city, or an entire
+state's worth of locations, is immediately visible without editing any
+component code.
 
 For Florida specifically: it's a medical-only market (Medical Marijuana Treatment Centers, regulated by the state's Office of Medical Marijuana Use), not the walk-in recreational retail model OSM contributors have mapped heavily in states like Colorado, so `shop=cannabis` coverage there may be sparse — a 0/low-result run reflects OSM mapping gaps, not reality. The state's own public MMTC locator (knowthefactsmmj.com / mmuregistry.flhealth.gov) is the authoritative source; there's no importer for it here yet since its actual data format hasn't been inspected (this repo's sandbox can't fetch external sites — see the egress notes below) — happy to build one against a real sample of its output.
 
@@ -259,11 +213,11 @@ script you run **on your own machine** (this repo may have been assembled
 in a sandbox with no general internet access, so it can't be run from
 there) to replace the demo dispensaries with real ones from
 [OpenStreetMap](https://www.openstreetmap.org) — the same free, keyless,
-open (ODbL-licensed) map data this app's map already renders on. There's
-no public API for pulling real Google Maps/Apple Maps/Leafly/Weedmaps
-listings without a paid developer key (Google/Apple) or violating a
-site's terms of service (Leafly/Weedmaps explicitly prohibit scraping),
-so OSM is the legitimate free option.
+open (ODbL-licensed) map data the Manage tab's location picker renders
+on. There's no public API for pulling real Google Maps/Apple
+Maps/Leafly/Weedmaps listings without a paid developer key (Google/Apple)
+or violating a site's terms of service (Leafly/Weedmaps explicitly
+prohibit scraping), so OSM is the legitimate free option.
 
 ```bash
 npm run import:osm -- "Denver, CO"
@@ -282,7 +236,7 @@ reverts it). A few things it deliberately does **not** do:
   (`src/data/generateProducts.ts`) is still 100% synthetic no matter which
   dispensary it's attached to — real business name or not, don't present
   its prices/THC%/strains/stock as anyone's actual live inventory. The app
-  flags any OpenStreetMap-sourced listing in the Map tab's sidebar as a
+  flags any OpenStreetMap-sourced listing in the dispensary picker as a
   "real location — sample menu" for exactly this reason.
 - **It does not invent a star rating.** OpenStreetMap has no rating field,
   so `rating` is simply left unset for imported listings instead of made
@@ -308,40 +262,30 @@ To move this from demo to production you'd primarily touch
   generator. The `Product`/`Dispensary`/`Brand`/`Strain` shapes in
   `types.ts` are designed to be an adapter target for that.
 - **Live sync** would need a real backend with a database (inventory
-  changes constantly); `api/menu.ts` is a real serverless function, but
-  it has no database behind it — it just re-serves the same static demo
-  catalog every request. Swapping its body for a real POS/database call
-  is the actual next step; the client side doesn't need to change.
-- **Nicer map tiles** — swap the OpenStreetMap tile layer in
-  `DispensaryMap.tsx` for Mapbox/MapTiler/Google if you have an API key;
-  the rest of the map logic (markers, radius, draw tool) is
-  provider-agnostic.
-- **True "along roads" boundaries** — right now "not just a circle"
-  is solved with a freehand polygon/rectangle draw tool (trace along the
-  roads shown on the basemap yourself). A drive-time/isochrone boundary
-  (e.g. via OpenRouteService or Mapbox Isochrone APIs) would need an API
-  key this environment doesn't have; `BoundaryShape` in `types.ts` already
-  models an arbitrary polygon, so an isochrone response could be dropped
-  in as another boundary source with no changes to the filtering logic.
+  changes constantly) — there's no server component in this app at all
+  right now to build that into; it'd be a new piece.
+- **Real strain effects/flavors and terpene data** — `src/data/strains.ts`
+  and `src/data/terpenes.ts` are general reference info written by hand,
+  not sourced from a licensed database; a production app would want a
+  proper data source (or a licensing deal) for anything presented as
+  authoritative.
 - **Compliance** — a real cannabis-menu app needs state licensing checks,
   an age gate (21+/medical card), and per-state product/potency
   regulations, none of which are in scope for this demo.
 
 ## Deploying
 
-Zero config needed — `npm run build` outputs `dist/`, and `api/menu.ts`
-deploys automatically as a serverless function on Vercel. On
-[Vercel](https://vercel.com): New Project → import this repo → framework
-auto-detects as Vite (build `npm run build`, output `dist`) → Deploy. No
-environment variables or database to provision. (Netlify/Cloudflare
-Pages/GitHub Pages would host the static `dist/` output the same way,
-but you'd need each platform's own equivalent of a serverless function
-for `/api/menu` — Vercel is the path with nothing extra to configure.)
+This is a 100% static site now — `npm run build` outputs `dist/`, and
+that's the entire deployable artifact. No serverless functions, no
+database, no environment variables to provision. Any static host works:
+[Vercel](https://vercel.com), Netlify, Cloudflare Pages, GitHub Pages —
+import the repo, build command `npm run build`, output directory `dist`.
 
 ## Known dev-only advisory
 
-`npm audit` flags a moderate advisory in `esbuild` (via `vite`'s dev
-server only — it lets a malicious page make requests to the local dev
-server while `npm run dev` is running). It doesn't affect `npm run build`
-output. Fixing it requires a Vite 8 major upgrade; left as-is here to
-avoid an unvetted breaking change, but worth doing before real-world use.
+`npm audit` flags advisories in `esbuild`/`vite` (dev server only — they
+let a malicious page make requests to, or reach paths outside, the local
+dev server while `npm run dev` is running). They don't affect `npm run
+build` output. Fixing them requires a Vite 8 major upgrade; left as-is
+here to avoid an unvetted breaking change, but worth doing before
+real-world use.

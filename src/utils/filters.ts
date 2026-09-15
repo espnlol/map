@@ -1,6 +1,5 @@
 import type {
   AccessorySubtype,
-  BoundaryShape,
   Dispensary,
   Product,
   ProductCategory,
@@ -8,7 +7,6 @@ import type {
   StrainLineage,
 } from '../types'
 import { strainById } from '../data'
-import { isWithinBoundary } from './geo'
 
 /** How many dispensaries the user must be narrowed down to before the
  * strain / brand / THC% / terpene% "detail" filters unlock. */
@@ -31,27 +29,17 @@ export interface FilterState {
   terpeneRange: [number, number]
 }
 
-/** Dispensaries currently within the drawn map boundary (or all, if none set). */
-export function dispensariesInBoundary(
-  dispensaries: Dispensary[],
-  boundary: BoundaryShape,
-): Dispensary[] {
-  if (!boundary) return dispensaries
-  return dispensaries.filter((d) => isWithinBoundary(d.coords, boundary))
-}
-
-/** The dispensary set actually "in scope" for product search: the map
- * boundary narrows the field first, then explicit checkbox picks narrow
- * further within it. With no picks, everything inside the boundary is used. */
+/** The dispensary set actually "in scope" for product search: explicit
+ * checkbox picks in the dispensary list narrow the field; with nothing
+ * checked, every known dispensary is in scope. Filters out any stale id
+ * (e.g. a since-deleted Manage-added dispensary) against the real list. */
 export function effectiveDispensaryIds(
   dispensaries: Dispensary[],
-  boundary: BoundaryShape,
   selectedDispensaryIds: string[],
 ): string[] {
-  const visible = dispensariesInBoundary(dispensaries, boundary)
-  if (selectedDispensaryIds.length === 0) return visible.map((d) => d.id)
-  const visibleSet = new Set(visible.map((d) => d.id))
-  return selectedDispensaryIds.filter((id) => visibleSet.has(id))
+  if (selectedDispensaryIds.length === 0) return dispensaries.map((d) => d.id)
+  const knownSet = new Set(dispensaries.map((d) => d.id))
+  return selectedDispensaryIds.filter((id) => knownSet.has(id))
 }
 
 /** Whether the strain/brand/THC%/terpene% detail filters should be unlocked. */

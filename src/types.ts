@@ -79,6 +79,18 @@ export const LINEAGE_LABEL: Record<StrainLineage, string> = {
   hybrid: 'Hybrid',
 }
 
+/** A cannabis aroma compound. This is general, widely-published botanical/
+ * chemistry reference info (what each terpene smells/tastes like and what
+ * it's commonly reported to do) — not per-product lab data, and not
+ * sourced from any single commercial platform. See src/data/terpenes.ts. */
+export interface Terpene {
+  id: string
+  name: string
+  aroma: string[]
+  effects: string[]
+  alsoFoundIn: string[]
+}
+
 export interface Coordinates {
   lat: number
   lng: number
@@ -121,6 +133,12 @@ export interface Strain {
   id: string
   name: string
   lineage: StrainLineage
+  /** Commonly-reported effects/flavors for this genetic (general strain
+   * knowledge shared across the industry — like a seed bank or dispensary
+   * placard would list — not lab results for any specific batch). Powers
+   * the strain searcher's "search by effect/flavor" and its result tags. */
+  effects: string[]
+  flavors: string[]
 }
 
 export interface SizeOption {
@@ -148,7 +166,7 @@ export interface Product {
   description: string
 }
 
-export type AppTab = 'map' | 'menu' | 'favorites' | 'manage'
+export type AppTab = 'menu' | 'favorites' | 'manage'
 
 export type SortOption =
   | 'price-desc'
@@ -164,12 +182,3 @@ export const SORT_OPTIONS: { id: SortOption; label: string }[] = [
   { id: 'terpene-desc', label: 'Terpene %: High to Low' },
   { id: 'name-asc', label: 'Name: A to Z' },
 ]
-
-/** A custom search-area boundary the user has drawn on the map. A
- * dispensary is in scope if it falls inside ANY one of `polygons` — you
- * can draw as many separate shapes as you like (e.g. two neighborhoods
- * that aren't adjacent) and they all count. */
-export type BoundaryShape =
-  | { kind: 'circle'; center: Coordinates; radiusMiles: number }
-  | { kind: 'polygon'; polygons: Coordinates[][] }
-  | null

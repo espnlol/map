@@ -1,11 +1,10 @@
 import type { Dispensary } from '../types'
 
 // Sample/demo dispensary listings scattered around the Denver, CO metro area
-// (chosen because recreational cannabis is state-legal there, which keeps the
-// map + distance/boundary tooling meaningful). Names, addresses, phone and
-// license numbers are fictional placeholders for this demo dataset — wire a
-// real POS/menu provider (Dutchie, Jane, Treez, Blaze, etc.) up to
-// `src/data/index.ts` to replace them with live listings.
+// (chosen because recreational cannabis is state-legal there). Names,
+// addresses, phone and license numbers are fictional placeholders for this
+// demo dataset — wire a real POS/menu provider (Dutchie, Jane, Treez,
+// Blaze, etc.) up to `src/data/index.ts` to replace them with live listings.
 export const dispensaries: Dispensary[] = [
   {
     id: 'disp-mile-high-greenhouse',
