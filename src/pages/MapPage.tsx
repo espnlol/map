@@ -56,7 +56,7 @@ export function MapPage() {
       if (dispSort === 'distance' && referencePoint) {
         return distanceMiles(referencePoint, a.coords) - distanceMiles(referencePoint, b.coords)
       }
-      if (dispSort === 'rating') return b.rating - a.rating
+      if (dispSort === 'rating') return (b.rating ?? -1) - (a.rating ?? -1)
       return a.name.localeCompare(b.name)
     })
   }, [search, referencePoint, dispSort])
@@ -272,13 +272,20 @@ export function MapPage() {
                         {d.address}, {d.city}
                       </span>
                       <span className="mt-0.5 flex items-center gap-2 text-xs text-stone-500 dark:text-stone-400">
-                        <span className="flex items-center gap-0.5">
-                          <StarIcon filled width={11} height={11} className="text-amber-500" />
-                          {d.rating.toFixed(1)}
-                        </span>
+                        {d.rating !== undefined && (
+                          <span className="flex items-center gap-0.5">
+                            <StarIcon filled width={11} height={11} className="text-amber-500" />
+                            {d.rating.toFixed(1)}
+                          </span>
+                        )}
                         {dist !== null && <span>{formatDistance(dist)}</span>}
                         {!visible && <span className="italic">outside area</span>}
                       </span>
+                      {d.source === 'openstreetmap' && (
+                        <span className="mt-0.5 block text-[10px] italic text-amber-600 dark:text-amber-400">
+                          Real location (OSM) — sample menu, not live inventory
+                        </span>
+                      )}
                     </span>
                   </label>
                 </li>

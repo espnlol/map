@@ -93,6 +93,49 @@ picks narrow further within it. Once that scoped count is between 1 and 5,
 brand/THC%/terpene% controls — change `DETAIL_UNLOCK_THRESHOLD` there to
 adjust the cutoff.
 
+## Importing real dispensary listings
+
+`scripts/import-osm-dispensaries.mjs` is a standalone, dependency-free Node
+script you run **on your own machine** (this repo may have been assembled
+in a sandbox with no general internet access, so it can't be run from
+there) to replace the demo dispensaries with real ones from
+[OpenStreetMap](https://www.openstreetmap.org) — the same free, keyless,
+open (ODbL-licensed) map data this app's map already renders on. There's
+no public API for pulling real Google Maps/Apple Maps/Leafly/Weedmaps
+listings without a paid developer key (Google/Apple) or violating a
+site's terms of service (Leafly/Weedmaps explicitly prohibit scraping),
+so OSM is the legitimate free option.
+
+```bash
+npm run import:osm -- "Denver, CO"
+# or an explicit bounding box:
+npm run import:osm -- --bbox 39.55,-105.3,39.9,-104.6
+# options: --limit N (default 40), --out path, --overpass-url <mirror>
+```
+
+This overwrites `src/data/dispensaries.ts` with real names, addresses, and
+coordinates (git-tracked, so `git checkout -- src/data/dispensaries.ts`
+reverts it). A few things it deliberately does **not** do:
+
+- **It does not invent a menu.** The product catalog
+  (`src/data/generateProducts.ts`) is still 100% synthetic no matter which
+  dispensary it's attached to — real business name or not, don't present
+  its prices/THC%/strains/stock as anyone's actual live inventory. The app
+  flags any OpenStreetMap-sourced listing in the Map tab's sidebar as a
+  "real location — sample menu" for exactly this reason.
+- **It does not invent a star rating.** OpenStreetMap has no rating field,
+  so `rating` is simply left unset for imported listings instead of made
+  up — the UI hides the star display when it's absent.
+- **Coverage depends on volunteer OSM mapping.** A 0-result run means
+  nothing is tagged `shop=cannabis` in that area on OSM yet, not that
+  there are no real dispensaries there.
+
+The element→`Dispensary` mapping logic (`toDispensary`,
+`elementsToDispensaries`) is exported and was verified against fixture
+Overpass responses (missing tags, missing name, missing coordinates,
+duplicate elements) without needing live network access — see them for the
+exact fallback behavior before trusting the output.
+
 ## Wiring up real data
 
 To move this from demo to production you'd primarily touch
