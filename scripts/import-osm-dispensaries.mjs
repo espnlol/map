@@ -16,6 +16,7 @@
  * Usage:
  *   node scripts/import-osm-dispensaries.mjs "Denver, CO"
  *   node scripts/import-osm-dispensaries.mjs --bbox 39.55,-105.3,39.9,-104.6
+ *   node scripts/import-osm-dispensaries.mjs --near 26.6771,-80.0370 --radius 10000
  *   node scripts/import-osm-dispensaries.mjs "Portland, OR" --limit 25 --out src/data/dispensaries.ts
  *
  * IMPORTANT — what this does and doesn't get you:
@@ -26,6 +27,9 @@
  *     Don't present them as any of these businesses' actual live menu.
  *   - No star rating is invented — OpenStreetMap doesn't have one, so
  *     `rating` is simply left out rather than faked.
+ *   - A `shop=cannabis` entry with no `name` tag is DROPPED, not given a
+ *     placeholder like "Licensed Retail Location" — a made-up name is
+ *     worse than no listing at all.
  *   - Coverage depends on volunteer OSM mapping in your area; a 0-result
  *     run doesn't necessarily mean there are no dispensaries there.
  */
@@ -42,6 +46,8 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === '--bbox') args.bbox = argv[++i]
+    else if (a === '--near') args.near = argv[++i]
+    else if (a === '--radius') args.radius = Number(argv[++i])
     else if (a === '--limit') args.limit = Number(argv[++i])
     else if (a === '--out') args.out = argv[++i]
     else if (a === '--overpass-url') args.overpassUrl = argv[++i]
@@ -57,25 +63,45 @@ async function geocodePlace(place) {
   const results = await res.json()
   if (!results.length) throw new Error(`Could not find a location for "${place}".`)
   const [south, north, west, east] = results[0].boundingbox.map(Number)
-  return { south, west, north, east, label: results[0].display_name }
+  return { kind: 'bbox', south, west, north, east, label: results[0].display_name }
 }
 
-function parseBboxArg(bbox) {
+export function parseBboxArg(bbox) {
   const parts = bbox.split(',').map(Number)
   if (parts.length !== 4 || parts.some(Number.isNaN)) {
     throw new Error('--bbox must be "south,west,north,east" (four comma-separated numbers)')
   }
   const [south, west, north, east] = parts
-  return { south, west, north, east, label: `bbox(${bbox})` }
+  return { kind: 'bbox', south, west, north, east, label: `bbox(${bbox})` }
 }
 
-async function queryOverpass(overpassUrl, { south, west, north, east }) {
+/** `--near lat,lng` (paired with `--radius <meters>`, default 10000 = 10km) —
+ * a plain "search around this point" mode, using Overpass's `around:`
+ * filter instead of a bounding box. */
+export function parseNearArg(near, radiusMeters) {
+  const parts = near.split(',').map(Number)
+  if (parts.length !== 2 || parts.some(Number.isNaN)) {
+    throw new Error('--near must be "lat,lng" (two comma-separated numbers)')
+  }
+  const [lat, lng] = parts
+  const radius = radiusMeters || 10000
+  return { kind: 'point', lat, lng, radiusMeters: radius, label: `${radius}m around (${lat}, ${lng})` }
+}
+
+export function overpassFilter(area) {
+  return area.kind === 'point'
+    ? `(around:${area.radiusMeters},${area.lat},${area.lng})`
+    : `(${area.south},${area.west},${area.north},${area.east})`
+}
+
+async function queryOverpass(overpassUrl, area) {
+  const filter = overpassFilter(area)
   const query = `
     [out:json][timeout:60];
     (
-      node["shop"="cannabis"](${south},${west},${north},${east});
-      way["shop"="cannabis"](${south},${west},${north},${east});
-      relation["shop"="cannabis"](${south},${west},${north},${east});
+      node["shop"="cannabis"]${filter};
+      way["shop"="cannabis"]${filter};
+      relation["shop"="cannabis"]${filter};
     );
     out center tags;
   `.trim()
@@ -137,6 +163,11 @@ export function toDispensary(el) {
     phone: tags.phone || tags['contact:phone'] || 'Not listed on OpenStreetMap',
     licenseNumber: 'Not available via OpenStreetMap — check your state licensing board',
     source: 'openstreetmap',
+    // Optional and omitted entirely when absent, same reasoning as `rating`:
+    // no OSM tag for it means no value, not a guess.
+    ...(tags.website || tags['contact:website']
+      ? { website: tags.website || tags['contact:website'] }
+      : {}),
   }
 }
 
@@ -169,14 +200,19 @@ export const dispensaries: Dispensary[] = ${JSON.stringify(dispensaries, null, 2
 async function main() {
   const args = parseArgs(process.argv.slice(2))
   const place = args._.join(' ').trim()
-  if (!place && !args.bbox) {
+  if (!place && !args.bbox && !args.near) {
     console.error('Usage: node scripts/import-osm-dispensaries.mjs "<City, ST>" [--limit N] [--out path]')
     console.error('   or: node scripts/import-osm-dispensaries.mjs --bbox south,west,north,east')
+    console.error('   or: node scripts/import-osm-dispensaries.mjs --near lat,lng [--radius meters]')
     process.exitCode = 1
     return
   }
 
-  const area = args.bbox ? parseBboxArg(args.bbox) : await geocodePlace(place)
+  const area = args.near
+    ? parseNearArg(args.near, args.radius)
+    : args.bbox
+      ? parseBboxArg(args.bbox)
+      : await geocodePlace(place)
   console.log(`Searching OpenStreetMap for cannabis dispensaries in: ${area.label}`)
 
   const elements = await queryOverpass(args.overpassUrl || DEFAULT_OVERPASS_URL, area)

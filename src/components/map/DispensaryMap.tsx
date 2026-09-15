@@ -71,6 +71,12 @@ function buildPopupHtml(
   if (dist !== null) meta.push(`${dist.toFixed(1)} mi`)
   if (meta.length) parts.push(`<span style="font-size:12px;color:#57534e">${meta.join(' · ')}</span><br/>`)
 
+  if (d.website) {
+    parts.push(
+      `<a href="${escapeHtml(d.website)}" target="_blank" rel="noopener noreferrer" style="font-size:12px;color:#29774e">Visit website ↗</a><br/>`,
+    )
+  }
+
   if (d.source === 'openstreetmap') {
     parts.push(
       `<span style="font-size:11px;font-style:italic;color:#b45309">Real location — sample menu, not live inventory</span><br/>`,

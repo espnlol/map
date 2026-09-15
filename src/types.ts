@@ -98,6 +98,9 @@ export interface Dispensary {
   /** Not every data source has a real rating (e.g. OpenStreetMap doesn't) —
    * left undefined rather than fabricated when unknown. */
   rating?: number
+  /** Only set when the source actually has one (e.g. an OSM website/
+   * contact:website tag) — omitted rather than guessed. */
+  website?: string
   /** Where this listing came from. Undefined/'demo' = the built-in sample
    * catalog. 'openstreetmap' = imported via scripts/import-osm-dispensaries.mjs,
    * meaning the name/address/location are real but the product catalog

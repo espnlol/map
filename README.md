@@ -141,6 +141,8 @@ so OSM is the legitimate free option.
 npm run import:osm -- "Denver, CO"
 # or an explicit bounding box:
 npm run import:osm -- --bbox 39.55,-105.3,39.9,-104.6
+# or a point + radius (meters, default 10000 = 10km):
+npm run import:osm -- --near 26.6771,-80.0370 --radius 10000
 # options: --limit N (default 40), --out path, --overpass-url <mirror>
 ```
 
