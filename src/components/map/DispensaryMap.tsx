@@ -29,12 +29,16 @@ function pinIcon(selected: boolean, dimmed: boolean): L.DivIcon {
   })
 }
 
+export interface MenuPreviewItem {
+  name: string
+  priceLabel: string
+}
+
 export interface DispensaryMapProps {
   dispensaries: Dispensary[]
   /** dispensaries currently allowed by the drawn boundary (or all, if none) */
   visibleIds: Set<string>
   selectedIds: Set<string>
-  onToggleDispensary: (id: string) => void
   boundary: BoundaryShape
   onBoundaryChange: (b: BoundaryShape) => void
   /** point used to show "x mi away" tooltips, if any */
@@ -44,19 +48,73 @@ export interface DispensaryMapProps {
   onPickCenter: (c: Coordinates) => void
   /** which draw tools (if any) are active on the toolbar */
   drawMode: 'none' | 'shape'
+  /** a few sample menu items per dispensary, shown in its map popup */
+  previews: Map<string, MenuPreviewItem[]>
+  /** "View full menu" was clicked in a dispensary's popup */
+  onViewMenu: (id: string) => void
+}
+
+function buildPopupHtml(
+  d: Dispensary,
+  visible: boolean,
+  dist: number | null,
+  preview: MenuPreviewItem[],
+): string {
+  const parts: string[] = [`<div style="min-width:200px;max-width:240px">`]
+  parts.push(`<strong>${escapeHtml(d.name)}</strong><br/>`)
+  parts.push(
+    `<span style="color:#78716c;font-size:12px">${escapeHtml(d.address)}, ${escapeHtml(d.city)}</span><br/>`,
+  )
+
+  const meta: string[] = []
+  if (d.rating !== undefined) meta.push(`★ ${d.rating.toFixed(1)}`)
+  if (dist !== null) meta.push(`${dist.toFixed(1)} mi`)
+  if (meta.length) parts.push(`<span style="font-size:12px;color:#57534e">${meta.join(' · ')}</span><br/>`)
+
+  if (d.source === 'openstreetmap') {
+    parts.push(
+      `<span style="font-size:11px;font-style:italic;color:#b45309">Real location — sample menu, not live inventory</span><br/>`,
+    )
+  }
+
+  if (!visible) {
+    parts.push(`<span style="font-size:12px;font-style:italic;color:#a8a29e">Outside current search area</span>`)
+  } else {
+    if (preview.length > 0) {
+      parts.push(
+        `<div style="margin-top:6px;padding-top:6px;border-top:1px solid #e7e5e4;font-size:12px">`,
+      )
+      for (const item of preview) {
+        parts.push(
+          `<div style="display:flex;justify-content:space-between;gap:10px">` +
+            `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(item.name)}</span>` +
+            `<span style="white-space:nowrap;font-weight:600">${escapeHtml(item.priceLabel)}</span>` +
+            `</div>`,
+        )
+      }
+      parts.push(`</div>`)
+    }
+    parts.push(
+      `<button type="button" class="leafmap-view-menu-btn" style="margin-top:8px;width:100%;padding:6px 8px;border:none;border-radius:8px;background:#29774e;color:white;font-size:12px;font-weight:600;cursor:pointer">View full menu →</button>`,
+    )
+  }
+
+  parts.push(`</div>`)
+  return parts.join('')
 }
 
 export function DispensaryMap({
   dispensaries,
   visibleIds,
   selectedIds,
-  onToggleDispensary,
   boundary,
   onBoundaryChange,
   referencePoint,
   pickingCenter,
   onPickCenter,
   drawMode,
+  previews,
+  onViewMenu,
 }: DispensaryMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<L.Map | null>(null)
@@ -67,14 +125,14 @@ export function DispensaryMap({
 
   // refs mirror the latest callback props so the one-time map-init effect
   // never closes over stale versions of them
-  const onToggleDispensaryRef = useRef(onToggleDispensary)
   const onBoundaryChangeRef = useRef(onBoundaryChange)
   const onPickCenterRef = useRef(onPickCenter)
+  const onViewMenuRef = useRef(onViewMenu)
   const pickingCenterRef = useRef(pickingCenter)
   useEffect(() => {
-    onToggleDispensaryRef.current = onToggleDispensary
     onBoundaryChangeRef.current = onBoundaryChange
     onPickCenterRef.current = onPickCenter
+    onViewMenuRef.current = onViewMenu
     pickingCenterRef.current = pickingCenter
   })
 
@@ -102,10 +160,16 @@ export function DispensaryMap({
       draw: {
         polygon: {
           allowIntersection: false,
-          showArea: true,
+          // showArea's live tooltip hits a long-standing leaflet-draw bug
+          // (its bundled GeometryUtil.readableArea references an
+          // out-of-scope `type` and throws) — confirmed via a Playwright
+          // draw test that still finished the polygon, but spammed
+          // ReferenceErrors on every mouse move while drawing. Not worth
+          // the area readout; leave it off.
+          showArea: false,
           shapeOptions: { color: '#29774e', fillOpacity: 0.12 },
         },
-        rectangle: { shapeOptions: { color: '#29774e', fillOpacity: 0.12 } },
+        rectangle: { showArea: false, shapeOptions: { color: '#29774e', fillOpacity: 0.12 } },
         circle: false,
         circlemarker: false,
         marker: false,
@@ -187,12 +251,22 @@ export function DispensaryMap({
       const tooltipParts = [escapeHtml(d.name)]
       if (dist !== null) tooltipParts.push(`${dist.toFixed(1)} mi`)
       marker.bindTooltip(tooltipParts.join(' · '), { direction: 'top', offset: [0, -6] })
-      if (visible) {
-        marker.on('click', () => onToggleDispensaryRef.current(d.id))
-      }
+
+      // Clicking a pin only opens its info/menu-preview popup — it must NOT
+      // also mutate selection state. Selection changes make this effect's
+      // dependencies change, which clears and rebuilds every marker; doing
+      // that from the same click that's opening this exact marker's popup
+      // destroys the popup before/while it opens (a real bug, caught via a
+      // Playwright click test, not just a hover-tooltip check). Dispensary
+      // selection is a sidebar-checkbox-only action for that reason.
+      marker.bindPopup(buildPopupHtml(d, visible, dist, previews.get(d.id) ?? []), { maxWidth: 260 })
+      marker.on('popupopen', () => {
+        const btn = marker.getPopup()?.getElement()?.querySelector('.leafmap-view-menu-btn')
+        btn?.addEventListener('click', () => onViewMenuRef.current(d.id), { once: true })
+      })
       marker.addTo(layer)
     }
-  }, [dispensaries, selectedIds, visibleIds, referencePoint])
+  }, [dispensaries, selectedIds, visibleIds, referencePoint, previews])
 
   // --- sync circle overlay (radius boundary) ---
   useEffect(() => {

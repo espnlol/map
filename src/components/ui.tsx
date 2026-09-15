@@ -64,17 +64,20 @@ export function PrimaryButton({
   onClick,
   className = '',
   type = 'button',
+  disabled = false,
 }: {
   children: ReactNode
   onClick?: () => void
   className?: string
   type?: 'button' | 'submit'
+  disabled?: boolean
 }) {
   return (
     <button
       type={type}
       onClick={onClick}
-      className={`rounded-xl bg-leaf-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-leaf-700 ${className}`}
+      disabled={disabled}
+      className={`rounded-xl bg-leaf-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-leaf-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-leaf-600 ${className}`}
     >
       {children}
     </button>

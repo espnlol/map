@@ -142,6 +142,8 @@ export interface Product {
   description: string
 }
 
+export type AppTab = 'map' | 'menu' | 'favorites'
+
 export type SortOption =
   | 'price-desc'
   | 'price-asc'

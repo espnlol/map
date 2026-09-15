@@ -40,6 +40,14 @@ Leafly/Weedmaps-style menu browsing rather than an embed of either.
   search to 5 or fewer dispensaries, exactly as requested — narrowing
   can happen either by drawing/radius-filtering the map or by checking
   dispensaries directly.
+- **Confirm-gated search flow:** the Map tab is the primary flow (Draw —
+  any-shape polygon, not just a circle — is the default tool), and the
+  Menu tab's filters/results stay locked behind a "Continue to menu →"
+  button on the Map tab until you explicitly confirm your area/selection.
+  Any further change to the boundary or dispensary picks re-locks it.
+  Clicking a pin opens a popup with dispensary info and a live 3-item
+  menu preview, with its own "View full menu →" shortcut straight into
+  the (already-confirmed) Menu tab for just that location.
 
 ## Stack
 
@@ -92,6 +100,29 @@ picks narrow further within it. Once that scoped count is between 1 and 5,
 `detailFiltersUnlocked()` (in `utils/filters.ts`) flips on the strain/
 brand/THC%/terpene% controls — change `DETAIL_UNLOCK_THRESHOLD` there to
 adjust the cutoff.
+
+`boundaryConfirmed` (in the Zustand store) is the separate gate behind the
+Menu tab itself: `confirmSelection()` sets it, and any action that changes
+scope (`setBoundary`, `toggleDispensary`, `setSelectedDispensaries`,
+`clearDispensarySelection`) resets it — so the only way to see menus is to
+explicitly hit Continue after picking an area, and any further edit
+re-locks it. `activeTab` also lives in the store (not component state) so
+that a map popup's "View full menu" button can set a single-dispensary
+selection, confirm it, and switch tabs all in one action.
+
+Two bugs worth knowing about if you touch `DispensaryMap.tsx` again:
+- Dispensary **selection is sidebar-checkbox-only, never a marker click**.
+  A marker click that also mutated `selectedIds` would change this
+  component's own effect dependencies, tearing down and rebuilding every
+  marker (including the one whose popup was mid-open) from the very click
+  that opened it — killing the popup before it rendered. Caught via an
+  actual Playwright click test, not by inspection.
+- `leaflet-draw`'s polygon/rectangle `showArea` live-measurement tooltip
+  throws (`ReferenceError: type is not defined` inside its own bundled
+  `GeometryUtil.readableArea`) on every mouse-move while drawing — a
+  bug in the library, not this code. It's turned off here; the shape
+  still draws and finalizes fine either way, just without a running
+  area readout.
 
 ## Importing real dispensary listings
 
@@ -162,6 +193,14 @@ To move this from demo to production you'd primarily touch
 - **Compliance** — a real cannabis-menu app needs state licensing checks,
   an age gate (21+/medical card), and per-state product/potency
   regulations, none of which are in scope for this demo.
+
+## Deploying
+
+Static SPA, zero config needed — `npm run build` outputs `dist/`. On
+[Vercel](https://vercel.com): New Project → import this repo → framework
+auto-detects as Vite (build `npm run build`, output `dist`) → Deploy.
+Same idea on Netlify/GitHub Pages/Cloudflare Pages. No environment
+variables or backend to provision.
 
 ## Known dev-only advisory
 

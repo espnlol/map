@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type {
   AccessorySubtype,
+  AppTab,
   BoundaryShape,
   Coordinates,
   ProductCategory,
@@ -26,7 +27,14 @@ export interface AppState extends FilterState {
   boundary: BoundaryShape
   userLocation: Coordinates | null
   favorites: string[]
+  activeTab: AppTab
+  /** Whether the user has explicitly confirmed their map search area/
+   * dispensary picks. The Menu tab's filters + results stay gated behind
+   * this until they hit "Continue" on the Map tab — see confirmSelection. */
+  boundaryConfirmed: boolean
 
+  setActiveTab: (t: AppTab) => void
+  confirmSelection: () => void
   toggleDispensary: (id: string) => void
   setSelectedDispensaries: (ids: string[]) => void
   clearDispensarySelection: () => void
@@ -71,17 +79,25 @@ export const useAppStore = create<AppState>()(
       boundary: null,
       userLocation: null,
       favorites: [],
+      activeTab: 'map',
+      boundaryConfirmed: false,
 
+      setActiveTab: (t) => set({ activeTab: t }),
+      confirmSelection: () => set({ boundaryConfirmed: true }),
       toggleDispensary: (id) =>
-        set((s) => ({ selectedDispensaryIds: toggleInArray(s.selectedDispensaryIds, id) })),
-      setSelectedDispensaries: (ids) => set({ selectedDispensaryIds: ids }),
-      clearDispensarySelection: () => set({ selectedDispensaryIds: [] }),
+        set((s) => ({
+          selectedDispensaryIds: toggleInArray(s.selectedDispensaryIds, id),
+          boundaryConfirmed: false,
+        })),
+      setSelectedDispensaries: (ids) => set({ selectedDispensaryIds: ids, boundaryConfirmed: false }),
+      clearDispensarySelection: () => set({ selectedDispensaryIds: [], boundaryConfirmed: false }),
       setBoundary: (b) =>
         set((s) => {
           const allowed = new Set(dispensariesInBoundary(dispensaries, b).map((d) => d.id))
           return {
             boundary: b,
             selectedDispensaryIds: s.selectedDispensaryIds.filter((id) => allowed.has(id)),
+            boundaryConfirmed: false,
           }
         }),
       setUserLocation: (c) => set({ userLocation: c }),

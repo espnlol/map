@@ -1,14 +1,16 @@
 import { useMemo, useState } from 'react'
-import { dispensaries } from '../data'
+import { dispensaries, products } from '../data'
 import { useAppStore } from '../store/useAppStore'
-import { DispensaryMap } from '../components/map/DispensaryMap'
+import { DispensaryMap, type MenuPreviewItem } from '../components/map/DispensaryMap'
 import {
   DETAIL_UNLOCK_THRESHOLD,
   dispensariesInBoundary,
   effectiveDispensaryIds,
+  representativePrice,
 } from '../utils/filters'
 import { distanceMiles, formatDistance } from '../utils/geo'
-import { Card, GhostButton, SectionHeading } from '../components/ui'
+import { formatPrice } from '../utils/format'
+import { Card, GhostButton, PrimaryButton, SectionHeading } from '../components/ui'
 import { CircleIcon, CrosshairIcon, DrawIcon, MapPinIcon, SearchIcon, StarIcon, XIcon } from '../components/Icons'
 import type { Coordinates } from '../types'
 
@@ -24,9 +26,13 @@ export function MapPage() {
   const clearDispensarySelection = useAppStore((s) => s.clearDispensarySelection)
   const userLocation = useAppStore((s) => s.userLocation)
   const setUserLocation = useAppStore((s) => s.setUserLocation)
+  const confirmSelection = useAppStore((s) => s.confirmSelection)
+  const setActiveTab = useAppStore((s) => s.setActiveTab)
 
+  // "Draw" (any-shape polygon) is the primary way to search, so it's the
+  // default the first time someone lands here with no boundary set yet.
   const [mode, setMode] = useState<Mode>(
-    boundary?.kind === 'circle' ? 'radius' : boundary?.kind === 'polygon' ? 'shape' : 'none',
+    boundary?.kind === 'circle' ? 'radius' : boundary?.kind === 'polygon' ? 'shape' : 'shape',
   )
   const [radiusMiles, setRadiusMiles] = useState(boundary?.kind === 'circle' ? boundary.radiusMiles : 5)
   const [pickingCenter, setPickingCenter] = useState(false)
@@ -44,6 +50,33 @@ export function MapPage() {
 
   const referencePoint: Coordinates | null =
     userLocation ?? (boundary?.kind === 'circle' ? boundary.center : null)
+
+  // A few sample menu items per dispensary (highest price first, matching
+  // the app's default sort) to preview right in the map popup.
+  const previews = useMemo(() => {
+    const map = new Map<string, MenuPreviewItem[]>()
+    for (const d of dispensaries) {
+      const items = products
+        .filter((p) => p.dispensaryId === d.id)
+        .map((p) => ({ name: p.name, price: representativePrice(p, []) ?? 0 }))
+        .sort((a, b) => b.price - a.price)
+        .slice(0, 3)
+        .map(({ name, price }) => ({ name, priceLabel: formatPrice(price) }))
+      map.set(d.id, items)
+    }
+    return map
+  }, [])
+
+  function goToMenu() {
+    confirmSelection()
+    setActiveTab('menu')
+  }
+
+  function handleViewMenu(dispensaryId: string) {
+    setSelectedDispensaries([dispensaryId])
+    confirmSelection()
+    setActiveTab('menu')
+  }
 
   const filteredList = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -108,18 +141,18 @@ export function MapPage() {
         <Card className="p-4">
           <SectionHeading>Search area</SectionHeading>
           <div className="flex gap-2">
-            <GhostButton active={mode === 'none'} onClick={() => chooseMode('none')} className="flex-1">
-              All areas
+            <GhostButton active={mode === 'shape'} onClick={() => chooseMode('shape')} className="flex-1">
+              <span className="flex items-center justify-center gap-1">
+                <DrawIcon width={14} height={14} /> Draw
+              </span>
             </GhostButton>
             <GhostButton active={mode === 'radius'} onClick={() => chooseMode('radius')} className="flex-1">
               <span className="flex items-center justify-center gap-1">
                 <CircleIcon width={14} height={14} /> Radius
               </span>
             </GhostButton>
-            <GhostButton active={mode === 'shape'} onClick={() => chooseMode('shape')} className="flex-1">
-              <span className="flex items-center justify-center gap-1">
-                <DrawIcon width={14} height={14} /> Draw
-              </span>
+            <GhostButton active={mode === 'none'} onClick={() => chooseMode('none')} className="flex-1">
+              All areas
             </GhostButton>
           </div>
 
@@ -292,21 +325,33 @@ export function MapPage() {
               )
             })}
           </ul>
+
+          <div className="mt-3 border-t border-stone-200 pt-3 dark:border-stone-700">
+            <PrimaryButton className="w-full" disabled={effective.length === 0} onClick={goToMenu}>
+              {effective.length === 0
+                ? 'Select an area to continue'
+                : `Continue to menu (${effective.length} ${effective.length === 1 ? 'dispensary' : 'dispensaries'}) →`}
+            </PrimaryButton>
+          </div>
         </Card>
       </div>
 
-      <Card className="min-h-[420px] flex-1 overflow-hidden">
+      <Card className="relative min-h-[420px] flex-1 overflow-hidden">
+        <div className="pointer-events-none absolute bottom-3 left-1/2 z-[1000] -translate-x-1/2 rounded-full bg-stone-900/80 px-3 py-1 text-xs text-white shadow">
+          Click a pin for details &amp; a menu preview · check the list to include it in your search
+        </div>
         <DispensaryMap
           dispensaries={dispensaries}
           visibleIds={visibleIds}
           selectedIds={selectedIds}
-          onToggleDispensary={toggleDispensary}
           boundary={boundary}
           onBoundaryChange={setBoundary}
           referencePoint={referencePoint}
           pickingCenter={pickingCenter}
           onPickCenter={handlePickCenter}
           drawMode={mode === 'shape' ? 'shape' : 'none'}
+          previews={previews}
+          onViewMenu={handleViewMenu}
         />
       </Card>
     </div>

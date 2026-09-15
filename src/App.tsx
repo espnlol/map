@@ -1,20 +1,19 @@
-import { useState } from 'react'
 import { MapPage } from './pages/MapPage'
 import { MenuPage } from './pages/MenuPage'
 import { FavoritesPage } from './pages/FavoritesPage'
 import { useAppStore } from './store/useAppStore'
 import { HeartIcon, MapPinIcon } from './components/Icons'
+import type { AppTab } from './types'
 
-type Tab = 'map' | 'menu' | 'favorites'
-
-const TABS: { id: Tab; label: string }[] = [
+const TABS: { id: AppTab; label: string }[] = [
   { id: 'map', label: 'Map' },
   { id: 'menu', label: 'Menu' },
   { id: 'favorites', label: 'Favorites' },
 ]
 
 export default function App() {
-  const [tab, setTab] = useState<Tab>('map')
+  const tab = useAppStore((s) => s.activeTab)
+  const setTab = useAppStore((s) => s.setActiveTab)
   const favoritesCount = useAppStore((s) => s.favorites.length)
 
   return (
