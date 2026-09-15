@@ -61,8 +61,14 @@ export function StrainDetail({
           </div>
         </Dropdown>
 
-        <Dropdown label="Terpene breakdown" defaultOpen>
+        <Dropdown label="Terpene breakdown" defaultOpen={strain.dominantTerpenes.length > 0}>
           <div className="space-y-3">
+            {strain.dominantTerpenes.length === 0 && (
+              <p className="text-xs italic text-stone-400">
+                No specific terpene profile documented for this strain yet — see the Terpenes tab for
+                general reference on what each one does.
+              </p>
+            )}
             {strain.dominantTerpenes.map((tid) => {
               const t = terpeneById.get(tid)
               if (!t) return null
