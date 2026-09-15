@@ -57,7 +57,10 @@ Leafly/Weedmaps-style menu browsing rather than an embed of either.
 React 18 + TypeScript + Vite, Tailwind CSS, Zustand (state +
 `localStorage` persistence for favorites/selection), and Leaflet +
 Leaflet.Draw for the map — no API key required since it renders on
-OpenStreetMap tiles. Everything is a static SPA; there is no backend.
+OpenStreetMap tiles. The app itself is a static SPA; the one exception is
+a single small `/api/menu` serverless function (see below) that the map
+popup fetches from — there's no database or persistent server behind it,
+just this app's own already-bundled demo data served over HTTP too.
 
 ## Running it
 
@@ -72,6 +75,11 @@ npm run typecheck
 ## Architecture
 
 ```
+api/
+  menu.ts          # Vercel serverless function: GET /api/menu?dispensaryId=...
+  _menuData.ts      # pure data-shaping logic (no req/res types) — reused, not duplicated
+  _menuHandler.ts   # URL parsing + response writing, shared by menu.ts AND vite.config.ts's
+                     # local dev/preview middleware, so localhost behaves like production
 src/
   types.ts                 # domain types + fixed size/category enums
   data/
@@ -126,6 +134,51 @@ Two bugs worth knowing about if you touch `DispensaryMap.tsx` again:
   bug in the library, not this code. It's turned off here; the shape
   still draws and finalizes fine either way, just without a running
   area readout.
+
+## The /api/menu endpoint
+
+The map popup's menu section is fetched from a real JSON endpoint rather
+than read out of an in-memory prop:
+
+```
+GET /api/menu?dispensaryId=<id>
+200 -> { dispensaryId, dispensaryName, totalCount, items: [{ id, name, category, brand, strain, thcPercent, terpenePercent, sizes }] }
+400 -> { error } — missing dispensaryId
+404 -> { error } — no dispensary with that id
+```
+
+Clicking a pin binds a "Loading menu…" popup immediately, then fetches
+this endpoint and swaps in the real content (a 3-item price preview + a
+real total item count) once it resolves, or an error state if the fetch
+fails — including an abort guard (`popupclose` listener) so closing the
+popup mid-fetch doesn't try to update content nobody's looking at
+anymore.
+
+This is a **real, working HTTP endpoint**, not a simulated delay over
+data that was already in memory — open your browser's network tab while
+clicking a pin and you'll see the actual request. What it serves,
+though, is still this app's own synthetic demo catalog
+(`src/data/generateProducts.ts`), just now reachable over HTTP as well
+as by direct import — it does not change anything about what data is
+real vs. synthetic (see the callout at the top of this file).
+
+**Why a real endpoint at all**, given the app already had this data in
+memory: because "click a marker, fetch its menu from a JSON endpoint"
+is a real, common architecture (this is exactly how you'd wire up a
+genuine backend later — swap what's inside `api/_menuData.ts` for a
+real database/POS call and nothing on the client needs to change), and
+because it needed to actually be demonstrated working, not just
+described.
+
+**Why it works identically in `npm run dev`/`npm run preview` and on a
+real Vercel deploy**: Vercel auto-deploys any `api/*.ts` file as its own
+serverless function with zero config — reachable at `/api/menu` once
+deployed, no `vercel.json` needed. Locally, there's no Vercel runtime to
+do that, so `vite.config.ts` registers a small dev-server middleware
+that serves the exact same route by calling the exact same
+`api/_menuHandler.ts` code Vercel's function calls — one implementation,
+two ways of running it, rather than a second copy that could drift out
+of sync with the real one.
 
 ## Bringing in a different region (e.g. statewide data)
 
@@ -190,8 +243,11 @@ To move this from demo to production you'd primarily touch
   Logix) or your own backend aggregating them, rather than the local
   generator. The `Product`/`Dispensary`/`Brand`/`Strain` shapes in
   `types.ts` are designed to be an adapter target for that.
-- **Live sync** would need a real backend (inventory changes constantly);
-  this app currently has none by design, to stay a static, key-free demo.
+- **Live sync** would need a real backend with a database (inventory
+  changes constantly); `api/menu.ts` is a real serverless function, but
+  it has no database behind it — it just re-serves the same static demo
+  catalog every request. Swapping its body for a real POS/database call
+  is the actual next step; the client side doesn't need to change.
 - **Nicer map tiles** — swap the OpenStreetMap tile layer in
   `DispensaryMap.tsx` for Mapbox/MapTiler/Google if you have an API key;
   the rest of the map logic (markers, radius, draw tool) is
@@ -209,11 +265,14 @@ To move this from demo to production you'd primarily touch
 
 ## Deploying
 
-Static SPA, zero config needed — `npm run build` outputs `dist/`. On
+Zero config needed — `npm run build` outputs `dist/`, and `api/menu.ts`
+deploys automatically as a serverless function on Vercel. On
 [Vercel](https://vercel.com): New Project → import this repo → framework
-auto-detects as Vite (build `npm run build`, output `dist`) → Deploy.
-Same idea on Netlify/GitHub Pages/Cloudflare Pages. No environment
-variables or backend to provision.
+auto-detects as Vite (build `npm run build`, output `dist`) → Deploy. No
+environment variables or database to provision. (Netlify/Cloudflare
+Pages/GitHub Pages would host the static `dist/` output the same way,
+but you'd need each platform's own equivalent of a serverless function
+for `/api/menu` — Vercel is the path with nothing extra to configure.)
 
 ## Known dev-only advisory
 

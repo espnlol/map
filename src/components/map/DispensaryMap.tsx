@@ -5,6 +5,12 @@ import 'leaflet-draw'
 import 'leaflet-draw/dist/leaflet.draw.css'
 import type { BoundaryShape, Coordinates, Dispensary } from '../../types'
 import { distanceMiles } from '../../utils/geo'
+import { formatPrice } from '../../utils/format'
+// Type-only — erased at compile time, so this doesn't pull server code
+// into the client bundle. It just keeps the popup's expectations of
+// /api/menu's response shape in sync with what that endpoint actually
+// returns, instead of a second hand-copied type drifting out of sync.
+import type { MenuApiResponse } from '../../../api/_menuData'
 
 // Used only when there's no dispensary data to frame the view around
 // (an empty import result) — the real initial view is computed from
@@ -31,19 +37,6 @@ function pinIcon(selected: boolean, dimmed: boolean): L.DivIcon {
     iconSize: [size, size],
     iconAnchor: [size / 2, size],
   })
-}
-
-export interface MenuPreviewItem {
-  name: string
-  priceLabel: string
-}
-
-export interface DispensaryPreview {
-  /** a few sample items, highest-priced first */
-  items: MenuPreviewItem[]
-  /** total product count at this dispensary — real, already-loaded data,
-   * not a network call */
-  totalCount: number
 }
 
 /** Extracts every drawn shape's outer ring as plain {lat,lng} points —
@@ -76,20 +69,18 @@ export interface DispensaryMapProps {
   onPickCenter: (c: Coordinates) => void
   /** which draw tools (if any) are active on the toolbar */
   drawMode: 'none' | 'shape'
-  /** a few sample menu items (+ total count) per dispensary, shown in its
-   * map popup */
-  previews: Map<string, DispensaryPreview>
   /** "View full menu" was clicked in a dispensary's popup */
   onViewMenu: (id: string) => void
 }
 
-function buildPopupHtml(
-  d: Dispensary,
-  visible: boolean,
-  dist: number | null,
-  preview: DispensaryPreview,
-): string {
-  const parts: string[] = [`<div style="min-width:200px;max-width:240px">`]
+function wrapPopup(inner: string): string {
+  return `<div style="min-width:200px;max-width:240px">${inner}</div>`
+}
+
+/** The part of the popup that's always known immediately — no fetch
+ * needed for a dispensary's own basic info. */
+function buildInfoHtml(d: Dispensary, visible: boolean, dist: number | null): string {
+  const parts: string[] = []
   parts.push(`<strong>${escapeHtml(d.name)}</strong><br/>`)
   parts.push(
     `<span style="color:#78716c;font-size:12px">${escapeHtml(d.address)}, ${escapeHtml(d.city)}</span><br/>`,
@@ -114,31 +105,52 @@ function buildPopupHtml(
 
   if (!visible) {
     parts.push(`<span style="font-size:12px;font-style:italic;color:#a8a29e">Outside current search area</span>`)
-  } else {
-    if (preview.items.length > 0) {
-      parts.push(
-        `<div style="margin-top:6px;padding-top:6px;border-top:1px solid #e7e5e4;font-size:12px">`,
-      )
-      for (const item of preview.items) {
-        parts.push(
-          `<div style="display:flex;justify-content:space-between;gap:10px">` +
-            `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(item.name)}</span>` +
-            `<span style="white-space:nowrap;font-weight:600">${escapeHtml(item.priceLabel)}</span>` +
-            `</div>`,
-        )
-      }
-      parts.push(
-        `<div style="margin-top:4px;color:#78716c">${preview.totalCount} items in this sample menu</div>`,
-      )
-      parts.push(`</div>`)
-    }
-    parts.push(
-      `<button type="button" class="leafmap-view-menu-btn" style="margin-top:8px;width:100%;padding:6px 8px;border:none;border-radius:8px;background:#29774e;color:white;font-size:12px;font-weight:600;cursor:pointer">View full menu →</button>`,
-    )
   }
 
-  parts.push(`</div>`)
   return parts.join('')
+}
+
+function buildLoadingPopupHtml(d: Dispensary, visible: boolean, dist: number | null): string {
+  const info = buildInfoHtml(d, visible, dist)
+  if (!visible) return wrapPopup(info)
+  return wrapPopup(
+    info + `<p style="margin:8px 0 0;font-size:12px;font-style:italic;color:#a8a29e">Loading menu…</p>`,
+  )
+}
+
+function buildErrorPopupHtml(d: Dispensary, visible: boolean, dist: number | null): string {
+  return wrapPopup(
+    buildInfoHtml(d, visible, dist) +
+      `<p style="margin:8px 0 0;font-size:12px;color:#b91c1c">⚠ Could not load menu for this location.</p>`,
+  )
+}
+
+function minPrice(item: MenuApiResponse['items'][number]): number {
+  return item.sizes.length ? Math.min(...item.sizes.map((s) => s.price)) : 0
+}
+
+function buildMenuPopupHtml(d: Dispensary, visible: boolean, dist: number | null, data: MenuApiResponse): string {
+  const top3 = [...data.items].sort((a, b) => minPrice(b) - minPrice(a)).slice(0, 3)
+  const parts: string[] = [buildInfoHtml(d, visible, dist)]
+
+  if (top3.length > 0) {
+    parts.push(`<div style="margin-top:6px;padding-top:6px;border-top:1px solid #e7e5e4;font-size:12px">`)
+    for (const item of top3) {
+      parts.push(
+        `<div style="display:flex;justify-content:space-between;gap:10px">` +
+          `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(item.name)}</span>` +
+          `<span style="white-space:nowrap;font-weight:600">${escapeHtml(formatPrice(minPrice(item)))}</span>` +
+          `</div>`,
+      )
+    }
+    parts.push(`<div style="margin-top:4px;color:#78716c">${data.totalCount} items in this sample menu</div>`)
+    parts.push(`</div>`)
+  }
+  parts.push(
+    `<button type="button" class="leafmap-view-menu-btn" style="margin-top:8px;width:100%;padding:6px 8px;border:none;border-radius:8px;background:#29774e;color:white;font-size:12px;font-weight:600;cursor:pointer">View full menu →</button>`,
+  )
+
+  return wrapPopup(parts.join(''))
 }
 
 export function DispensaryMap({
@@ -151,7 +163,6 @@ export function DispensaryMap({
   pickingCenter,
   onPickCenter,
   drawMode,
-  previews,
   onViewMenu,
 }: DispensaryMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -298,22 +309,48 @@ export function DispensaryMap({
       if (dist !== null) tooltipParts.push(`${dist.toFixed(1)} mi`)
       marker.bindTooltip(tooltipParts.join(' · '), { direction: 'top', offset: [0, -6] })
 
-      // Clicking a pin only opens its info/menu-preview popup — it must NOT
-      // also mutate selection state. Selection changes make this effect's
+      // Clicking a pin only opens its info/menu popup — it must NOT also
+      // mutate selection state. Selection changes make this effect's
       // dependencies change, which clears and rebuilds every marker; doing
       // that from the same click that's opening this exact marker's popup
       // destroys the popup before/while it opens (a real bug, caught via a
       // Playwright click test, not just a hover-tooltip check). Dispensary
       // selection is a sidebar-checkbox-only action for that reason.
-      const preview = previews.get(d.id) ?? { items: [], totalCount: 0 }
-      marker.bindPopup(buildPopupHtml(d, visible, dist, preview), { maxWidth: 260 })
+      marker.bindPopup(buildLoadingPopupHtml(d, visible, dist), { maxWidth: 260 })
+
       marker.on('popupopen', () => {
-        const btn = marker.getPopup()?.getElement()?.querySelector('.leafmap-view-menu-btn')
-        btn?.addEventListener('click', () => onViewMenuRef.current(d.id), { once: true })
+        const popup = marker.getPopup()
+        // "Outside search area" has nothing to fetch or click through.
+        if (!popup || !visible) return
+
+        // Abort the UI update if the user closes the popup while the
+        // fetch is still in flight, rather than setContent()-ing a
+        // popup nobody's looking at anymore.
+        let stillOpen = true
+        marker.once('popupclose', () => {
+          stillOpen = false
+        })
+
+        fetch(`/api/menu?dispensaryId=${encodeURIComponent(d.id)}`)
+          .then((res) => {
+            if (!res.ok) throw new Error(`HTTP ${res.status}`)
+            return res.json() as Promise<MenuApiResponse>
+          })
+          .then((data) => {
+            if (!stillOpen) return
+            popup.setContent(buildMenuPopupHtml(d, visible, dist, data))
+            const btn = popup.getElement()?.querySelector('.leafmap-view-menu-btn')
+            btn?.addEventListener('click', () => onViewMenuRef.current(d.id), { once: true })
+          })
+          .catch(() => {
+            if (!stillOpen) return
+            popup.setContent(buildErrorPopupHtml(d, visible, dist))
+          })
       })
+
       marker.addTo(layer)
     }
-  }, [dispensaries, selectedIds, visibleIds, referencePoint, previews])
+  }, [dispensaries, selectedIds, visibleIds, referencePoint])
 
   // --- sync circle overlay (radius boundary) ---
   useEffect(() => {

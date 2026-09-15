@@ -1,15 +1,9 @@
 import { useMemo, useState } from 'react'
-import { dispensaries, products } from '../data'
+import { dispensaries } from '../data'
 import { useAppStore } from '../store/useAppStore'
-import { DispensaryMap, type DispensaryPreview } from '../components/map/DispensaryMap'
-import {
-  DETAIL_UNLOCK_THRESHOLD,
-  dispensariesInBoundary,
-  effectiveDispensaryIds,
-  representativePrice,
-} from '../utils/filters'
+import { DispensaryMap } from '../components/map/DispensaryMap'
+import { DETAIL_UNLOCK_THRESHOLD, dispensariesInBoundary, effectiveDispensaryIds } from '../utils/filters'
 import { distanceMiles, formatDistance } from '../utils/geo'
-import { formatPrice } from '../utils/format'
 import { Card, GhostButton, PrimaryButton, SectionHeading } from '../components/ui'
 import { CircleIcon, CrosshairIcon, DrawIcon, MapPinIcon, SearchIcon, StarIcon, XIcon } from '../components/Icons'
 import type { Coordinates } from '../types'
@@ -50,24 +44,6 @@ export function MapPage() {
 
   const referencePoint: Coordinates | null =
     userLocation ?? (boundary?.kind === 'circle' ? boundary.center : null)
-
-  // A few sample menu items per dispensary (highest price first, matching
-  // the app's default sort), plus the real total item count, to preview
-  // right in the map popup — all from data the app already has in memory,
-  // no network round trip needed.
-  const previews = useMemo(() => {
-    const map = new Map<string, DispensaryPreview>()
-    for (const d of dispensaries) {
-      const dispensaryProducts = products.filter((p) => p.dispensaryId === d.id)
-      const items = dispensaryProducts
-        .map((p) => ({ name: p.name, price: representativePrice(p, []) ?? 0 }))
-        .sort((a, b) => b.price - a.price)
-        .slice(0, 3)
-        .map(({ name, price }) => ({ name, priceLabel: formatPrice(price) }))
-      map.set(d.id, { items, totalCount: dispensaryProducts.length })
-    }
-    return map
-  }, [])
 
   function goToMenu() {
     confirmSelection()
@@ -354,7 +330,6 @@ export function MapPage() {
           pickingCenter={pickingCenter}
           onPickCenter={handlePickCenter}
           drawMode={mode === 'shape' ? 'shape' : 'none'}
-          previews={previews}
           onViewMenu={handleViewMenu}
         />
       </Card>
