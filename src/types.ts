@@ -1,4 +1,4 @@
-// Core domain types for the dispensary menu aggregator.
+// Core domain types for the dispensary price tracker.
 // Kept framework-agnostic so this file could back a real API client later.
 
 export type ProductCategory =
@@ -18,12 +18,22 @@ export const PRODUCT_CATEGORIES: { id: ProductCategory; label: string }[] = [
   { id: 'accessory', label: 'Accessories' },
 ]
 
-/** Categories where THC% / terpene% percentage filters make sense. */
+/** Categories where THC% / terpene% fields make sense. */
 export const POTENCY_FILTERABLE_CATEGORIES: ProductCategory[] = [
   'flower',
   'cartridge',
   'concentrate',
 ]
+
+/** Accent color used for a product card's placeholder swatch, by category. */
+export const CATEGORY_SWATCH: Record<ProductCategory, string> = {
+  flower: '#399462',
+  cartridge: '#d97706',
+  concentrate: '#ea580c',
+  edible: '#db2777',
+  tincture: '#2563eb',
+  accessory: '#64748b',
+}
 
 export type ConcentrateSubtype =
   | 'rosin'
@@ -79,18 +89,6 @@ export const LINEAGE_LABEL: Record<StrainLineage, string> = {
   hybrid: 'Hybrid',
 }
 
-/** A cannabis aroma compound. This is general, widely-published botanical/
- * chemistry reference info (what each terpene smells/tastes like and what
- * it's commonly reported to do) — not per-product lab data, and not
- * sourced from any single commercial platform. See src/data/terpenes.ts. */
-export interface Terpene {
-  id: string
-  name: string
-  aroma: string[]
-  effects: string[]
-  alsoFoundIn: string[]
-}
-
 export interface Coordinates {
   lat: number
   lng: number
@@ -107,38 +105,15 @@ export interface Dispensary {
   hours: string
   phone: string
   licenseNumber: string
-  /** Not every data source has a real rating (e.g. OpenStreetMap doesn't) —
-   * left undefined rather than fabricated when unknown. */
-  rating?: number
-  /** Only set when the source actually has one (e.g. an OSM website/
-   * contact:website tag) — omitted rather than guessed. */
+  /** The dispensary's real website — what the Websites tab links to and
+   * groups logged prices under. */
   website?: string
-  /** Where this listing came from. Undefined/'demo' = the built-in sample
-   * catalog. 'openstreetmap' = imported via scripts/import-osm-dispensaries.mjs,
-   * meaning the name/address/location are real but the product catalog
-   * generated for it (see data/generateProducts.ts) is still synthetic.
-   * 'user-added' = entered by hand via the Manage tab and saved to this
-   * browser only (src/store/useAppStore.ts's userDispensaries) — both the
-   * listing and its menu are whatever the person who added it entered. */
-  source?: 'demo' | 'openstreetmap' | 'user-added'
-}
-
-export interface Brand {
-  id: string
-  name: string
-  categories: ProductCategory[]
 }
 
 export interface Strain {
   id: string
   name: string
   lineage: StrainLineage
-  /** Commonly-reported effects/flavors for this genetic (general strain
-   * knowledge shared across the industry — like a seed bank or dispensary
-   * placard would list — not lab results for any specific batch). Powers
-   * the strain searcher's "search by effect/flavor" and its result tags. */
-  effects: string[]
-  flavors: string[]
 }
 
 export interface SizeOption {
@@ -166,19 +141,4 @@ export interface Product {
   description: string
 }
 
-export type AppTab = 'menu' | 'favorites' | 'manage'
-
-export type SortOption =
-  | 'price-desc'
-  | 'price-asc'
-  | 'thc-desc'
-  | 'terpene-desc'
-  | 'name-asc'
-
-export const SORT_OPTIONS: { id: SortOption; label: string }[] = [
-  { id: 'price-desc', label: 'Price: High to Low' },
-  { id: 'price-asc', label: 'Price: Low to High' },
-  { id: 'thc-desc', label: 'THC %: High to Low' },
-  { id: 'terpene-desc', label: 'Terpene %: High to Low' },
-  { id: 'name-asc', label: 'Name: A to Z' },
-]
+export type AppTab = 'websites' | 'favorites' | 'manage'

@@ -1,7 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { PrimaryButton, GhostButton, Chip } from '../ui'
 import { strains } from '../../data'
-import { CATEGORY_SWATCH } from '../../data/generateProducts'
 import {
   PRODUCT_CATEGORIES,
   CONCENTRATE_SUBTYPES,
@@ -11,6 +10,7 @@ import {
   ROSIN_SIZES_G,
   OTHER_CONCENTRATE_SIZES_G,
   FLOWER_SIZES_G,
+  CATEGORY_SWATCH,
 } from '../../types'
 import type { ProductCategory, SizeOption } from '../../types'
 

@@ -1,13 +1,12 @@
 import { useState } from 'react'
 import { useAppStore } from '../store/useAppStore'
-import { CATEGORY_SWATCH } from '../data/generateProducts'
 import { DispensaryForm, type DispensaryFormValues } from '../components/manage/DispensaryForm'
 import { ProductForm, type ProductFormValues } from '../components/manage/ProductForm'
 import { Card, PrimaryButton, GhostButton, SectionHeading, EmptyState } from '../components/ui'
 import { MapPinIcon } from '../components/Icons'
 import { formatPrice } from '../utils/format'
-import { representativePrice } from '../utils/filters'
-import type { AccessorySubtype, ConcentrateSubtype, Dispensary, Product } from '../types'
+import { representativePrice } from '../utils/pricing'
+import { CATEGORY_SWATCH, type AccessorySubtype, type ConcentrateSubtype, type Dispensary, type Product } from '../types'
 
 type View =
   | { mode: 'list' }
@@ -32,7 +31,7 @@ function dispensaryToFormValues(d: Dispensary): DispensaryFormValues {
   }
 }
 
-function formValuesToDispensaryPayload(v: DispensaryFormValues): Omit<Dispensary, 'id' | 'source'> {
+function formValuesToDispensaryPayload(v: DispensaryFormValues): Omit<Dispensary, 'id'> {
   return {
     name: v.name.trim(),
     address: v.address.trim(),
@@ -68,10 +67,8 @@ function formValuesToProductPayload(dispensaryId: string, v: ProductFormValues):
     category: v.category,
     subtype: (v.subtype || undefined) as ConcentrateSubtype | AccessorySubtype | undefined,
     name: v.name.trim(),
-    // No separate "add a brand" step for user-added products — the brand
-    // name IS the id here; ProductCard etc. fall back to displaying it
-    // directly when it doesn't match a built-in Brand record (see
-    // useCombinedData.ts's nameFromBrandLookup).
+    // No separate "add a brand" step — the free-text name IS brandId;
+    // ProductCard shows it as-is.
     brandId: v.brandName.trim(),
     ...(v.strainId ? { strainId: v.strainId } : {}),
     sizes: v.sizes,
@@ -193,7 +190,7 @@ export function ManagePage() {
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {items.map((p) => {
-              const price = representativePrice(p, [])
+              const price = representativePrice(p)
               return (
                 <Card key={p.id} className="p-3">
                   <div className="flex items-start justify-between gap-2">

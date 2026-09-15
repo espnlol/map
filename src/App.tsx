@@ -1,4 +1,4 @@
-import { MenuPage } from './pages/MenuPage'
+import { WebsitesPage } from './pages/WebsitesPage'
 import { FavoritesPage } from './pages/FavoritesPage'
 import { ManagePage } from './pages/ManagePage'
 import { useAppStore } from './store/useAppStore'
@@ -6,7 +6,7 @@ import { HeartIcon, MapPinIcon } from './components/Icons'
 import type { AppTab } from './types'
 
 const TABS: { id: AppTab; label: string }[] = [
-  { id: 'menu', label: 'Menu' },
+  { id: 'websites', label: 'Websites' },
   { id: 'favorites', label: 'Favorites' },
   { id: 'manage', label: 'Manage' },
 ]
@@ -25,9 +25,6 @@ export default function App() {
         <div className="flex items-center gap-2 font-semibold text-leaf-800 dark:text-leaf-300">
           <MapPinIcon width={20} height={20} />
           LeafMap
-          <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-normal uppercase tracking-wide text-stone-400 dark:bg-stone-800">
-            Demo data
-          </span>
         </div>
         <nav className="flex gap-1 rounded-full bg-stone-100 p-1 dark:bg-stone-800">
           {TABS.map((t) => (
@@ -58,7 +55,7 @@ export default function App() {
         </nav>
       </header>
       <main>
-        {tab === 'menu' && <MenuPage />}
+        {tab === 'websites' && <WebsitesPage />}
         {tab === 'favorites' && <FavoritesPage />}
         {tab === 'manage' && <ManagePage />}
       </main>

@@ -1,10 +1,9 @@
 import { useMemo } from 'react'
 import { useAppStore } from '../store/useAppStore'
-import { useAllProducts } from '../store/useCombinedData'
 import { ProductGrid } from '../components/products/ProductGrid'
 
 export function FavoritesPage() {
-  const products = useAllProducts()
+  const products = useAppStore((s) => s.userProducts)
   const favorites = useAppStore((s) => s.favorites)
   const favoriteSet = useMemo(() => new Set(favorites), [favorites])
   const favoriteOrder = useMemo(() => new Map(favorites.map((id, i) => [id, i])), [favorites])
@@ -28,7 +27,7 @@ export function FavoritesPage() {
       <ProductGrid
         products={favoriteProducts}
         emptyTitle="No favorites yet"
-        emptyHint="Tap the heart icon on any product in the Menu tab to save it here."
+        emptyHint="Tap the heart icon on any product in the Websites tab to save it here."
       />
     </div>
   )

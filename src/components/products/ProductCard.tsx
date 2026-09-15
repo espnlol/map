@@ -1,10 +1,9 @@
-import { brandById, strainById } from '../../data'
+import { strainById } from '../../data'
 import { useAppStore } from '../../store/useAppStore'
-import { useDispensaryById, nameFromBrandLookup } from '../../store/useCombinedData'
 import { HeartIcon, MapPinIcon } from '../Icons'
 import { formatPrice } from '../../utils/format'
 import { ACCESSORY_SUBTYPES, LINEAGE_LABEL, type Product } from '../../types'
-import { representativePrice } from '../../utils/filters'
+import { representativePrice } from '../../utils/pricing'
 
 export function ProductCard({
   product,
@@ -15,17 +14,13 @@ export function ProductCard({
 }) {
   const isFavorite = useAppStore((s) => s.favorites.includes(product.id))
   const toggleFavorite = useAppStore((s) => s.toggleFavorite)
-  const sizesG = useAppStore((s) => s.sizesG)
-  const dispensaryById = useDispensaryById()
+  const dispensary = useAppStore((s) => s.userDispensaries).find((d) => d.id === product.dispensaryId)
 
-  // Products added via Manage store a plain brand-name string in
-  // brandId (there's no separate "add a brand" step), so this falls
-  // back to displaying that string directly when it's not one of the
-  // built-in Brand records.
-  const brandName = nameFromBrandLookup(product.brandId)
+  // There's no separate "add a brand" step in Manage — brandId IS the
+  // free-text name the person typed in, so it's shown as-is.
+  const brandName = product.brandId
   const strain = product.strainId ? strainById.get(product.strainId) : undefined
-  const dispensary = dispensaryById.get(product.dispensaryId)
-  const price = representativePrice(product, sizesG)
+  const price = representativePrice(product)
   const accessoryLabel =
     product.category === 'accessory'
       ? ACCESSORY_SUBTYPES.find((s) => s.id === product.subtype)?.label
