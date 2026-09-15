@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-stone-50 text-stone-900 dark:bg-stone-950 dark:text-stone-100;
+}
+
+/* Dual-thumb range slider (see components/ui.tsx DualRangeSlider) */
+input[type='range'].range-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 1.5rem;
+  background: transparent;
+}
+input[type='range'].range-thumb:focus {
+  outline: none;
+}
+input[type='range'].range-thumb::-webkit-slider-runnable-track {
+  -webkit-appearance: none;
+  background: transparent;
+}
+input[type='range'].range-thumb::-moz-range-track {
+  background: transparent;
+}
+input[type='range'].range-thumb::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  pointer-events: auto;
+  width: 16px;
+  height: 16px;
+  margin-top: 0;
+  border-radius: 9999px;
+  background: #29774e;
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+input[type='range'].range-thumb::-moz-range-thumb {
+  pointer-events: auto;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: #29774e;
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+/* Leaflet map + draw toolbar tweaks */
+.leaflet-container {
+  font-family: inherit;
+  background: #eef2ee;
+}
+.leaflet-tooltip {
+  border-radius: 6px;
+  font-size: 12px;
+}
