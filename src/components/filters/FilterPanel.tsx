@@ -50,13 +50,19 @@ export function FilterPanel() {
 
   const [strainSearch, setStrainSearch] = useState('')
   const visibleStrains = useMemo(
-    () => strains.filter((s) => s.name.toLowerCase().includes(strainSearch.trim().toLowerCase())),
+    () =>
+      strains
+        .filter((s) => s.name.toLowerCase().includes(strainSearch.trim().toLowerCase()))
+        .sort((a, b) => a.name.localeCompare(b.name)),
     [strainSearch],
   )
 
   const relevantBrands = useMemo(() => {
-    if (categories.length === 0) return brands
-    return brands.filter((b) => b.categories.some((c) => categories.includes(c)))
+    const list =
+      categories.length === 0
+        ? brands
+        : brands.filter((b) => b.categories.some((c) => categories.includes(c)))
+    return [...list].sort((a, b) => a.name.localeCompare(b.name))
   }, [categories])
 
   return (

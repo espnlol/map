@@ -13,6 +13,7 @@ import { CircleIcon, CrosshairIcon, DrawIcon, MapPinIcon, SearchIcon, StarIcon, 
 import type { Coordinates } from '../types'
 
 type Mode = 'none' | 'radius' | 'shape'
+type DispensarySort = 'name' | 'distance' | 'rating'
 
 export function MapPage() {
   const boundary = useAppStore((s) => s.boundary)
@@ -31,6 +32,7 @@ export function MapPage() {
   const [pickingCenter, setPickingCenter] = useState(false)
   const [locationError, setLocationError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const [dispSort, setDispSort] = useState<DispensarySort>('name')
 
   const visibleDispensaries = useMemo(() => dispensariesInBoundary(dispensaries, boundary), [boundary])
   const visibleIds = useMemo(() => new Set(visibleDispensaries.map((d) => d.id)), [visibleDispensaries])
@@ -51,10 +53,13 @@ export function MapPage() {
         )
       : dispensaries
     return [...list].sort((a, b) => {
-      if (!referencePoint) return a.name.localeCompare(b.name)
-      return distanceMiles(referencePoint, a.coords) - distanceMiles(referencePoint, b.coords)
+      if (dispSort === 'distance' && referencePoint) {
+        return distanceMiles(referencePoint, a.coords) - distanceMiles(referencePoint, b.coords)
+      }
+      if (dispSort === 'rating') return b.rating - a.rating
+      return a.name.localeCompare(b.name)
     })
-  }, [search, referencePoint])
+  }, [search, referencePoint, dispSort])
 
   function chooseMode(next: Mode) {
     setPickingCenter(false)
@@ -206,6 +211,22 @@ export function MapPage() {
               placeholder="Search by name or city…"
               className="w-full rounded-lg border border-stone-300 bg-white py-1.5 pl-8 pr-2 text-sm dark:border-stone-600 dark:bg-stone-800"
             />
+          </div>
+
+          <div className="mb-2 flex items-center gap-2 text-xs text-stone-500 dark:text-stone-400">
+            <label htmlFor="disp-sort">Sort:</label>
+            <select
+              id="disp-sort"
+              value={dispSort}
+              onChange={(e) => setDispSort(e.target.value as DispensarySort)}
+              className="flex-1 rounded-lg border border-stone-300 bg-white px-2 py-1 text-xs dark:border-stone-600 dark:bg-stone-800"
+            >
+              <option value="name">Company name (A–Z)</option>
+              <option value="distance" disabled={!referencePoint}>
+                Distance{!referencePoint ? ' — set a location first' : ''}
+              </option>
+              <option value="rating">Rating (high–low)</option>
+            </select>
           </div>
 
           <div
