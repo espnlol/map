@@ -6,7 +6,11 @@ import 'leaflet-draw/dist/leaflet.draw.css'
 import type { BoundaryShape, Coordinates, Dispensary } from '../../types'
 import { distanceMiles } from '../../utils/geo'
 
-const DENVER_CENTER: Coordinates = { lat: 39.7392, lng: -104.9903 }
+// Used only when there's no dispensary data to frame the view around
+// (an empty import result) — the real initial view is computed from
+// whatever's actually in `dispensaries` below, so this app isn't tied to
+// any one city/region's data.
+const FALLBACK_CENTER: Coordinates = { lat: 39.7392, lng: -104.9903 }
 const METERS_PER_MILE = 1609.34
 
 function escapeHtml(s: string): string {
@@ -173,11 +177,21 @@ export function DispensaryMap({
   // --- create the map once ---
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
-    const map = L.map(containerRef.current, {
-      center: [DENVER_CENTER.lat, DENVER_CENTER.lng],
-      zoom: 11,
-    })
+    const map = L.map(containerRef.current)
     mapRef.current = map
+
+    // Frame the view around whatever dispensary data actually got loaded
+    // (10 Denver-metro demo entries, 500 real Florida MMTC locations,
+    // whatever) instead of a hardcoded city — `dispensaries` here is
+    // effectively static for the life of this component (it's loaded
+    // once from src/data at build time), so fitting bounds once on
+    // mount is correct; it doesn't need to react to later prop changes.
+    if (dispensaries.length > 0) {
+      const bounds = L.latLngBounds(dispensaries.map((d): [number, number] => [d.coords.lat, d.coords.lng]))
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13 })
+    } else {
+      map.setView([FALLBACK_CENTER.lat, FALLBACK_CENTER.lng], 11)
+    }
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,

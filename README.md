@@ -127,6 +127,14 @@ Two bugs worth knowing about if you touch `DispensaryMap.tsx` again:
   still draws and finalizes fine either way, just without a running
   area readout.
 
+## Bringing in a different region (e.g. statewide data)
+
+The map now frames itself around whatever's actually in `src/data/dispensaries.ts` (via Leaflet `fitBounds`) instead of being hardcoded to Denver — importing a different city, or an entire state's worth of locations, is immediately visible without editing any map code.
+
+For Florida specifically: it's a medical-only market (Medical Marijuana Treatment Centers, regulated by the state's Office of Medical Marijuana Use), not the walk-in recreational retail model OSM contributors have mapped heavily in states like Colorado, so `shop=cannabis` coverage there may be sparse — a 0/low-result run reflects OSM mapping gaps, not reality. The state's own public MMTC locator (knowthefactsmmj.com / mmuregistry.flhealth.gov) is the authoritative source; there's no importer for it here yet since its actual data format hasn't been inspected (this repo's sandbox can't fetch external sites — see the egress notes below) — happy to build one against a real sample of its output.
+
+**Deliberately out of scope**: pulling real product/menu/pricing data from individual dispensaries' own websites. Nearly all of them embed a third-party menu platform (Dutchie, Jane, Tymber, etc.) whose terms of service prohibit scraping, inventory changes constantly (this would mean running an ongoing scraper against dozens of separate companies, not a one-time import), and it isn't technically possible from this sandbox anyway (its network egress is fully blocked — see below). Product data stays the synthetic demo catalog regardless of which dispensaries are loaded.
+
 ## Importing real dispensary listings
 
 `scripts/import-osm-dispensaries.mjs` is a standalone, dependency-free Node
