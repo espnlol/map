@@ -42,13 +42,15 @@ export function pointInPolygon(point: Coordinates, polygon: Coordinates[]): bool
   return inside
 }
 
-/** Whether a coordinate falls within the given search boundary (if any). */
+/** Whether a coordinate falls within the given search boundary (if any).
+ * For a multi-shape polygon boundary, "within" means inside at least one
+ * of the drawn shapes — not all of them. */
 export function isWithinBoundary(point: Coordinates, boundary: BoundaryShape): boolean {
   if (!boundary) return true
   if (boundary.kind === 'circle') {
     return distanceMiles(point, boundary.center) <= boundary.radiusMiles
   }
-  return pointInPolygon(point, boundary.points)
+  return boundary.polygons.some((polygon) => pointInPolygon(point, polygon))
 }
 
 export function formatDistance(miles: number): string {

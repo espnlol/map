@@ -34,6 +34,30 @@ export interface MenuPreviewItem {
   priceLabel: string
 }
 
+export interface DispensaryPreview {
+  /** a few sample items, highest-priced first */
+  items: MenuPreviewItem[]
+  /** total product count at this dispensary — real, already-loaded data,
+   * not a network call */
+  totalCount: number
+}
+
+/** Extracts every drawn shape's outer ring as plain {lat,lng} points —
+ * this is what lets multiple simultaneously-drawn polygons/rectangles all
+ * count toward the search area, instead of the latest one replacing the
+ * rest. Uses this app's own zero-dependency pointInPolygon (via
+ * isWithinBoundary/utils/geo.ts) rather than pulling in @turf/turf for
+ * the same job. */
+function collectPolygons(group: L.FeatureGroup): Coordinates[][] {
+  const polygons: Coordinates[][] = []
+  group.eachLayer((layer) => {
+    if (!('getLatLngs' in layer)) return
+    const outerRing = (layer as L.Polygon).getLatLngs()[0] as L.LatLng[]
+    polygons.push(outerRing.map((ll) => ({ lat: ll.lat, lng: ll.lng })))
+  })
+  return polygons
+}
+
 export interface DispensaryMapProps {
   dispensaries: Dispensary[]
   /** dispensaries currently allowed by the drawn boundary (or all, if none) */
@@ -48,8 +72,9 @@ export interface DispensaryMapProps {
   onPickCenter: (c: Coordinates) => void
   /** which draw tools (if any) are active on the toolbar */
   drawMode: 'none' | 'shape'
-  /** a few sample menu items per dispensary, shown in its map popup */
-  previews: Map<string, MenuPreviewItem[]>
+  /** a few sample menu items (+ total count) per dispensary, shown in its
+   * map popup */
+  previews: Map<string, DispensaryPreview>
   /** "View full menu" was clicked in a dispensary's popup */
   onViewMenu: (id: string) => void
 }
@@ -58,7 +83,7 @@ function buildPopupHtml(
   d: Dispensary,
   visible: boolean,
   dist: number | null,
-  preview: MenuPreviewItem[],
+  preview: DispensaryPreview,
 ): string {
   const parts: string[] = [`<div style="min-width:200px;max-width:240px">`]
   parts.push(`<strong>${escapeHtml(d.name)}</strong><br/>`)
@@ -86,11 +111,11 @@ function buildPopupHtml(
   if (!visible) {
     parts.push(`<span style="font-size:12px;font-style:italic;color:#a8a29e">Outside current search area</span>`)
   } else {
-    if (preview.length > 0) {
+    if (preview.items.length > 0) {
       parts.push(
         `<div style="margin-top:6px;padding-top:6px;border-top:1px solid #e7e5e4;font-size:12px">`,
       )
-      for (const item of preview) {
+      for (const item of preview.items) {
         parts.push(
           `<div style="display:flex;justify-content:space-between;gap:10px">` +
             `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(item.name)}</span>` +
@@ -98,6 +123,9 @@ function buildPopupHtml(
             `</div>`,
         )
       }
+      parts.push(
+        `<div style="margin-top:4px;color:#78716c">${preview.totalCount} items in this sample menu</div>`,
+      )
       parts.push(`</div>`)
     }
     parts.push(
@@ -188,25 +216,23 @@ export function DispensaryMap({
     })
     drawControlRef.current = drawControl
 
+    // Each of these adds/edits/removes ONE shape in `drawnItems`, but the
+    // boundary this app searches by is ALL shapes currently in that group
+    // — so every handler recomputes the full polygon list from scratch
+    // rather than tracking just the one shape that changed. This is what
+    // lets someone draw several separate areas (e.g. two neighborhoods)
+    // and have dispensaries in either one count.
     map.on(L.Draw.Event.CREATED, (e) => {
       const layer = (e as L.DrawEvents.Created).layer as L.Polygon
-      drawnItems.clearLayers()
       drawnItems.addLayer(layer)
-      const latlngs = (layer.getLatLngs()[0] as L.LatLng[]).map((ll) => ({ lat: ll.lat, lng: ll.lng }))
-      onBoundaryChangeRef.current({ kind: 'polygon', points: latlngs })
+      onBoundaryChangeRef.current({ kind: 'polygon', polygons: collectPolygons(drawnItems) })
     })
-    map.on(L.Draw.Event.EDITED, (e) => {
-      const layers = (e as L.DrawEvents.Edited).layers
-      layers.eachLayer((layer) => {
-        const latlngs = ((layer as L.Polygon).getLatLngs()[0] as L.LatLng[]).map((ll) => ({
-          lat: ll.lat,
-          lng: ll.lng,
-        }))
-        onBoundaryChangeRef.current({ kind: 'polygon', points: latlngs })
-      })
+    map.on(L.Draw.Event.EDITED, () => {
+      onBoundaryChangeRef.current({ kind: 'polygon', polygons: collectPolygons(drawnItems) })
     })
     map.on(L.Draw.Event.DELETED, () => {
-      onBoundaryChangeRef.current(null)
+      const remaining = collectPolygons(drawnItems)
+      onBoundaryChangeRef.current(remaining.length > 0 ? { kind: 'polygon', polygons: remaining } : null)
     })
 
     map.on('click', (e: L.LeafletMouseEvent) => {
@@ -265,7 +291,8 @@ export function DispensaryMap({
       // destroys the popup before/while it opens (a real bug, caught via a
       // Playwright click test, not just a hover-tooltip check). Dispensary
       // selection is a sidebar-checkbox-only action for that reason.
-      marker.bindPopup(buildPopupHtml(d, visible, dist, previews.get(d.id) ?? []), { maxWidth: 260 })
+      const preview = previews.get(d.id) ?? { items: [], totalCount: 0 }
+      marker.bindPopup(buildPopupHtml(d, visible, dist, preview), { maxWidth: 260 })
       marker.on('popupopen', () => {
         const btn = marker.getPopup()?.getElement()?.querySelector('.leafmap-view-menu-btn')
         btn?.addEventListener('click', () => onViewMenuRef.current(d.id), { once: true })
@@ -298,12 +325,15 @@ export function DispensaryMap({
         fillOpacity: 1,
       }).addTo(overlay)
     } else if (boundary?.kind === 'polygon') {
-      // Avoid clobbering a polygon the user just drew (already sitting in
-      // `drawn` from the CREATED handler) — only (re)render if it's empty,
-      // e.g. right after loading a persisted boundary from localStorage.
+      // Avoid clobbering shapes the user just drew/edited (already sitting
+      // in `drawn` from the CREATED/EDITED handlers) — only (re)render if
+      // empty, e.g. right after loading a persisted boundary from
+      // localStorage, where `drawn` starts out with nothing in it.
       if (drawn.getLayers().length === 0) {
-        const latlngs = boundary.points.map((p) => [p.lat, p.lng]) as [number, number][]
-        L.polygon(latlngs, { color: '#29774e', fillOpacity: 0.12 }).addTo(drawn)
+        for (const points of boundary.polygons) {
+          const latlngs = points.map((p) => [p.lat, p.lng]) as [number, number][]
+          L.polygon(latlngs, { color: '#29774e', fillOpacity: 0.12 }).addTo(drawn)
+        }
       }
     } else {
       drawn.clearLayers()

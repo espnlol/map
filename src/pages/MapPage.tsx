@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { dispensaries, products } from '../data'
 import { useAppStore } from '../store/useAppStore'
-import { DispensaryMap, type MenuPreviewItem } from '../components/map/DispensaryMap'
+import { DispensaryMap, type DispensaryPreview } from '../components/map/DispensaryMap'
 import {
   DETAIL_UNLOCK_THRESHOLD,
   dispensariesInBoundary,
@@ -52,17 +52,19 @@ export function MapPage() {
     userLocation ?? (boundary?.kind === 'circle' ? boundary.center : null)
 
   // A few sample menu items per dispensary (highest price first, matching
-  // the app's default sort) to preview right in the map popup.
+  // the app's default sort), plus the real total item count, to preview
+  // right in the map popup — all from data the app already has in memory,
+  // no network round trip needed.
   const previews = useMemo(() => {
-    const map = new Map<string, MenuPreviewItem[]>()
+    const map = new Map<string, DispensaryPreview>()
     for (const d of dispensaries) {
-      const items = products
-        .filter((p) => p.dispensaryId === d.id)
+      const dispensaryProducts = products.filter((p) => p.dispensaryId === d.id)
+      const items = dispensaryProducts
         .map((p) => ({ name: p.name, price: representativePrice(p, []) ?? 0 }))
         .sort((a, b) => b.price - a.price)
         .slice(0, 3)
         .map(({ name, price }) => ({ name, priceLabel: formatPrice(price) }))
-      map.set(d.id, items)
+      map.set(d.id, { items, totalCount: dispensaryProducts.length })
     }
     return map
   }, [])
@@ -193,7 +195,9 @@ export function MapPage() {
           {mode === 'shape' && (
             <p className="mt-3 text-xs text-stone-500 dark:text-stone-400">
               Use the polygon or rectangle tool in the top-left of the map to trace a custom area —
-              e.g. along specific roads or a neighborhood boundary — instead of a plain circle.
+              e.g. along specific roads or a neighborhood boundary — instead of a plain circle. Draw
+              more than one shape if you want (e.g. two separate neighborhoods) — a dispensary in
+              any of them counts. Use the edit tool below it to delete just one shape.
             </p>
           )}
 

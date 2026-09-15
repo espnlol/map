@@ -34,7 +34,10 @@ Leafly/Weedmaps-style menu browsing rather than an embed of either.
 - **Dispensary map** (Leaflet + OpenStreetMap) with a **distance/radius**
   setting *and* a **custom-shape draw tool** (polygon/rectangle) so you're
   not limited to a circle — trace along specific roads or a neighborhood
-  instead.
+  instead. You can draw **more than one shape at once** (e.g. two
+  non-adjacent neighborhoods) — a dispensary in any of them counts —
+  and delete just one shape via the map's edit toolbar without losing
+  the others.
 - **Progressive filter disclosure:** strain, brand, THC%, and terpene%
   filters stay locked (with an explanation) until you've narrowed your
   search to 5 or fewer dispensaries, exactly as requested — narrowing

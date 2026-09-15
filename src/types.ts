@@ -162,8 +162,11 @@ export const SORT_OPTIONS: { id: SortOption; label: string }[] = [
   { id: 'name-asc', label: 'Name: A to Z' },
 ]
 
-/** A custom search-area boundary the user has drawn on the map. */
+/** A custom search-area boundary the user has drawn on the map. A
+ * dispensary is in scope if it falls inside ANY one of `polygons` — you
+ * can draw as many separate shapes as you like (e.g. two neighborhoods
+ * that aren't adjacent) and they all count. */
 export type BoundaryShape =
   | { kind: 'circle'; center: Coordinates; radiusMiles: number }
-  | { kind: 'polygon'; points: Coordinates[] }
+  | { kind: 'polygon'; polygons: Coordinates[][] }
   | null
