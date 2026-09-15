@@ -15,19 +15,19 @@ one.
 > bank listing or dispensary placard for that genetic — not a lab assay
 > of any specific product. "Leafly-style" here means the search-and-browse
 > *pattern* (search by name/effect/flavor, dropdown detail sections,
-> related strains) — not Leafly's data or code. **213 strains** are
-> covered: 28 written by hand with full research (description, dominant
-> terpenes, the works), plus 185 pulled from a real open dataset — see
-> [Where the 213 strains come from](#where-the-213-strains-come-from)
+> related strains) — not Leafly's data or code. **261 strains** are
+> covered, from three sources — see
+> [Where the 261 strains come from](#where-the-261-strains-come-from)
 > below for exactly which is which and why. Genetic parentage mentioned
-> in a hand-written strain's description is noted as "commonly cited"
-> where the actual cross is disputed or was never formally documented,
-> rather than stated as settled fact.
+> in a description is noted as "commonly cited" where the actual cross
+> is disputed or was never formally documented, rather than stated as
+> settled fact — true for a lot of well-known strains, not just obscure
+> ones.
 
 ## Features
 
-- **213 strains** to search and browse (see
-  [Where the 213 strains come from](#where-the-213-strains-come-from)).
+- **261 strains** to search and browse (see
+  [Where the 261 strains come from](#where-the-261-strains-come-from)).
 - **Search** strains by name, effect ("relaxed"), or flavor ("citrus").
 - **Filter by lineage** — Indica / Sativa / Hybrid, multi-select.
 - **Strain detail view** with collapsible dropdown sections: Effects,
@@ -67,7 +67,7 @@ npm run typecheck
 src/
   types.ts                     # Strain / Terpene / StrainLineage
   data/
-    strains.ts                  # 213 strains: 28 hand-written in full
+    strains.ts                  # 261 strains: 76 hand-written in full
                                   # depth, 185 imported (see below) with
                                   # everything except dominantTerpenes
     terpenes.ts                  # 8 terpenes: aroma, effects, boiling
@@ -95,11 +95,14 @@ one-shot `focusStrainId`/`focusTerpeneId` used only when a cross-link
 asks to jump to a specific entry on the other tab. A plain nav-button
 click clears both, so it never "sticks" on an old jump target.
 
-## Where the 213 strains come from
+## Where the 261 strains come from
 
-`src/data/terpenes.ts` (all 8 entries) and the first 28 strains in
+`src/data/terpenes.ts` (all 8 entries) and 76 of the strains in
 `src/data/strains.ts` are hand-written reference content — not pulled
-from any API or site. The remaining 185 strains were imported from
+from any API or site (28 from the original build, plus 48 more added
+later to cover the modern "Cookies/Gelato/Mints" strain family that
+predates the 2017 dataset below entirely). The other 185 strains were
+imported from
 [kushyapp/cannabis-dataset](https://github.com/kushyapp/cannabis-dataset),
 a real, MIT-licensed open dataset published by Kushy (a cannabis app/API
 company) — a 2017 snapshot of their own API, not a scrape of a
@@ -116,7 +119,7 @@ What actually happened to those 185, in order:
    (→ helpsWith), and `flavor` fields — not its free-text `description`
    field, so nothing here is copied prose from that dataset; every
    description in this app was generated fresh from the structured
-   fields, or (for the original 28) written by hand.
+   fields, or (for the 76 hand-written strains) written from scratch.
 2. Dropped rows with no real effects/flavor data (many entries in a
    community-sourced 2017 snapshot are little more than a bare name) and
    rows whose lineage wasn't a clean Indica/Sativa/Hybrid — about half
@@ -124,7 +127,7 @@ What actually happened to those 185, in order:
 3. Removed side-effect tags (Dry Mouth, Paranoid, Anxious) that the
    source mixes into the same field as genuine subjective effects, to
    match this app's existing style of listing only the latter.
-4. Deduplicated against the 28 hand-written strains by name.
+4. Deduplicated against the hand-written strains by name.
 
 A few honesty notes, consistent with how the rest of this project has
 handled unverified data:
@@ -132,21 +135,21 @@ handled unverified data:
 - **The imported 185 have no `dominantTerpenes`** — the source dataset's
   terpene field was empty for nearly every row, so rather than guess,
   the strain detail view shows an explicit "not documented" note for
-  these instead of a fabricated terpene profile. Only the original 28
-  have a real terpene breakdown.
+  these instead of a fabricated terpene profile. Only the 76 hand-written
+  strains have a real terpene breakdown.
 - **Their descriptions are templated**, e.g. "A hybrid commonly reported
   for relaxed, happy, euphoric effects, with a citrus, sweet flavor
   profile" — directly derived from the same effects/flavor/helpsWith
-  data shown elsewhere on the page, not extra research. The original 28
-  have real, individually-researched paragraphs (history, genetics,
-  what makes them notable).
+  data shown elsewhere on the page, not extra research. The 76
+  hand-written strains have real, individually-written descriptions
+  (history, genetics, what makes them notable) instead.
 - **"Commonly reported to help with"** tags are shown with an explicit
   disclaimer in the UI — user-reported association, not medical advice,
   for either group.
 - **Terpene boiling points** are labeled approximate, since published
   vaporization guides vary by a few degrees depending on source and
   measurement method.
-- **Strain parentage** mentioned in the hand-written 28's descriptions is
+- **Strain parentage** mentioned in the hand-written strains' descriptions is
   hedged ("commonly cited as...") wherever a strain's actual genetic
   cross is disputed or was never formally documented — true for a
   surprising number of famous strains, OG Kush chief among them.
