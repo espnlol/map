@@ -10,7 +10,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host --port 4173",
     "typecheck": "tsc --noEmit && npm run typecheck --prefix server",
-    "postinstall": "npm install --prefix server"
+    "postinstall": "node scripts/maybe-install-server.js"
   },
   "dependencies": {
     "react": "^18.3.1",

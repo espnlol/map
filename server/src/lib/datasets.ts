@@ -1,7 +1,13 @@
 import zlib from 'node:zlib';
+import { promisify } from 'node:util';
 import { parse as parseCsvStream } from 'csv-parse';
 import { fetchTextCached, fetchBufferCached } from './cache';
 import { parseCsv, CsvRow } from './csv';
+
+const gunzip = promisify(zlib.gunzip);
+/** Hands control back to the event loop (a macrotask, not just a microtask) so a long parse loop can't starve
+ * incoming HTTP requests — this app has been observed to make the whole server briefly unresponsive without it. */
+const yieldToEventLoop = () => new Promise<void>((resolve) => setImmediate(resolve));
 
 const BASE = 'https://github.com/nflverse/nflverse-data/releases/download';
 const HOUR = 60 * 60 * 1000;
@@ -54,7 +60,7 @@ interface WeeklyAgg {
 async function aggregatePbpSeason(season: number, force: boolean): Promise<Map<string, WeeklyAgg>> {
   const url = `${BASE}/pbp/play_by_play_${season}.csv.gz`;
   const { buffer } = await fetchBufferCached(url, { key: `pbp_${season}_gz`, ttlMs: force ? 0 : 6 * HOUR });
-  const text = zlib.gunzipSync(buffer).toString('utf8');
+  const text = (await gunzip(buffer)).toString('utf8');
 
   const agg = new Map<string, WeeklyAgg>();
   const get = (playerId: string, team: string, opponent: string, week: number): WeeklyAgg => {
@@ -87,18 +93,31 @@ async function aggregatePbpSeason(season: number, force: boolean): Promise<Map<s
     return row;
   };
 
-  await new Promise<void>((resolve, reject) => {
-    const parser = parseCsvStream(text, { columns: true, skip_empty_lines: true, relax_column_count: true });
-    parser.on('readable', () => {
-      let record: CsvRow | null;
-      // eslint-disable-next-line no-cond-assign
-      while ((record = parser.read()) !== null) {
-        if (record.season_type !== 'REG') continue;
-        const week = Number(record.week);
-        const posteam = record.posteam;
-        const defteam = record.defteam;
-        if (!posteam || !defteam || !week) continue;
+  // Handing the parser the whole 100MB+ decompressed string in one write() lets it tokenize a huge chunk
+  // synchronously before the first record is even readable, which was observed to stall the server for
+  // several seconds despite the per-record yields below. Feeding it in small pieces (respecting backpressure)
+  // bounds each synchronous tokenizing pass to one piece instead of the whole file.
+  const parser = parseCsvStream({ columns: true, skip_empty_lines: true, relax_column_count: true });
+  const feed = (async () => {
+    const CHUNK = 65536;
+    for (let i = 0; i < text.length; i += CHUNK) {
+      if (!parser.write(text.slice(i, i + CHUNK))) {
+        await new Promise<void>((resolve) => parser.once('drain', resolve));
+      } else {
+        await yieldToEventLoop();
+      }
+    }
+    parser.end();
+  })();
 
+  let sinceYield = 0;
+  for await (const record of parser as AsyncIterable<CsvRow>) {
+    if (record.season_type === 'REG') {
+      const week = Number(record.week);
+      const posteam = record.posteam;
+      const defteam = record.defteam;
+
+      if (posteam && defteam && week) {
         if (record.passer_player_id) {
           const r = get(record.passer_player_id, posteam, defteam, week);
           r.fallbackName = record.passer_player_name || r.fallbackName;
@@ -129,10 +148,17 @@ async function aggregatePbpSeason(season: number, force: boolean): Promise<Map<s
           if (record.rush_touchdown === '1') r.rushingTds += 1;
         }
       }
-    });
-    parser.on('error', reject);
-    parser.on('end', () => resolve());
-  });
+    }
+
+    // Bare `for await` over a stream can resolve entirely on microtasks when data is already buffered, which
+    // never gives the event loop a chance to accept/serve other requests. Forcing a real yield periodically
+    // is what actually keeps the server responsive during this — see the comment on yieldToEventLoop above.
+    if (++sinceYield >= 2000) {
+      sinceYield = 0;
+      await yieldToEventLoop();
+    }
+  }
+  await feed;
 
   return agg;
 }

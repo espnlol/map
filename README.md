@@ -40,13 +40,74 @@ npm run build        # typecheck + production client build to dist/
 npm run typecheck
 ```
 
-For production, `cd server && npm run build && npm start` serves the built
-client and the API from one Node process on `$PORT` (default 8787).
-
 No API keys or accounts are required for the core matchup analysis — it pulls
 directly from nflverse's public data on every cold request and caches it to
 `server/.cache/` (gitignored) with a several-hour TTL. Use the **Refresh
 data** button in the header to force a re-pull mid-session.
+
+## Deploying
+
+This is a two-piece app (a static React frontend + a stateful Node API), so
+"deploy it" means picking one of two shapes:
+
+### Option A — one host, one process (simplest if the host supports it)
+
+`cd server && npm run build && npm start` serves the built client *and* the
+API from a single Node process on `$PORT`. Run `npm run build` at the repo
+root first so `dist/` exists for it to serve. This is the right shape for
+any host that runs a persistent Node process — a VPS, Railway, Render, Fly.io,
+etc. — but **not Vercel**: its serverless functions are ephemeral and don't
+support what this server does on startup (see the note below), so this
+option doesn't apply there.
+
+### Option B — split: frontend on Vercel, backend on Railway/Render
+
+This is the shape to use if you specifically want a Vercel link. The backend
+needs a host that runs a normal long-lived Node process — Railway and Render
+both do this on their free tiers; Vercel's serverless functions do not (more
+on why below).
+
+1. **Backend, on Railway or Render:** create a new web service from this
+   repo, with:
+   - Root/base directory: `server`
+   - Build command: `npm install && npm run build`
+   - Start command: `npm start`
+   - No environment variables are required to start. `PORT` is provided by
+     the platform automatically.
+   - Note the public URL it gives you (e.g. `https://your-app.up.railway.app`).
+2. **Frontend, on Vercel:** import this repo as a new project, with:
+   - Root directory: the repo root (leave as-is)
+   - Framework preset: Vite (auto-detected; `vercel.json` also pins this)
+   - Add an environment variable `VITE_API_BASE_URL` set to the backend URL
+     from step 1 (no trailing slash) — see `.env.example`.
+   - Deploy. You'll get your `*.vercel.app` link from this step.
+3. **Optional hardening:** back on the backend host, set a `CORS_ORIGIN` env
+   var to your Vercel URL from step 2 and redeploy — this locks the API to
+   only answer that origin instead of any origin. See `server/.env.example`.
+
+I can't run either of these steps myself: this project was built in a
+sandbox whose network policy blocks Vercel, Railway, Render, Fly.io, and
+Netlify outright (not something specific to one provider), and account
+linking has to happen on your end regardless, credentials-wise. Everything
+above is prepared and tested locally — CORS, the configurable API base URL,
+the build commands — so it's just clicking through the two dashboards.
+
+**Why not put the backend on Vercel too?** On startup (and whenever you hit
+**Refresh data**), the backend downloads several seasons of play-by-play,
+decompresses, and aggregates them into an in-memory weekly stats table — a
+one-time job that takes way longer than a serverless function is allowed to
+run, and produces state (that in-memory table, the on-disk cache) that a
+stateless, ephemeral function can't retain between requests anyway. It's
+written to not block other requests while that runs (see
+`server/src/lib/datasets.ts`), which only makes sense for a process that
+stays alive.
+
+**Cold starts:** on either option, the first request after a fresh deploy or
+a spun-down free-tier instance waking back up will lag behind the
+`[startup] weekly player stats warmed` log line while that aggregation
+finishes in the background — expect roughly a minute the very first time,
+much less once `server/.cache/` is warm (if the host's disk persists across
+restarts; Railway's does by default, plan-dependent on Render).
 
 ### Optional: connect your ESPN league
 
