@@ -1,69 +1,96 @@
-import { useState } from 'react'
-import { StrainsPage } from './pages/StrainsPage'
-import { TerpenesPage } from './pages/TerpenesPage'
-import { LeafIcon } from './components/Icons'
+import { useEffect, useState } from 'react';
+import { api } from './lib/api';
+import type { MetaResponse } from './lib/types';
+import { DashboardPage } from './pages/DashboardPage';
+import { MethodologyPage } from './pages/MethodologyPage';
+import { Spinner } from './components/ui';
 
-type Tab = 'strains' | 'terpenes'
-
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'strains', label: 'Strains' },
-  { id: 'terpenes', label: 'Terpenes' },
-]
+type Tab = 'dashboard' | 'methodology';
 
 export default function App() {
-  const [tab, setTabRaw] = useState<Tab>('strains')
-  const [focusStrainId, setFocusStrainId] = useState<string | null>(null)
-  const [focusTerpeneId, setFocusTerpeneId] = useState<string | null>(null)
+  const [tab, setTab] = useState<Tab>('dashboard');
+  const [meta, setMeta] = useState<MetaResponse | null>(null);
+  const [metaError, setMetaError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Plain nav click: switch tabs, don't jump to anything in particular.
-  function setTab(t: Tab) {
-    setTabRaw(t)
-    setFocusStrainId(null)
-    setFocusTerpeneId(null)
+  function loadMeta() {
+    api
+      .meta()
+      .then(setMeta)
+      .catch((err) => setMetaError(err.message));
   }
 
-  // Cross-links: a terpene's "strains commonly high in this" tag jumps to
-  // that strain's detail view; a strain's terpene breakdown's "Full
-  // breakdown →" jumps to that terpene's entry, scrolled into view.
-  function jumpToStrain(id: string) {
-    setTabRaw('strains')
-    setFocusStrainId(id)
-  }
-  function jumpToTerpene(id: string) {
-    setTabRaw('terpenes')
-    setFocusTerpeneId(id)
+  useEffect(loadMeta, []);
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    try {
+      await api.refresh();
+      loadMeta();
+    } finally {
+      setRefreshing(false);
+    }
   }
 
   return (
-    <div className="min-h-dvh bg-stone-50 dark:bg-stone-950">
-      <header
-        className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-stone-200 bg-white/90 px-4 backdrop-blur dark:border-stone-800 dark:bg-stone-900/90"
-        style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
-      >
-        <div className="flex items-center gap-2 font-semibold text-leaf-800 dark:text-leaf-300">
-          <LeafIcon width={20} height={20} />
-          StrainGuide
-        </div>
-        <nav className="flex gap-1 rounded-full bg-stone-100 p-1 dark:bg-stone-800">
-          {TABS.map((t) => (
+    <div className="min-h-screen">
+      <header className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+        <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3 px-4 py-4">
+          <div>
+            <h1 className="text-lg font-bold tracking-tight text-slate-900 dark:text-slate-50">Fourth Quarter</h1>
+            <p className="text-xs text-slate-500">
+              {meta ? (
+                <>
+                  {meta.season} season · Week {meta.week}
+                  {meta.dataStale && <span className="ml-1 text-amber-600 dark:text-amber-400">(showing cached data)</span>}
+                </>
+              ) : metaError ? (
+                <span className="text-red-600">{metaError}</span>
+              ) : (
+                'Loading…'
+              )}
+            </p>
+          </div>
+          <nav className="flex items-center gap-1 rounded-xl bg-slate-100 p-1 text-sm dark:bg-slate-800">
             <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                tab === t.id
-                  ? 'bg-white text-leaf-800 shadow-sm dark:bg-stone-700 dark:text-leaf-200'
-                  : 'text-stone-500 hover:text-stone-700 dark:text-stone-400'
+              onClick={() => setTab('dashboard')}
+              className={`rounded-lg px-3 py-1.5 font-medium transition ${
+                tab === 'dashboard'
+                  ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white'
+                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
               }`}
             >
-              {t.label}
+              Dashboard
             </button>
-          ))}
-        </nav>
+            <button
+              onClick={() => setTab('methodology')}
+              className={`rounded-lg px-3 py-1.5 font-medium transition ${
+                tab === 'methodology'
+                  ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white'
+                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+              }`}
+            >
+              Methodology
+            </button>
+          </nav>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+          >
+            {refreshing && <Spinner />}
+            Refresh data
+          </button>
+        </div>
       </header>
-      <main>
-        {tab === 'strains' && <StrainsPage focusStrainId={focusStrainId} jumpToTerpene={jumpToTerpene} />}
-        {tab === 'terpenes' && <TerpenesPage focusTerpeneId={focusTerpeneId} jumpToStrain={jumpToStrain} />}
+
+      <main className="mx-auto max-w-4xl px-4 py-6">
+        {tab === 'dashboard' ? <DashboardPage meta={meta} /> : <MethodologyPage meta={meta} />}
       </main>
+
+      <footer className="mx-auto max-w-4xl px-4 pb-8 pt-2 text-center text-xs text-slate-400">
+        Data via nflverse (CC-BY 4.0) and Pro Football Reference. Not affiliated with the NFL, ESPN, or PFF.
+      </footer>
     </div>
-  )
+  );
 }

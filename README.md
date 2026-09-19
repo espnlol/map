@@ -1,170 +1,161 @@
-# StrainGuide — Strain & Terpene Explorer
+# Fourth Quarter — Start/Sit Matchup Analyzer
 
-A Leafly-style strain explorer: search and filter cannabis strains by
-lineage, effects, or flavor; open a strain to see a full breakdown —
-effects, flavor/aroma, dominant terpenes (with their own deep-dive:
-aroma, commonly-reported effects, approximate boiling point, and what
-else they're found in), what people commonly report using it for, and
-related strains. A dedicated Terpenes tab covers the same compounds in
-more depth, cross-linked back to which strains are commonly high in each
-one.
+A weekly fantasy football start/sit tool for your own lineup. Add your WRs and
+RBs and it pulls their real matchup for the week — opponent history, defensive
+tendencies, and (for WR/RB specifically, per how this was scoped) the coverage
+and pass-rush detail below — and shows a transparent lean with every number
+that went into it. It never collapses that down to a single unexplained score.
 
-> **This is reference content, not live or lab data.** Every strain's
-> effects/flavors/dominant terpenes/"helps with" tags are the kind of
-> commonly-reported, industry-general information you'd see on a seed
-> bank listing or dispensary placard for that genetic — not a lab assay
-> of any specific product. "Leafly-style" here means the search-and-browse
-> *pattern* (search by name/effect/flavor, dropdown detail sections,
-> related strains) — not Leafly's data or code. **261 strains** are
-> covered, from three sources — see
-> [Where the 261 strains come from](#where-the-261-strains-come-from)
-> below for exactly which is which and why. Genetic parentage mentioned
-> in a description is noted as "commonly cited" where the actual cross
-> is disputed or was never formally documented, rather than stated as
-> settled fact — true for a lot of well-known strains, not just obscure
-> ones.
+## What it actually checks
 
-## Features
+**For a WR:**
+- The receiver's own career history against this specific opponent.
+- The opponent's pass defense allowed to the WR position — this season, last
+  season, and the last 4 games.
+- The opponent's most-used cornerbacks' season-long coverage stats (targets,
+  completion% allowed, yards/target, passer rating allowed).
+- The starting QB's history against this defense, with the opponent's current
+  defensive coordinator shown alongside it for context.
 
-- **261 strains** to search and browse (see
-  [Where the 261 strains come from](#where-the-261-strains-come-from)).
-- **Search** strains by name, effect ("relaxed"), or flavor ("citrus").
-- **Filter by lineage** — Indica / Sativa / Hybrid, multi-select.
-- **Strain detail view** with collapsible dropdown sections: Effects,
-  Flavor & aroma, Terpene breakdown, and Commonly reported to help with
-  (clearly labeled as user-reported, not medical advice).
-- **Terpene breakdown, in depth** — each dominant terpene on a strain's
-  page shows its aroma, a top effect, and links to a full entry with a
-  longer description, every commonly-reported effect, an approximate
-  boiling point, other foods/plants it's found in, and which other
-  strains are commonly high in it.
-- **Related strains** — a similarity score based on shared lineage,
-  effects, flavors, and dominant terpenes (see `utils/related.ts`).
-  Explicitly not a claim about real genetic relation.
-- **Terpenes tab** — browse all 8 terpenes covered, cross-linked back to
-  Strains in both directions (click a strain from a terpene's page,
-  click a terpene from a strain's page).
+**For a RB:**
+- The same own-history and run-defense-allowed splits as above.
+- The RB's own offensive line pass-block quality this season (proxied from
+  the team's own QB pressure rate — see Methodology below for why).
+- The opponent's individual pass rushers' real production this season
+  (pressures/hurries/hits/sacks), including their rate specifically in games
+  against offensive lines rated the same tier as this matchup.
 
-## Stack
-
-React 18 + TypeScript + Vite + Tailwind CSS. No backend, no database, no
-persisted state at all — every screen just reads the static reference
-data in `src/data/`. `npm run build` outputs a fully static `dist/`.
+Every one of those is a real, live, computed number — never a guess dressed
+up as one. Where the ideal data isn't publicly available for free (true
+per-play coverage assignments, per-lineman pass-block grades), the app uses
+the closest honest substitute and says so explicitly, both in the app's
+**Methodology** tab and below.
 
 ## Running it
 
 ```bash
-npm install
-npm run dev        # http://localhost:5173
-npm run build       # typecheck + production build to dist/
-npm run preview     # serve the production build locally
+npm install        # also installs server/ (postinstall)
+npm run dev         # client on :5173 (proxies /api to the server), server on :8787
+npm run build        # typecheck + production client build to dist/
 npm run typecheck
 ```
+
+For production, `cd server && npm run build && npm start` serves the built
+client and the API from one Node process on `$PORT` (default 8787).
+
+No API keys or accounts are required for the core matchup analysis — it pulls
+directly from nflverse's public data on every cold request and caches it to
+`server/.cache/` (gitignored) with a several-hour TTL. Use the **Refresh
+data** button in the header to force a re-pull mid-session.
+
+### Optional: connect your ESPN league
+
+The dashboard's roster is manual-add by default (search, click, done —
+persisted in your browser's local storage, never sent anywhere but this app's
+own server). There's also a best-effort ESPN import: enter your league ID and
+team ID (and, for a private league, your `espn_s2`/`SWID` session cookies) and
+it fetches your roster server-side, so private-league cookies never touch
+your browser's network tab. **This could not be tested against a real ESPN
+league** while building it — the sandbox this was built in blocks network
+access to espn.com entirely — so treat it as unverified until you've tried it
+against your own league. Manual search always works and is the better-tested
+path.
 
 ## Architecture
 
 ```
-src/
-  types.ts                     # Strain / Terpene / StrainLineage
-  data/
-    strains.ts                  # 261 strains: 76 hand-written in full
-                                  # depth, 185 imported (see below) with
-                                  # everything except dominantTerpenes
-    terpenes.ts                  # 8 terpenes: aroma, effects, boiling
-                                  # point, also-found-in, a description
-    index.ts                     # exports + id-keyed lookup maps
-  utils/
-    related.ts                   # relatedStrains() similarity scoring
-  components/
-    ui.tsx                       # Card/Chip/GhostButton/EmptyState +
-                                  # Dropdown (native <details>-based)
-    strains/
-      StrainDetail.tsx            # the detail view + its dropdowns
-      lineageStyle.ts              # shared indica/sativa/hybrid badge colors
-  pages/
-    StrainsPage.tsx               # search + lineage filter + grid,
-                                    # or a selected strain's detail
-    TerpenesPage.tsx              # the 8 terpenes, each expandable
-  App.tsx                        # 2-tab shell (Strains, Terpenes) +
-                                   # the cross-tab "jump to X" plumbing
+src/                    React 18 + TypeScript + Vite + Tailwind client
+  lib/                   API client, shared types, localStorage roster persistence
+  components/             PlayerSearch, MatchupCard (the main event), EspnConnect, ui primitives
+  pages/                  DashboardPage, MethodologyPage
+server/
+  src/
+    lib/                   nflverse data fetch+cache, CSV parsing, player search/ID crosswalks
+    matchup/                one module per signal (coverage, pass rush, O-line tier, opponent-allowed,
+                             career history, coordinators) + util.ts's transparent percentile/composite scoring
+    espn.ts                 best-effort ESPN Fantasy API proxy
+    routes.ts, index.ts      Express app
+  config/coordinators.json   the defensive-coordinator list described below
 ```
 
-There's no client-side router — `App.tsx` holds `activeTab` plus a
-one-shot `focusStrainId`/`focusTerpeneId` used only when a cross-link
-(a terpene tag on a strain's page, or a strain chip on a terpene's page)
-asks to jump to a specific entry on the other tab. A plain nav-button
-click clears both, so it never "sticks" on an old jump target.
+## Data sources & attribution
 
-## Where the 261 strains come from
+- Play-by-play, rosters, snap counts, depth charts, and schedules come from
+  [nflverse](https://github.com/nflverse/nflverse-data), an open,
+  community-maintained NFL data project released under **CC-BY 4.0**.
+- Cornerback coverage and pass-rush stats come from **Pro Football
+  Reference's** advanced stats, redistributed via nflverse.
+- This project is not affiliated with the NFL, ESPN, PFF, or Pro Football
+  Reference.
 
-`src/data/terpenes.ts` (all 8 entries) and 76 of the strains in
-`src/data/strains.ts` are hand-written reference content — not pulled
-from any API or site (28 from the original build, plus 48 more added
-later to cover the modern "Cookies/Gelato/Mints" strain family that
-predates the 2017 dataset below entirely). The other 185 strains were
-imported from
-[kushyapp/cannabis-dataset](https://github.com/kushyapp/cannabis-dataset),
-a real, MIT-licensed open dataset published by Kushy (a cannabis app/API
-company) — a 2017 snapshot of their own API, not a scrape of a
-competitor. That distinction mattered: a search for open strain datasets
-also turned up at least one GitHub repo that openly describes itself as
-scraped from a commercial site, which was not used here for the same
-reason this project has never scraped Weedmaps, Leafly, or any dispensary
-site directly — reusing someone else's unauthorized scrape doesn't make
-it authorized.
+### Why weekly stats are computed from play-by-play, not nflverse's own "player_stats" file
 
-What actually happened to those 185, in order:
+nflverse publishes a convenient pre-aggregated weekly player-stats file that
+almost every fantasy tool built on this ecosystem uses. While building this,
+that file (and its per-position offense/defense/kicking variants) turned out
+to be **frozen since May 2025** — it stops mid-way through the 2024 season
+and was never updated for 2025 or 2026, even though it's still served with a
+current `Last-Modified` header. Rather than silently ship stale data, this
+app rebuilds the same weekly box scores directly from nflverse's play-by-play
+release (the `pbp` tag), which **is** updated same-day. Fantasy points are
+computed as standard full-PPR from that box score; your league's exact
+scoring settings (0.5 PPR, TE premium, return TDs, fumble/2-point rules) may
+differ slightly. If nflverse's own file starts updating again, swapping back
+would simplify `server/src/lib/datasets.ts`, but there's no need to wait on
+that.
 
-1. Pulled the dataset's `name`, `type` (→ lineage), `effects`, `ailment`
-   (→ helpsWith), and `flavor` fields — not its free-text `description`
-   field, so nothing here is copied prose from that dataset; every
-   description in this app was generated fresh from the structured
-   fields, or (for the 76 hand-written strains) written from scratch.
-2. Dropped rows with no real effects/flavor data (many entries in a
-   community-sourced 2017 snapshot are little more than a bare name) and
-   rows whose lineage wasn't a clean Indica/Sativa/Hybrid — about half
-   the ~440-row file didn't clear this bar.
-3. Removed side-effect tags (Dry Mouth, Paranoid, Anxious) that the
-   source mixes into the same field as genuine subjective effects, to
-   match this app's existing style of listing only the latter.
-4. Deduplicated against the hand-written strains by name.
+### Cornerback matchups — what this is and isn't
 
-A few honesty notes, consistent with how the rest of this project has
-handled unverified data:
+There's no free, public data on which specific defender covered which
+specific receiver on a given play. That's the kind of all-22 charting PFF and
+NFL Next Gen Stats sell, not open data. What's shown instead is each
+cornerback's own season-long coverage performance, for the corners who've
+actually played the most defensive snaps at the position this season (real
+game participation, not a scraped depth chart — see below for why that
+distinction mattered). Read it as "how good has this corner been in
+coverage," not "this corner will be matched on this receiver."
 
-- **The imported 185 have no `dominantTerpenes`** — the source dataset's
-  terpene field was empty for nearly every row, so rather than guess,
-  the strain detail view shows an explicit "not documented" note for
-  these instead of a fabricated terpene profile. Only the 76 hand-written
-  strains have a real terpene breakdown.
-- **Their descriptions are templated**, e.g. "A hybrid commonly reported
-  for relaxed, happy, euphoric effects, with a citrus, sweet flavor
-  profile" — directly derived from the same effects/flavor/helpsWith
-  data shown elsewhere on the page, not extra research. The 76
-  hand-written strains have real, individually-written descriptions
-  (history, genetics, what makes them notable) instead.
-- **"Commonly reported to help with"** tags are shown with an explicit
-  disclaimer in the UI — user-reported association, not medical advice,
-  for either group.
-- **Terpene boiling points** are labeled approximate, since published
-  vaporization guides vary by a few degrees depending on source and
-  measurement method.
-- **Strain parentage** mentioned in the hand-written strains' descriptions is
-  hedged ("commonly cited as...") wherever a strain's actual genetic
-  cross is disputed or was never formally documented — true for a
-  surprising number of famous strains, OG Kush chief among them.
+### Offensive line vs. pass rush — what this is and isn't
 
-## Deploying
+Per-lineman pass-block grades are PFF's paywalled product; there's no free
+equivalent. As the best available substitute, an offense's O-line quality is
+proxied by how often its own quarterback(s) have been pressured this season
+(from PFR's pressure stats): a lower pressure rate implies better protection.
+That's a whole-offense number, not a per-player grade, and it's shaped by
+more than the O-line alone (scheme, QB mobility, play calling). The
+opponent's individual pass rushers are still shown with their real,
+individual production, plus their pressure rate specifically in games
+against O-lines that graded into the same tier as the matchup being viewed.
 
-Fully static — `npm run build` outputs `dist/`, and that's the whole
-deployable artifact. Any static host works: [Vercel](https://vercel.com),
-Netlify, Cloudflare Pages, GitHub Pages. No environment variables, no
-database.
+### Defensive coordinators — unverified, on purpose flagged as such
 
-## Known dev-only advisory
+Each opponent's current DC is shown next to the QB-vs-defense history, for
+context (e.g. "this history is against a totally different coordinator").
+`server/config/coordinators.json` was assembled from web search rather than a
+structured feed — Wikipedia and team sites were both unreachable from the
+build environment — and has **not** been checked against a primary source.
+Two entries that came back contradictory (the same person credited to two
+teams) were dropped rather than guessed at; a few teams have no entry at all
+for the same reason. It's a plain, hand-editable JSON file — fix anything
+you know to be wrong, and prefer leaving a team `null` over guessing, since a
+wrong name is worse than an honest gap here.
 
-`npm audit` flags advisories in `esbuild`/`vite` (dev server only — they
-let a malicious page make requests to, or reach paths outside, the local
-dev server while `npm run dev` is running). They don't affect `npm run
-build` output. Fixing them requires a Vite 8 major upgrade; left as-is
-here to avoid an unvetted breaking change.
+### Depth charts vs. snap counts
+
+nflverse's `depth_charts` release is a rolling log of every intraday
+snapshot all season (not one current snapshot), and — independent of that —
+depth-chart projections can simply be stale or wrong between games. Every
+"who's the starter" decision in this app (starting QB, most-used corners)
+is instead resolved from **actual snap counts** in games already played,
+falling back to the depth chart only before Week 1 snap data exists.
+
+## Known limitations
+
+- WR and RB only. QB/TE roster entries are shown but not analyzed — the
+  request this was built for was specifically about receivers and backs.
+- Early in a season, "this season" splits can be a 1-2 game sample. Every
+  such stat shows its game count; the UI surfaces last season's full-sample
+  numbers right alongside it for exactly this reason.
+- The composite "lean" is a transparent weighted average of the percentiles
+  shown beneath it — not a validated predictive model. Treat it as a
+  starting point for your own judgment, not a verdict.
