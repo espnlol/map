@@ -13,10 +13,13 @@ type SortKey = 'callsign' | 'altitude' | 'speed' | 'emergency'
 
 const RADII = [25, 50, 100, 150, 250]
 
+// Set when building the sandboxed web preview, which can't reach outside APIs.
+const PREVIEW = import.meta.env.VITE_PREVIEW === '1'
+
 export default function App() {
   const [center, setCenter] = useState<Center>(PRESETS[0])
   const [radius, setRadius] = useState(50)
-  const [mode, setMode] = useState<Mode>('live')
+  const [mode, setMode] = useState<Mode>(PREVIEW ? 'demo' : 'live')
   const [cats, setCats] = useState<Set<string>>(new Set())
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState<SortKey>('emergency')
@@ -130,7 +133,8 @@ export default function App() {
 
       {mode === 'demo' && (
         <div className="bg-amber-500/15 px-4 py-1 text-center text-xs text-amber-200">
-          DEMO MODE — simulated traffic, not real aircraft. Switch to LIVE for real ADS-B data.
+          DEMO MODE — simulated traffic, not real aircraft.{' '}
+          {PREVIEW ? 'This web preview cannot reach live flight data; run the app from GitHub for real planes.' : 'Switch to LIVE for real ADS-B data.'}
         </div>
       )}
 
