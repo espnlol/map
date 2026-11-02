@@ -71,7 +71,8 @@ export interface Aircraft {
   takeoff: TimeValue | null
   touchdown: TimeValue | null
   route?: Route
-  trail: [number, number][]
+  /** [lat, lon, altitude ft or null on the ground] seen while SkyWatch was open */
+  trail: [number, number, number | null][]
   special: import('./lib/special').SpecialMatch[]
 }
 

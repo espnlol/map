@@ -2,6 +2,41 @@ import { useEffect, useRef } from 'react'
 import L from 'leaflet'
 import type { Aircraft, Center } from '../types'
 import { categoryInfo } from '../lib/categories'
+import type { FlightPath } from '../lib/history'
+
+/** Altitude → colour, low = orange, high = violet (same idea as most flight trackers). */
+export function altColor(alt: number | null): string {
+  if (alt === null) return '#94a3b8'
+  const t = Math.max(0, Math.min(1, alt / 40000))
+  const hue = 25 + t * 255
+  return `hsl(${Math.round(hue / 15) * 15} 90% 58%)`
+}
+
+/** Merge consecutive same-colour segments so long paths stay fast. */
+function drawAltitudePath(points: [number, number, number | null][], layer: L.LayerGroup, renderer: L.Renderer, weight: number) {
+  let run: [number, number][] = []
+  let runColor = ''
+  const flush = () => {
+    if (run.length > 1) L.polyline(run, { color: runColor, weight, opacity: 0.95, renderer, interactive: false }).addTo(layer)
+  }
+  for (let i = 1; i < points.length; i++) {
+    const [lat0, lon0] = points[i - 1]
+    const [lat1, lon1, alt] = points[i]
+    if (Math.abs(lon1 - lon0) > 180) {
+      flush()
+      run = []
+      continue
+    }
+    const color = altColor(alt)
+    if (color !== runColor) {
+      flush()
+      run = [[lat0, lon0]]
+      runColor = color
+    }
+    run.push([lat1, lon1])
+  }
+  flush()
+}
 
 interface Props {
   aircraft: Aircraft[]
@@ -10,6 +45,8 @@ interface Props {
   center: Center
   radiusNm: number
   onSearchHere: (lat: number, lon: number) => void
+  showTrails: boolean
+  path: FlightPath | null
 }
 
 function planeSvg(color: string, rotation: number, size: number, isHeli: boolean) {
@@ -33,11 +70,14 @@ function iconFor(a: Aircraft, selected: boolean) {
   })
 }
 
-export default function MapView({ aircraft, selected, onSelect, center, radiusNm, onSearchHere }: Props) {
+export default function MapView({ aircraft, selected, onSelect, center, radiusNm, onSearchHere, showTrails, path }: Props) {
   const el = useRef<HTMLDivElement>(null)
   const map = useRef<L.Map | null>(null)
   const markers = useRef(new Map<string, { m: L.Marker; key: string }>())
-  const trail = useRef<L.Polyline | null>(null)
+  const trails = useRef<L.LayerGroup | null>(null)
+  const selPath = useRef<L.LayerGroup | null>(null)
+  const renderer = useRef<L.Renderer>(L.canvas({ padding: 0.3 }))
+  const fittedFor = useRef<string | null>(null)
   const routeLine = useRef<L.Polyline | null>(null)
   const ring = useRef<L.Circle | null>(null)
   const resizeObs = useRef<ResizeObserver | null>(null)
@@ -69,6 +109,8 @@ export default function MapView({ aircraft, selected, onSelect, center, radiusNm
     const ro = new ResizeObserver(() => m.invalidateSize())
     ro.observe(el.current)
     resizeObs.current = ro
+    trails.current = L.layerGroup().addTo(m)
+    selPath.current = L.layerGroup().addTo(m)
     m.on('click', () => selectRef.current(null))
     map.current = m
     return () => {
@@ -140,28 +182,67 @@ export default function MapView({ aircraft, selected, onSelect, center, radiusNm
       }
     }
 
-    // Trail + route line for the selected aircraft.
-    trail.current?.remove()
+    // Short trails for every aircraft (where it's been while SkyWatch was open).
+    trails.current?.clearLayers()
+    if (showTrails) {
+      for (const a of aircraft) {
+        if (a.hex === selected || a.trail.length < 2) continue
+        L.polyline(a.trail.map(([la, lo]) => [la, lo] as [number, number]), {
+          color: a.emergency ? '#ef4444' : categoryInfo(a.category).color,
+          weight: 1.5,
+          opacity: 0.45,
+          renderer: renderer.current,
+          interactive: false,
+        }).addTo(trails.current!)
+      }
+    }
+
+    // Full flight path + route line for the selected aircraft.
+    selPath.current?.clearLayers()
     routeLine.current?.remove()
-    trail.current = null
     routeLine.current = null
     const sel = aircraft.find((a) => a.hex === selected)
     if (sel) {
-      if (sel.trail.length > 1) trail.current = L.polyline(sel.trail, { color: '#f8fafc', weight: 2, opacity: 0.8 }).addTo(m)
-      const o = sel.route?.origin
+      let pts: [number, number, number | null][] = sel.trail
+      if (path && path.points.length > 1) {
+        const lastT = path.points[path.points.length - 1][3]
+        pts = path.points.map(([la, lo, al]) => [la, lo, al] as [number, number, number | null])
+        // add anything we've seen live since the history file was written
+        if (Date.now() - lastT < 10 * 60 * 1000) pts = [...pts, [sel.lat, sel.lon, sel.onGround ? null : sel.altitude]]
+      }
+      if (pts.length > 1) {
+        drawAltitudePath(pts, selPath.current!, renderer.current, 3)
+        L.circleMarker([pts[0][0], pts[0][1]], { radius: 4, color: '#f8fafc', weight: 2, fillColor: '#0f172a', fillOpacity: 1, renderer: renderer.current })
+          .bindTooltip(path?.fromTakeoff ? 'Takeoff' : 'Start of known path')
+          .addTo(selPath.current!)
+      }
+      if (path && fittedFor.current !== sel.hex && pts.length > 1) {
+        fittedFor.current = sel.hex
+        m.fitBounds(L.latLngBounds(pts.map(([la, lo]) => [la, lo] as [number, number])).extend([sel.lat, sel.lon]), { padding: [40, 40], maxZoom: 11 })
+      }
       const d = sel.route?.destination
-      const pts: [number, number][] = []
-      if (o?.lat != null && o.lon != null) pts.push([o.lat, o.lon])
-      pts.push([sel.lat, sel.lon])
-      if (d?.lat != null && d.lon != null) pts.push([d.lat, d.lon])
-      if (pts.length > 1)
-        routeLine.current = L.polyline(pts, { color: '#38bdf8', weight: 1.5, dashArray: '6 6', opacity: 0.7, interactive: false }).addTo(m)
+      if (d?.lat != null && d.lon != null)
+        routeLine.current = L.polyline([[sel.lat, sel.lon], [d.lat, d.lon]], { color: '#38bdf8', weight: 1.5, dashArray: '6 6', opacity: 0.7, interactive: false }).addTo(m)
+    } else {
+      fittedFor.current = null
     }
-  }, [aircraft, selected])
+  }, [aircraft, selected, showTrails, path])
 
   return (
     <div className="relative h-full w-full">
       <div ref={el} className="h-full w-full" />
+      {selected && (
+        <div className="pointer-events-none absolute bottom-6 left-1/2 z-[500] -translate-x-1/2 rounded-lg bg-slate-900/90 px-3 py-1.5 text-[10px] text-slate-300 ring-1 ring-slate-700">
+          <div className="mb-1 text-center font-semibold uppercase tracking-wider text-slate-400">Path altitude</div>
+          <div className="flex items-center gap-1.5">
+            <span>Ground</span>
+            {[null, 0, 5000, 10000, 20000, 30000, 40000].map((v, i) => (
+              <span key={i} className="h-2 w-5 rounded-sm" style={{ background: altColor(v) }} />
+            ))}
+            <span>40,000 ft</span>
+          </div>
+        </div>
+      )}
       <button
         className="absolute right-3 top-3 z-[500] rounded-lg bg-slate-900/90 px-3 py-2 text-xs font-medium text-sky-300 shadow ring-1 ring-slate-700 hover:bg-slate-800"
         onClick={() => {

@@ -2,12 +2,17 @@ import type { Aircraft, TimeValue } from '../types'
 import { categoryInfo } from '../lib/categories'
 import { SPECIAL_GROUPS } from '../lib/special'
 import { squawkInfo } from '../lib/squawks'
+import { fetchPhoto, lookupLinks, type FlightPath, type PlanePhoto } from '../lib/history'
+import { useEffect, useState } from 'react'
 import { PHASE_LABEL, airportCode, airportName, fmtAltFull, fmtMph, fmtSpeed, fmtTime, fmtVr } from '../lib/format'
 import { distanceNm } from '../lib/geo'
 
 interface Props {
   aircraft: Aircraft
   onClose: () => void
+  path: FlightPath | null
+  pathLoading: boolean
+  demo: boolean
 }
 
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
@@ -42,7 +47,7 @@ function TimeBlock({ label, t, fallback }: { label: string; t: TimeValue | null;
   )
 }
 
-export default function DetailPanel({ aircraft: a, onClose }: Props) {
+export default function DetailPanel({ aircraft: a, onClose, path, pathLoading, demo }: Props) {
   const info = categoryInfo(a.category)
   const r = a.route
   const o = r?.origin
@@ -53,6 +58,7 @@ export default function DetailPanel({ aircraft: a, onClose }: Props) {
 
   return (
     <div className="flex flex-col gap-3 p-4">
+      <Photo hex={a.hex} registration={a.registration} demo={demo} model={a.model} />
       <div className="flex items-start justify-between gap-2">
         <div>
           <div className="font-mono text-2xl font-bold tracking-wide">{a.callsign}</div>
@@ -141,6 +147,26 @@ export default function DetailPanel({ aircraft: a, onClose }: Props) {
 
       <SquawkBox code={a.squawk} />
 
+      <PathInfo path={path} loading={pathLoading} demo={demo} trailPoints={a.trail.length} />
+
+      <div>
+        <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Find this plane</div>
+        <div className="grid grid-cols-2 gap-1.5">
+          {lookupLinks(a).map((l) => (
+            <a
+              key={l.label}
+              href={l.href}
+              target="_blank"
+              rel="noreferrer"
+              title={l.hint}
+              className="rounded-lg bg-slate-800/60 px-3 py-2 text-sm text-sky-300 ring-1 ring-slate-700 hover:bg-slate-800 hover:text-sky-200"
+            >
+              {l.label} ↗<div className="truncate text-[10px] text-slate-500">{l.hint}</div>
+            </a>
+          ))}
+        </div>
+      </div>
+
       <p className="text-[11px] leading-relaxed text-slate-500">
         <span className="text-emerald-400">Observed</span> times were seen live by this app (ground → air or air → ground).{' '}
         <span className="text-amber-300">Estimated</span> times come from distance to/from the airports at current speed — not
@@ -177,6 +203,59 @@ function SquawkBox({ code }: { code?: string }) {
           <div className="text-xs text-slate-400">This aircraft isn't sending a squawk code.</div>
         )}
       </div>
+    </div>
+  )
+}
+
+function Photo({ hex, registration, demo, model }: { hex: string; registration?: string; demo: boolean; model?: string }) {
+  const [photo, setPhoto] = useState<PlanePhoto | null | undefined>(undefined)
+  useEffect(() => {
+    if (demo) return setPhoto(null)
+    let stop = false
+    setPhoto(undefined)
+    fetchPhoto(hex, registration).then((p) => !stop && setPhoto(p))
+    return () => {
+      stop = true
+    }
+  }, [hex, registration, demo])
+
+  if (photo === undefined)
+    return <div className="aspect-[16/9] w-full animate-pulse rounded-lg bg-slate-800" aria-label="Loading photo" />
+  if (photo === null)
+    return (
+      <div className="flex aspect-[16/9] w-full flex-col items-center justify-center gap-1 rounded-lg bg-slate-800/60 text-center text-xs text-slate-500">
+        <span className="text-3xl opacity-40">✈</span>
+        {demo ? 'Photos appear for real aircraft in LIVE mode' : `No photo of this exact aircraft yet${model ? ` (${model})` : ''}`}
+      </div>
+    )
+  return (
+    <figure className="overflow-hidden rounded-lg bg-slate-800">
+      <a href={photo.link} target="_blank" rel="noreferrer">
+        <img src={photo.large} alt={`Photo of ${registration ?? hex}`} className="aspect-[16/9] w-full object-cover" />
+      </a>
+      <figcaption className="px-2 py-1 text-[10px] text-slate-400">
+        Photo © {photo.photographer} ·{' '}
+        <a href={photo.link} target="_blank" rel="noreferrer" className="text-sky-400 hover:underline">
+          Planespotters.net
+        </a>
+      </figcaption>
+    </figure>
+  )
+}
+
+function PathInfo({ path, loading, demo, trailPoints }: { path: FlightPath | null; loading: boolean; demo: boolean; trailPoints: number }) {
+  let text: string
+  if (path && path.points.length > 1) {
+    const mins = Math.round((Date.now() - path.points[0][3]) / 60000)
+    const dur = mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`
+    text = `${path.fromTakeoff ? 'Full path since takeoff' : 'Path for the last'} ${path.fromTakeoff ? `(${dur} ago)` : dur}, from ${path.source} history.`
+  } else if (loading) text = 'Loading where this plane has been…'
+  else if (demo) text = 'Demo mode shows the path since SkyWatch opened.'
+  else text = trailPoints > 1 ? 'No history found, so the path shows only what SkyWatch has seen since it opened.' : 'No path history found for this aircraft yet.'
+  return (
+    <div className="flex items-center gap-2 rounded-lg bg-slate-800/60 px-3 py-2 text-xs text-slate-400">
+      <span className="h-0.5 w-6 shrink-0 rounded-full" style={{ background: 'linear-gradient(90deg,#fb923c,#facc15,#4ade80,#38bdf8,#a78bfa)' }} />
+      {text}
     </div>
   )
 }

@@ -35,6 +35,18 @@ get a full-screen SkyWatch icon. It only works while the computer is on and on t
 "Near me" doesn't work this way, because iPhones only share location with HTTPS sites. The app
 remembers the last airport or spot you picked.
 
+## Flight paths, photos and links
+
+- **Trails**: every aircraft draws a thin trail of where it has been since SkyWatch opened
+  (turn them off with the *Trails* checkbox).
+- **Full flight path**: click an aircraft to load its whole flight so far from the adsb.lol
+  (or airplanes.live) history files, coloured by altitude, with a dot where it took off.
+  It refreshes every minute.
+- **Photo**: a photo of that exact airframe from Planespotters.net, credited to its
+  photographer. Not every aircraft has one.
+- **Find this plane**: links to FlightAware, Flightradar24, ADS-B Exchange, adsb.lol,
+  Planespotters, JetPhotos and Wikipedia for the aircraft or its model.
+
 ## Filtering
 
 - **Aircraft category** chips (multi-select, with live counts), using the ADS-B emitter category the

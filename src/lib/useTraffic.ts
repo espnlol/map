@@ -21,7 +21,7 @@ export interface TrafficState {
 
 const POLL_MS = { live: 6000, demo: 2000 }
 const STALE_MS = 60_000
-const TRAIL_LEN = 80
+const TRAIL_LEN = 400
 
 function phaseOf(onGround: boolean, alt: number | null, vr: number | null): Phase {
   if (onGround) return 'ground'
@@ -138,7 +138,8 @@ export function useTraffic(center: Center, radiusNm: number, mode: Mode): Traffi
         }
 
         const last = a.trail[a.trail.length - 1]
-        if (!last || last[0] !== a.lat || last[1] !== a.lon) a.trail = [...a.trail, [a.lat, a.lon] as [number, number]].slice(-TRAIL_LEN)
+        if (!last || last[0] !== a.lat || last[1] !== a.lon)
+          a.trail = [...a.trail, [a.lat, a.lon, onGround ? null : altitude] as [number, number, number | null]].slice(-TRAIL_LEN)
 
         // Observed transitions beat estimates.
         let observedTakeoff = prev?.takeoff?.kind === 'observed' ? prev.takeoff : null

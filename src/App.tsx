@@ -5,6 +5,7 @@ import FlightList from './components/FlightList'
 import DetailPanel from './components/DetailPanel'
 import SquawkGuide from './components/SquawkGuide'
 import PhoneGuide from './components/PhoneGuide'
+import { fetchFlightPath, type FlightPath } from './lib/history'
 import { useTraffic, type Mode } from './lib/useTraffic'
 import { PRESETS } from './lib/presets'
 import { categoryKey } from './lib/categories'
@@ -33,6 +34,10 @@ export default function App() {
   const [tab, setTab] = useState<'flights' | 'events'>('flights')
   const [showSquawks, setShowSquawks] = useState(false)
   const [showPhone, setShowPhone] = useState(false)
+  const [showTrails, setShowTrails] = useState<boolean>(() => load('skywatch.trails', true))
+  useEffect(() => save('skywatch.trails', showTrails), [showTrails])
+  const [path, setPath] = useState<FlightPath | null>(null)
+  const [pathLoading, setPathLoading] = useState(false)
 
   const traffic = useTraffic(center, radius, mode)
   const emergencies = traffic.aircraft.filter((a) => a.emergency)
@@ -70,6 +75,25 @@ export default function App() {
   }, [traffic.aircraft, cats, query, sort, emergOnly, hideGround])
 
   const selectedAc = traffic.aircraft.find((a) => a.hex === selected) ?? null
+
+  // Full flight history for the clicked aircraft, refreshed every minute.
+  useEffect(() => {
+    setPath(null)
+    if (!selected || mode === 'demo') return
+    let stop = false
+    const get = () => {
+      setPathLoading(true)
+      fetchFlightPath(selected)
+        .then((p) => !stop && setPath(p))
+        .finally(() => !stop && setPathLoading(false))
+    }
+    get()
+    const t = setInterval(get, 60_000)
+    return () => {
+      stop = true
+      clearInterval(t)
+    }
+  }, [selected, mode])
 
   const changeCenter = (c: Center) => {
     setSelected(null)
@@ -185,7 +209,7 @@ export default function App() {
         <aside className="flex min-h-0 flex-1 flex-col overflow-y-auto border-slate-800 bg-slate-900 md:w-[400px] md:flex-none md:overflow-hidden md:border-r">
           {selectedAc ? (
             <div className="min-h-0 flex-1 overflow-y-auto">
-              <DetailPanel aircraft={selectedAc} onClose={() => setSelected(null)} />
+              <DetailPanel aircraft={selectedAc} onClose={() => setSelected(null)} path={path} pathLoading={pathLoading} demo={mode === 'demo'} />
             </div>
           ) : (
             <>
@@ -204,6 +228,9 @@ export default function App() {
                   </label>
                   <label className="flex items-center gap-1">
                     <input type="checkbox" checked={hideGround} onChange={(e) => setHideGround(e.target.checked)} /> Hide on ground
+                  </label>
+                  <label className="flex items-center gap-1">
+                    <input type="checkbox" checked={showTrails} onChange={(e) => setShowTrails(e.target.checked)} /> Trails
                   </label>
                   <select className="ml-auto rounded bg-slate-800 px-1.5 py-1 ring-1 ring-slate-700" value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
                     <option value="emergency">Sort: emergencies first</option>
@@ -248,6 +275,8 @@ export default function App() {
             center={center}
             radiusNm={radius}
             onSearchHere={(lat, lon) => changeCenter({ lat, lon, label: `${lat.toFixed(2)}, ${lon.toFixed(2)}` })}
+            showTrails={showTrails}
+            path={path}
           />
         </main>
       </div>

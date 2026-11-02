@@ -18,18 +18,26 @@ function lanAddresses(): string[] {
 
 // Proxy the public ADS-B APIs through the dev/preview server so the browser
 // never has to worry about CORS.
-const proxy = {
-  '/proxy/adsblol': {
-    target: 'https://api.adsb.lol',
-    changeOrigin: true,
-    rewrite: (p: string) => p.replace(/^\/proxy\/adsblol/, ''),
-  },
-  '/proxy/airplaneslive': {
-    target: 'https://api.airplanes.live',
-    changeOrigin: true,
-    rewrite: (p: string) => p.replace(/^\/proxy\/airplaneslive/, ''),
-  },
+const upstream: Record<string, string> = {
+  adsblol: 'https://api.adsb.lol',
+  airplaneslive: 'https://api.airplanes.live',
+  adsblolglobe: 'https://globe.adsb.lol',
+  airplanesliveglobe: 'https://globe.airplanes.live',
+  planespotters: 'https://api.planespotters.net',
 }
+
+// Keys end in "/" so "/proxy/adsblol/" doesn't also catch "/proxy/adsblolglobe/".
+const proxy = Object.fromEntries(
+  Object.entries(upstream).map(([name, target]) => [
+    `/proxy/${name}/`,
+    {
+      target,
+      changeOrigin: true,
+      headers: { Referer: `${target}/` },
+      rewrite: (p: string) => p.slice(`/proxy/${name}`.length),
+    },
+  ]),
+)
 
 // https://vitejs.dev/config/
 export default defineConfig({
