@@ -230,6 +230,7 @@ export class DemoTraffic {
       ;[p.lat, p.lon] = oc
       p.alt = rand(3000, 7000)
       p.gs = rand(45, 60)
+      p.squawk = '1202'
     } else if (kind === 'military') {
       const oc = destinationPoint(c.lat!, c.lon!, rand(0, 360), rand(15, R * 0.6))
       p.orbit = { lat: oc[0], lon: oc[1], r: 12, dir: 1 }
@@ -241,6 +242,7 @@ export class DemoTraffic {
       p.alt = Math.round(rand(25, 75)) * 100
       p.gs = rand(95, 140)
       p.targetAlt = p.alt
+      p.squawk = Math.random() < 0.6 ? '1200' : p.squawk
     }
     this.planes.set(p.hex, p)
   }

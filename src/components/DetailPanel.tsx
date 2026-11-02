@@ -1,6 +1,7 @@
 import type { Aircraft, TimeValue } from '../types'
 import { categoryInfo } from '../lib/categories'
 import { SPECIAL_GROUPS } from '../lib/special'
+import { squawkInfo } from '../lib/squawks'
 import { PHASE_LABEL, airportCode, airportName, fmtAltFull, fmtMph, fmtSpeed, fmtTime, fmtVr } from '../lib/format'
 import { distanceNm } from '../lib/geo'
 
@@ -130,20 +131,52 @@ export default function DetailPanel({ aircraft: a, onClose }: Props) {
         <TimeBlock label="Touchdown" t={a.touchdown} fallback={a.onGround ? 'On the ground' : 'Unknown'} />
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2 [&>*:last-child]:col-span-2">
         <Stat label="Altitude" value={fmtAltFull(a.altitude, a.onGround)} sub={a.altitude != null ? `${Math.round(a.altitude * 0.3048).toLocaleString()} m` : undefined} />
         <Stat label="Ground speed" value={fmtSpeed(a.groundSpeed)} sub={fmtMph(a.groundSpeed)} />
         <Stat label="Vertical rate" value={fmtVr(a.verticalRate)} />
         <Stat label="Heading" value={a.track != null ? `${Math.round(a.track)}°` : '—'} />
-        <Stat label="Squawk" value={a.squawk ?? '—'} />
         <Stat label="Type code" value={a.typeCode ?? '—'} sub={a.hex.startsWith("~") ? `Non-ICAO ${a.hex.slice(1).toUpperCase()}` : `ICAO ${a.hex.toUpperCase()}`} />
       </div>
+
+      <SquawkBox code={a.squawk} />
 
       <p className="text-[11px] leading-relaxed text-slate-500">
         <span className="text-emerald-400">Observed</span> times were seen live by this app (ground → air or air → ground).{' '}
         <span className="text-amber-300">Estimated</span> times come from distance to/from the airports at current speed — not
         airline schedules.
       </p>
+    </div>
+  )
+}
+
+function SquawkBox({ code }: { code?: string }) {
+  const info = squawkInfo(code)
+  const tone =
+    info?.level === 'emergency'
+      ? 'bg-red-500/15 ring-red-500/60'
+      : info?.level === 'special'
+        ? 'bg-amber-400/10 ring-amber-400/50'
+        : 'bg-slate-800/60 ring-transparent'
+  return (
+    <div className={`flex gap-3 rounded-lg px-3 py-2 ring-1 ${tone}`}>
+      <div>
+        <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Squawk</div>
+        <div className="font-mono text-lg text-slate-100">{code ?? '—'}</div>
+      </div>
+      <div className="min-w-0 flex-1 border-l border-slate-700 pl-3">
+        {info ? (
+          <>
+            <div className="text-sm font-semibold text-slate-100">
+              {info.title}
+              {info.where && <span className="ml-1.5 text-xs font-normal text-slate-500">{info.where}</span>}
+            </div>
+            <div className="text-xs text-slate-400">{info.meaning}</div>
+          </>
+        ) : (
+          <div className="text-xs text-slate-400">This aircraft isn't sending a squawk code.</div>
+        )}
+      </div>
     </div>
   )
 }

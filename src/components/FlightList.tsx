@@ -1,6 +1,7 @@
 import type { Aircraft } from '../types'
 import { categoryInfo } from '../lib/categories'
 import { SPECIAL_GROUPS } from '../lib/special'
+import { squawkInfo } from '../lib/squawks'
 import { airportCode, fmtAlt, fmtSpeed } from '../lib/format'
 
 interface Props {
@@ -37,6 +38,11 @@ export default function FlightList({ aircraft, selected, onSelect }: Props) {
                       </span>
                     )
                   })}
+                  {!a.emergency && squawkInfo(a.squawk)?.level === 'special' && (
+                    <span className="rounded bg-amber-400 px-1.5 text-[10px] font-bold uppercase text-slate-950" title={squawkInfo(a.squawk)!.meaning}>
+                      {a.squawk} {squawkInfo(a.squawk)!.title}
+                    </span>
+                  )}
                   {a.emergency && (
                     <span className="rounded bg-red-500 px-1.5 text-[10px] font-bold uppercase text-white">{a.emergency.label}</span>
                   )}

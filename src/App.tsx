@@ -3,6 +3,7 @@ import MapView from './components/MapView'
 import CategoryFilter from './components/CategoryFilter'
 import FlightList from './components/FlightList'
 import DetailPanel from './components/DetailPanel'
+import SquawkGuide from './components/SquawkGuide'
 import { useTraffic, type Mode } from './lib/useTraffic'
 import { PRESETS } from './lib/presets'
 import { categoryKey } from './lib/categories'
@@ -27,6 +28,7 @@ export default function App() {
   const [hideGround, setHideGround] = useState(false)
   const [selected, setSelected] = useState<string | null>(null)
   const [tab, setTab] = useState<'flights' | 'events'>('flights')
+  const [showSquawks, setShowSquawks] = useState(false)
 
   const traffic = useTraffic(center, radius, mode)
   const emergencies = traffic.aircraft.filter((a) => a.emergency)
@@ -79,6 +81,9 @@ export default function App() {
 
   return (
     <div className="flex h-full flex-col">
+      {showSquawks && (
+        <SquawkGuide onClose={() => setShowSquawks(false)} current={new Set(traffic.aircraft.map((a) => a.squawk ?? ''))} />
+      )}
       {/* Header */}
       <header className="flex flex-wrap items-center gap-2 border-b border-slate-800 bg-slate-900 px-4 py-2">
         <div className="mr-2 flex items-center gap-2">
@@ -111,6 +116,9 @@ export default function App() {
         </select>
         <button onClick={useMyLocation} className="rounded-md bg-slate-800 px-2.5 py-1.5 text-sm ring-1 ring-slate-700 hover:bg-slate-700">
           📍 Near me
+        </button>
+        <button onClick={() => setShowSquawks(true)} className="rounded-md bg-slate-800 px-2.5 py-1.5 text-sm ring-1 ring-slate-700 hover:bg-slate-700">
+          Squawk codes
         </button>
         <div className="ml-auto flex items-center gap-3">
           <div className="flex overflow-hidden rounded-md ring-1 ring-slate-700">
