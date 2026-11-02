@@ -5,6 +5,7 @@ import { modelName } from './aircraftTypes'
 import { DemoTraffic } from './demo'
 import { detectEmergency } from './emergency'
 import { distanceNm } from './geo'
+import { detectSpecial } from './special'
 
 export type Mode = 'live' | 'demo'
 
@@ -133,6 +134,7 @@ export function useTraffic(center: Center, radiusNm: number, mode: Mode): Traffi
           touchdown: null,
           route,
           trail: prev ? prev.trail : [],
+          special: detectSpecial(r, callsign),
         }
 
         const last = a.trail[a.trail.length - 1]

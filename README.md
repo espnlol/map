@@ -20,11 +20,26 @@ For every aircraft in range:
   - **estimated**: worked out from the distance to/from the airports at the current or typical cruise
     speed. These are *not* airline schedules.
 
+## Starting it on Windows (double-click)
+
+1. Install Node.js once from https://nodejs.org (the LTS version).
+2. Double-click **Start SkyWatch.bat**. The first run installs everything, then your browser
+   opens on the app. Keep the black window open while you use it; close it to stop.
+3. To get the latest version, double-click **Update SkyWatch.bat**, then start it again.
+
 ## Filtering
 
 - **Aircraft category** chips (multi-select, with live counts), using the ADS-B emitter category the
   aircraft broadcasts itself: Light, Small, Large, B757 (high vortex), Heavy, High performance,
   Rotorcraft, Glider, Balloon, Ultralight, Drone, Ground vehicle, Unknown
+- **Who's flying** chips:
+  - **Military / Gov**: air forces, navies, coast guards, police, customs, NASA and similar.
+    Matched by the aircraft database's military flag, the US/UK military transponder address
+    blocks, known callsigns (RCH, SAM, SPAR, CNV, RRR…) or the registered operator.
+  - **Sports**: likely sports-team flights. Matched by team-owned jets, charter airlines that
+    mostly fly teams (GlobalX, iAero) or the operator name. Many team flights go out on regular
+    airline charters with ordinary callsigns, so this group misses some.
+  Every match shows the reason it matched on the aircraft's detail panel.
 - Search by callsign, registration, type, model or airport code
 - "Emergencies only" and "Hide on ground" toggles
 - Sort by emergencies first, callsign, altitude or speed

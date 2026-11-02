@@ -34,11 +34,11 @@ export default function App() {
   const visible = useMemo(() => {
     const q = query.trim().toUpperCase()
     const list = traffic.aircraft.filter((a) => {
-      if (cats.size && !cats.has(categoryKey(a.category))) return false
+      if (cats.size && !cats.has(categoryKey(a.category)) && !a.special.some((sp) => cats.has(sp.tag))) return false
       if (emergOnly && !a.emergency) return false
       if (hideGround && a.onGround) return false
       if (q) {
-        const hay = [a.callsign, a.registration, a.typeCode, a.model, a.route?.origin?.iata, a.route?.destination?.iata, a.route?.origin?.icao, a.route?.destination?.icao]
+        const hay = [a.callsign, a.registration, a.operator, a.typeCode, a.model, a.route?.origin?.iata, a.route?.destination?.iata, a.route?.origin?.icao, a.route?.destination?.icao]
           .filter(Boolean)
           .join(' ')
           .toUpperCase()
@@ -168,7 +168,7 @@ export default function App() {
           ) : (
             <>
               <div className="space-y-2 border-b border-slate-800 p-3">
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Aircraft category</div>
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Aircraft size &amp; type</div>
                 <CategoryFilter aircraft={traffic.aircraft} active={cats} onChange={setCats} />
                 <input
                   value={query}

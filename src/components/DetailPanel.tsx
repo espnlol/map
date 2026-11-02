@@ -1,5 +1,6 @@
 import type { Aircraft, TimeValue } from '../types'
 import { categoryInfo } from '../lib/categories'
+import { SPECIAL_GROUPS } from '../lib/special'
 import { PHASE_LABEL, airportCode, airportName, fmtAltFull, fmtMph, fmtSpeed, fmtTime, fmtVr } from '../lib/format'
 import { distanceNm } from '../lib/geo'
 
@@ -68,6 +69,18 @@ export default function DetailPanel({ aircraft: a, onClose }: Props) {
           ✕
         </button>
       </div>
+
+      {a.special.map((sp) => {
+        const g = SPECIAL_GROUPS.find((x) => x.tag === sp.tag)!
+        return (
+          <div key={sp.tag} className="rounded-lg px-3 py-2 ring-1" style={{ background: `${g.color}1f`, borderColor: g.color, boxShadow: `inset 0 0 0 1px ${g.color}66` }}>
+            <div className="text-sm font-bold" style={{ color: g.color }}>{g.label}</div>
+            <div className="text-xs text-slate-300">{sp.reason}</div>
+          </div>
+        )
+      })}
+
+      {a.operator && <div className="text-xs text-slate-400">Operator: <span className="text-slate-200">{a.operator}</span></div>}
 
       {a.emergency ? (
         <div className="rounded-lg border border-red-500/60 bg-red-500/15 px-3 py-2">

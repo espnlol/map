@@ -1,5 +1,6 @@
 import type { Aircraft } from '../types'
 import { categoryInfo } from '../lib/categories'
+import { SPECIAL_GROUPS } from '../lib/special'
 import { airportCode, fmtAlt, fmtSpeed } from '../lib/format'
 
 interface Props {
@@ -28,6 +29,14 @@ export default function FlightList({ aircraft, selected, onSelect }: Props) {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="font-mono text-sm font-semibold tracking-wide">{a.callsign}</span>
+                  {a.special.map((sp) => {
+                    const g = SPECIAL_GROUPS.find((x) => x.tag === sp.tag)!
+                    return (
+                      <span key={sp.tag} className="rounded px-1.5 text-[10px] font-bold uppercase text-slate-950" style={{ background: g.color }}>
+                        {g.label}
+                      </span>
+                    )
+                  })}
                   {a.emergency && (
                     <span className="rounded bg-red-500 px-1.5 text-[10px] font-bold uppercase text-white">{a.emergency.label}</span>
                   )}

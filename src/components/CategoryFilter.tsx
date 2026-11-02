@@ -1,4 +1,5 @@
 import { CATEGORIES, categoryKey } from '../lib/categories'
+import { SPECIAL_GROUPS } from '../lib/special'
 import type { Aircraft } from '../types'
 
 interface Props {
@@ -12,6 +13,7 @@ export default function CategoryFilter({ aircraft, active, onChange }: Props) {
   for (const a of aircraft) {
     const k = categoryKey(a.category)
     counts.set(k, (counts.get(k) ?? 0) + 1)
+    for (const s of a.special) counts.set(s.tag, (counts.get(s.tag) ?? 0) + 1)
   }
   const all = active.size === 0
   const toggle = (code: string) => {
@@ -21,6 +23,7 @@ export default function CategoryFilter({ aircraft, active, onChange }: Props) {
     onChange(next)
   }
   return (
+    <div className="space-y-2">
     <div className="flex flex-wrap gap-1.5">
       <button
         onClick={() => onChange(new Set())}
@@ -48,6 +51,27 @@ export default function CategoryFilter({ aircraft, active, onChange }: Props) {
           </button>
         )
       })}
+    </div>
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Who's flying</span>
+      {SPECIAL_GROUPS.map((g) => {
+        const n = counts.get(g.tag) ?? 0
+        const on = active.has(g.tag)
+        return (
+          <button
+            key={g.tag}
+            title={g.description}
+            onClick={() => toggle(g.tag)}
+            className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1 transition ${
+              on ? 'bg-slate-100 text-slate-900 ring-white' : 'bg-slate-800 text-slate-300 ring-slate-700 hover:bg-slate-700'
+            }`}
+          >
+            <span className="h-2 w-2 rotate-45" style={{ background: g.color }} />
+            {g.label} <span className="opacity-60">{n}</span>
+          </button>
+        )
+      })}
+    </div>
     </div>
   )
 }

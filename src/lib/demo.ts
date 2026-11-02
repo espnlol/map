@@ -73,6 +73,7 @@ interface SimPlane {
   vr: number
   squawk: string
   emergency?: string
+  ownOp?: string
   route?: Route
   // behaviour state
   timer: number
@@ -121,9 +122,21 @@ export class DemoTraffic {
     const others = this.otherAirports()
     let tpl: Template
     let flight: string
+    let special: 'mil' | 'sports' | null = null
     if (kind === 'departure' || kind === 'arrival' || kind === 'overflight') {
-      tpl = Math.random() < 0.12 ? pick(BIZJETS) : pick(AIRLINE_TYPES)
-      flight = tpl.category === 'A2' && BIZJETS.includes(tpl) ? reg() : pick(AIRLINES) + Math.floor(rand(10, 2999))
+      const roll = Math.random()
+      if (roll < 0.04 || (initial && kind === 'overflight' && !this.planes.size)) {
+        special = 'mil'
+        tpl = pick([{ t: 'C17', category: 'A5' }, { t: 'K35R', category: 'A5' }, { t: 'C30J', category: 'A3' }])
+        flight = 'RCH' + Math.floor(rand(100, 999))
+      } else if (roll < 0.08 || (initial && kind === 'arrival' && this.planes.size === 7)) {
+        special = 'sports'
+        tpl = pick([{ t: 'A320', category: 'A3' }, { t: 'B763', category: 'A5' }])
+        flight = 'GXA' + Math.floor(rand(100, 999))
+      } else {
+        tpl = Math.random() < 0.12 ? pick(BIZJETS) : pick(AIRLINE_TYPES)
+        flight = tpl.category === 'A2' && BIZJETS.includes(tpl) ? reg() : pick(AIRLINES) + Math.floor(rand(10, 2999))
+      }
     } else if (kind === 'heli') {
       tpl = pick(HELIS)
       flight = reg()
@@ -139,7 +152,7 @@ export class DemoTraffic {
     }
 
     const p: SimPlane = {
-      hex: hex(),
+      hex: special === 'mil' ? 'ae' + Math.floor(Math.random() * 0xffff).toString(16).padStart(4, '0') : hex(),
       flight,
       reg: reg(),
       t: tpl.t,
@@ -210,6 +223,7 @@ export class DemoTraffic {
       p.alt = Math.round(rand(8, 20)) * 100
       p.gs = rand(80, 130)
       if (Math.random() < 0.3) p.emergency = 'lifeguard'
+      else if (Math.random() < 0.5) p.ownOp = pick(['COUNTY OF SUFFOLK POLICE', 'STATE POLICE AVIATION', 'COUNTY SHERIFF OFFICE'])
     } else if (kind === 'glider') {
       const oc = destinationPoint(c.lat!, c.lon!, rand(0, 360), rand(10, R * 0.5))
       p.orbit = { lat: oc[0], lon: oc[1], r: 0.6, dir: 1 }
@@ -265,6 +279,7 @@ export class DemoTraffic {
       baro_rate: p.onGround ? 0 : Math.round(p.vr / 64) * 64,
       squawk: p.squawk,
       emergency: p.emergency ?? 'none',
+      ownOp: p.ownOp,
       lat: p.lat,
       lon: p.lon,
       seen: 0,

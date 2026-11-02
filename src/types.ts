@@ -72,6 +72,7 @@ export interface Aircraft {
   touchdown: TimeValue | null
   route?: Route
   trail: [number, number][]
+  special: import('./lib/special').SpecialMatch[]
 }
 
 export interface EmergencyInfo {
