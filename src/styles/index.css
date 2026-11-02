@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: light dark;
+  color-scheme: dark;
 }
 
 html,
@@ -13,5 +13,33 @@ body,
 }
 
 body {
-  @apply bg-stone-50 text-stone-900 dark:bg-stone-950 dark:text-stone-100;
+  @apply bg-slate-950 text-slate-100;
+}
+
+.leaflet-container {
+  background: #0b1220;
+  font: inherit;
+}
+
+.plane-icon {
+  background: transparent;
+  border: none;
+}
+
+.plane-icon svg {
+  transition: transform 0.4s linear;
+  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.8));
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(0.6); opacity: 0.9; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+
+.emergency-ring {
+  position: absolute;
+  inset: -6px;
+  border-radius: 9999px;
+  border: 2px solid #ef4444;
+  animation: pulse-ring 1.2s ease-out infinite;
 }
