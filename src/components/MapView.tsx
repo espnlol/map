@@ -63,7 +63,7 @@ export default function MapView({ aircraft, selected, onSelect, center, radiusNm
       L.tileLayer(`${esri}/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}`, { maxNativeZoom: 18, maxZoom: 19 }),
     ])
     dark.addTo(m)
-    L.control.layers({ Dark: dark, Streets: streets, Satellite: satellite }, undefined, { position: 'bottomleft' }).addTo(m)
+    L.control.layers({ Dark: dark, Streets: streets, Satellite: satellite }, undefined, { position: 'topleft' }).addTo(m)
     // The container can be sized after Leaflet initialises (flex layout), so
     // keep Leaflet in sync or it zooms/positions against a 0×0 box.
     const ro = new ResizeObserver(() => m.invalidateSize())

@@ -28,6 +28,9 @@ echo  ==========================================================
 echo   SkyWatch is starting. Your browser will open by itself.
 echo   KEEP THIS WINDOW OPEN while you use the app.
 echo   Close this window to turn SkyWatch off.
+echo.
+echo   On your iPhone: click the Phone button in SkyWatch
+echo   and scan the QR code with your camera.
 echo  ==========================================================
 echo.
 call npm run dev -- --open

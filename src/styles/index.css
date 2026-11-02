@@ -16,6 +16,14 @@ body {
   @apply bg-slate-950 text-slate-100;
 }
 
+/* Keep clear of the iPhone notch / home bar when opened from the Home Screen. */
+#root {
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
 .leaflet-container {
   background: #0b1220;
   font: inherit;
@@ -42,4 +50,11 @@ body {
   border-radius: 9999px;
   border: 2px solid #ef4444;
   animation: pulse-ring 1.2s ease-out infinite;
+}
+
+@media (max-width: 640px) {
+  .leaflet-control-attribution {
+    font-size: 9px;
+    max-width: 70%;
+  }
 }

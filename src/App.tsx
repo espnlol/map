@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import MapView from './components/MapView'
 import CategoryFilter from './components/CategoryFilter'
 import FlightList from './components/FlightList'
 import DetailPanel from './components/DetailPanel'
 import SquawkGuide from './components/SquawkGuide'
+import PhoneGuide from './components/PhoneGuide'
 import { useTraffic, type Mode } from './lib/useTraffic'
 import { PRESETS } from './lib/presets'
 import { categoryKey } from './lib/categories'
@@ -18,8 +19,10 @@ const RADII = [25, 50, 100, 150, 250]
 const PREVIEW = import.meta.env.VITE_PREVIEW === '1'
 
 export default function App() {
-  const [center, setCenter] = useState<Center>(PRESETS[0])
-  const [radius, setRadius] = useState(50)
+  const [center, setCenter] = useState<Center>(() => load('skywatch.center', PRESETS[0]))
+  const [radius, setRadius] = useState<number>(() => load('skywatch.radius', 50))
+  useEffect(() => save('skywatch.center', center), [center])
+  useEffect(() => save('skywatch.radius', radius), [radius])
   const [mode, setMode] = useState<Mode>(PREVIEW ? 'demo' : 'live')
   const [cats, setCats] = useState<Set<string>>(new Set())
   const [query, setQuery] = useState('')
@@ -29,6 +32,7 @@ export default function App() {
   const [selected, setSelected] = useState<string | null>(null)
   const [tab, setTab] = useState<'flights' | 'events'>('flights')
   const [showSquawks, setShowSquawks] = useState(false)
+  const [showPhone, setShowPhone] = useState(false)
 
   const traffic = useTraffic(center, radius, mode)
   const emergencies = traffic.aircraft.filter((a) => a.emergency)
@@ -75,23 +79,29 @@ export default function App() {
   const useMyLocation = () => {
     navigator.geolocation?.getCurrentPosition(
       (p) => changeCenter({ lat: p.coords.latitude, lon: p.coords.longitude, label: 'My location' }),
-      () => alert('Could not get your location.'),
+      () =>
+        alert(
+          window.isSecureContext
+            ? 'Could not get your location. Check that location access is allowed for this site.'
+            : 'Your phone only shares location with secure websites, so "Near me" can\'t work here. Pick an airport, or pan the map and tap "Track planes here".',
+        ),
     )
   }
 
   return (
     <div className="flex h-full flex-col">
+      {showPhone && <PhoneGuide onClose={() => setShowPhone(false)} />}
       {showSquawks && (
         <SquawkGuide onClose={() => setShowSquawks(false)} current={new Set(traffic.aircraft.map((a) => a.squawk ?? ''))} />
       )}
       {/* Header */}
-      <header className="flex flex-wrap items-center gap-2 border-b border-slate-800 bg-slate-900 px-4 py-2">
+      <header className="flex flex-wrap items-center gap-1.5 border-b border-slate-800 bg-slate-900 px-3 py-2 sm:gap-2 sm:px-4">
         <div className="mr-2 flex items-center gap-2">
           <span className="text-xl">✈</span>
           <h1 className="text-lg font-bold tracking-tight">SkyWatch</h1>
         </div>
         <select
-          className="rounded-md bg-slate-800 px-2 py-1.5 text-sm ring-1 ring-slate-700"
+          className="max-w-[46%] rounded-md bg-slate-800 px-1.5 py-1 text-xs ring-1 ring-slate-700 sm:max-w-none sm:px-2 sm:py-1.5 sm:text-sm"
           value={PRESETS.some((p) => p.label === center.label) ? center.label : ''}
           onChange={(e) => {
             const p = PRESETS.find((x) => x.label === e.target.value)
@@ -104,21 +114,25 @@ export default function App() {
           ))}
         </select>
         <select
-          className="rounded-md bg-slate-800 px-2 py-1.5 text-sm ring-1 ring-slate-700"
+          className="max-w-[46%] rounded-md bg-slate-800 px-1.5 py-1 text-xs ring-1 ring-slate-700 sm:max-w-none sm:px-2 sm:py-1.5 sm:text-sm"
           value={radius}
           onChange={(e) => setRadius(Number(e.target.value))}
         >
           {RADII.map((r) => (
             <option key={r} value={r}>
-              {r} nm radius
+              {r} nm
             </option>
           ))}
         </select>
-        <button onClick={useMyLocation} className="rounded-md bg-slate-800 px-2.5 py-1.5 text-sm ring-1 ring-slate-700 hover:bg-slate-700">
-          📍 Near me
+        <button onClick={useMyLocation} className="rounded-md bg-slate-800 px-2 py-1 text-xs ring-1 ring-slate-700 hover:bg-slate-700 sm:px-2.5 sm:py-1.5 sm:text-sm">
+          📍<span className="hidden sm:inline"> Near me</span>
         </button>
-        <button onClick={() => setShowSquawks(true)} className="rounded-md bg-slate-800 px-2.5 py-1.5 text-sm ring-1 ring-slate-700 hover:bg-slate-700">
-          Squawk codes
+        <button onClick={() => setShowSquawks(true)} className="rounded-md bg-slate-800 px-2 py-1 text-xs ring-1 ring-slate-700 hover:bg-slate-700 sm:px-2.5 sm:py-1.5 sm:text-sm">
+          <span className="sm:hidden">Codes</span>
+          <span className="hidden sm:inline">Squawk codes</span>
+        </button>
+        <button onClick={() => setShowPhone(true)} className="rounded-md bg-slate-800 px-2 py-1 text-xs ring-1 ring-slate-700 hover:bg-slate-700 sm:px-2.5 sm:py-1.5 sm:text-sm">
+          📱<span className="hidden sm:inline"> Phone</span>
         </button>
         <div className="ml-auto flex items-center gap-3">
           <div className="flex overflow-hidden rounded-md ring-1 ring-slate-700">
@@ -168,7 +182,7 @@ export default function App() {
 
       <div className="flex min-h-0 flex-1 flex-col-reverse md:flex-row">
         {/* Sidebar */}
-        <aside className="flex min-h-0 flex-1 flex-col border-slate-800 bg-slate-900 md:w-[400px] md:flex-none md:border-r">
+        <aside className="flex min-h-0 flex-1 flex-col overflow-y-auto border-slate-800 bg-slate-900 md:w-[400px] md:flex-none md:overflow-hidden md:border-r">
           {selectedAc ? (
             <div className="min-h-0 flex-1 overflow-y-auto">
               <DetailPanel aircraft={selectedAc} onClose={() => setSelected(null)} />
@@ -210,7 +224,7 @@ export default function App() {
                   </button>
                 ))}
               </div>
-              <div className="min-h-0 flex-1 overflow-y-auto">
+              <div className="md:min-h-0 md:flex-1 md:overflow-y-auto">
                 {tab === 'flights' ? (
                   traffic.status === 'loading' ? (
                     <p className="px-4 py-8 text-center text-sm text-slate-500">Loading aircraft…</p>
@@ -226,7 +240,7 @@ export default function App() {
         </aside>
 
         {/* Map */}
-        <main className="h-[45vh] shrink-0 md:h-auto md:flex-1">
+        <main className="h-[40vh] shrink-0 md:h-auto md:flex-1">
           <MapView
             aircraft={visible}
             selected={selected}
@@ -273,4 +287,21 @@ function EventLog({ traffic, onSelect }: { traffic: ReturnType<typeof useTraffic
       ))}
     </ul>
   )
+}
+
+function load<T>(key: string, fallback: T): T {
+  try {
+    const v = localStorage.getItem(key)
+    return v ? (JSON.parse(v) as T) : fallback
+  } catch {
+    return fallback
+  }
+}
+
+function save(key: string, value: unknown) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value))
+  } catch {
+    /* storage unavailable: nothing to remember */
+  }
 }

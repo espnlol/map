@@ -27,6 +27,14 @@ For every aircraft in range:
    opens on the app. Keep the black window open while you use it; close it to stop.
 3. To get the latest version, double-click **Update SkyWatch.bat**, then start it again.
 
+## On your iPhone (free)
+
+With Start SkyWatch running and the phone on the same Wi-Fi, click **📱 Phone** in the app and
+scan the QR code with the iPhone camera. In Safari, tap Share, then **Add to Home Screen** to
+get a full-screen SkyWatch icon. It only works while the computer is on and on the same network.
+"Near me" doesn't work this way, because iPhones only share location with HTTPS sites. The app
+remembers the last airport or spot you picked.
+
 ## Filtering
 
 - **Aircraft category** chips (multi-select, with live counts), using the ADS-B emitter category the
