@@ -65,6 +65,18 @@ function estimateTimes(a: Aircraft, now: number): { takeoff: TimeValue | null; t
   return { takeoff, touchdown }
 }
 
+/** Feeds sometimes send junk callsigns: padding, stray punctuation, all zeros. */
+function cleanCallsign(raw?: string): string {
+  const s = (raw ?? '').trim().toUpperCase().replace(/^[^A-Z0-9]+/, '').replace(/[^A-Z0-9-]/g, '')
+  if (!s || /^0+$/.test(s) || /^@+$/.test(s)) return ''
+  return s
+}
+
+/** "~abc123" is a non-ICAO (TIS-B/MLAT) address; show it plainly. */
+function hexLabel(hex: string): string {
+  return hex.replace(/^~/, '').toUpperCase()
+}
+
 export function useTraffic(center: Center, radiusNm: number, mode: Mode): TrafficState {
   const [state, setState] = useState<TrafficState>({ aircraft: [], events: [], status: 'loading', mode })
   const tracked = useRef(new Map<string, Aircraft>())
@@ -92,11 +104,11 @@ export function useTraffic(center: Center, radiusNm: number, mode: Mode): Traffi
         const prev = tracked.current.get(r.hex)
         const onGround = r.alt_baro === 'ground'
         const altitude = onGround ? null : typeof r.alt_baro === 'number' ? r.alt_baro : r.alt_geom ?? null
-        const callsign = (r.flight ?? '').trim()
+        const callsign = cleanCallsign(r.flight)
         const vr = r.baro_rate ?? r.geom_rate ?? null
         const emergency = detectEmergency(r.squawk, r.emergency)
         const route = callsign ? routeFor(callsign) ?? undefined : undefined
-        const label = callsign || r.r || r.hex.toUpperCase()
+        const label = callsign || r.r || hexLabel(r.hex)
 
         const a: Aircraft = {
           hex: r.hex,
@@ -166,8 +178,8 @@ export function useTraffic(center: Center, radiusNm: number, mode: Mode): Traffi
           setState({ aircraft: [...tracked.current.values()], events: events.current, status: 'ok', source, updatedAt: Date.now(), mode })
           // Resolve routes in the background, then fold them in.
           const needRoutes = raw
-            .filter((r) => r.flight?.trim() && typeof r.lat === 'number' && r.alt_baro !== 'ground')
-            .map((r) => ({ callsign: r.flight!.trim(), lat: r.lat!, lon: r.lon! }))
+            .map((r) => ({ callsign: cleanCallsign(r.flight), lat: r.lat!, lon: r.lon!, ground: r.alt_baro === 'ground' }))
+            .filter((r) => r.callsign && typeof r.lat === 'number' && !r.ground)
           fetchLiveRoutes(needRoutes).then(() => {
             if (cancelled) return
             const now = Date.now()

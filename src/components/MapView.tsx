@@ -40,20 +40,39 @@ export default function MapView({ aircraft, selected, onSelect, center, radiusNm
   const trail = useRef<L.Polyline | null>(null)
   const routeLine = useRef<L.Polyline | null>(null)
   const ring = useRef<L.Circle | null>(null)
+  const resizeObs = useRef<ResizeObserver | null>(null)
   const selectRef = useRef(onSelect)
   selectRef.current = onSelect
 
   useEffect(() => {
     if (!el.current || map.current) return
     const m = L.map(el.current, { zoomControl: true, worldCopyJump: true }).setView([center.lat, center.lon], 8)
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-      subdomains: 'abcd',
+    // Keyless basemaps (CARTO's free tiles now require an API key).
+    const esri = 'https://server.arcgisonline.com/ArcGIS/rest/services'
+    const esriAttr = 'Tiles &copy; Esri'
+    const dark = L.layerGroup([
+      L.tileLayer(`${esri}/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}`, { attribution: `${esriAttr} &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap contributors`, maxNativeZoom: 16, maxZoom: 19 }),
+      L.tileLayer(`${esri}/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}`, { maxNativeZoom: 16, maxZoom: 19 }),
+    ])
+    const streets = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
       maxZoom: 19,
-    }).addTo(m)
+    })
+    const satellite = L.layerGroup([
+      L.tileLayer(`${esri}/World_Imagery/MapServer/tile/{z}/{y}/{x}`, { attribution: `${esriAttr} &mdash; Maxar, Earthstar Geographics`, maxNativeZoom: 18, maxZoom: 19 }),
+      L.tileLayer(`${esri}/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}`, { maxNativeZoom: 18, maxZoom: 19 }),
+    ])
+    dark.addTo(m)
+    L.control.layers({ Dark: dark, Streets: streets, Satellite: satellite }, undefined, { position: 'bottomleft' }).addTo(m)
+    // The container can be sized after Leaflet initialises (flex layout), so
+    // keep Leaflet in sync or it zooms/positions against a 0×0 box.
+    const ro = new ResizeObserver(() => m.invalidateSize())
+    ro.observe(el.current)
+    resizeObs.current = ro
     m.on('click', () => selectRef.current(null))
     map.current = m
     return () => {
+      resizeObs.current?.disconnect()
       m.remove()
       map.current = null
       markers.current.clear()
@@ -74,7 +93,15 @@ export default function MapView({ aircraft, selected, onSelect, center, radiusNm
       dashArray: '4 6',
       interactive: false,
     }).addTo(m)
-    m.fitBounds(ring.current.getBounds(), { padding: [20, 20] })
+    const bounds = ring.current.getBounds()
+    m.invalidateSize()
+    m.fitBounds(bounds, { padding: [20, 20] })
+    // Re-fit once layout has settled, in case the map was still 0×0 above.
+    const t = setTimeout(() => {
+      m.invalidateSize()
+      m.fitBounds(bounds, { padding: [20, 20] })
+    }, 250)
+    return () => clearTimeout(t)
   }, [center.lat, center.lon, radiusNm])
 
   // Sync markers.

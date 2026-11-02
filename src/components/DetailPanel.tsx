@@ -123,7 +123,7 @@ export default function DetailPanel({ aircraft: a, onClose }: Props) {
         <Stat label="Vertical rate" value={fmtVr(a.verticalRate)} />
         <Stat label="Heading" value={a.track != null ? `${Math.round(a.track)}°` : '—'} />
         <Stat label="Squawk" value={a.squawk ?? '—'} />
-        <Stat label="Type code" value={a.typeCode ?? '—'} sub={`ICAO ${a.hex.toUpperCase()}`} />
+        <Stat label="Type code" value={a.typeCode ?? '—'} sub={a.hex.startsWith("~") ? `Non-ICAO ${a.hex.slice(1).toUpperCase()}` : `ICAO ${a.hex.toUpperCase()}`} />
       </div>
 
       <p className="text-[11px] leading-relaxed text-slate-500">
