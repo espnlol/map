@@ -4,6 +4,7 @@ import { SPECIAL_GROUPS } from '../lib/special'
 import { squawkInfo } from '../lib/squawks'
 import { fetchPhoto, lookupLinks, type FlightPath, type PlanePhoto } from '../lib/history'
 import { useEffect, useState } from 'react'
+import OwnerTab from './OwnerTab'
 import { PHASE_LABEL, airportCode, airportName, fmtAltFull, fmtMph, fmtSpeed, fmtTime, fmtVr } from '../lib/format'
 import { distanceNm } from '../lib/geo'
 
@@ -55,6 +56,7 @@ export default function DetailPanel({ aircraft: a, onClose, path, pathLoading, d
   const total = o?.lat != null && d?.lat != null ? distanceNm(o.lat, o.lon!, d.lat, d.lon!) : null
   const left = d?.lat != null ? distanceNm(a.lat, a.lon, d.lat, d.lon!) : null
   const progress = total && left != null ? Math.max(0, Math.min(1, 1 - left / total)) : null
+  const [tab, setTab] = useState<'flight' | 'owner'>('flight')
 
   return (
     <div className="flex flex-col gap-3 p-4">
@@ -77,6 +79,24 @@ export default function DetailPanel({ aircraft: a, onClose, path, pathLoading, d
         </button>
       </div>
 
+      <div className="flex rounded-lg bg-slate-800/60 p-1 text-sm font-semibold" role="tablist">
+        {(['flight', 'owner'] as const).map((t) => (
+          <button
+            key={t}
+            role="tab"
+            aria-selected={tab === t}
+            onClick={() => setTab(t)}
+            className={`flex-1 rounded-md py-1.5 ${tab === t ? 'bg-sky-500 text-slate-950' : 'text-slate-300 hover:text-white'}`}
+          >
+            {t === 'flight' ? 'Flight' : 'Owner'}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'owner' ? (
+        <OwnerTab a={a} demo={demo} />
+      ) : (
+        <>
       {a.special.map((sp) => {
         const g = SPECIAL_GROUPS.find((x) => x.tag === sp.tag)!
         return (
@@ -172,6 +192,8 @@ export default function DetailPanel({ aircraft: a, onClose, path, pathLoading, d
         <span className="text-amber-300">Estimated</span> times come from distance to/from the airports at current speed — not
         airline schedules.
       </p>
+        </>
+      )}
     </div>
   )
 }

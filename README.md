@@ -47,6 +47,20 @@ remembers the last airport or spot you picked.
 - **Find this plane**: links to FlightAware, Flightradar24, ADS-B Exchange, adsb.lol,
   Planespotters, JetPhotos and Wikipedia for the aircraft or its model.
 
+## Owner tab
+
+Click a plane, then **Owner**:
+
+- **Registered owner** from public registry data (via [hexdb.io](https://hexdb.io)), or the operator
+  the ADS-B network reports.
+- **Usually flown by**: the airline or operator, from the callsign's 3-letter ICAO code
+  (SKW5123 = SkyWest) or the operator on file. Private aircraft show that no airline is linked.
+- Registration, country of registration, manufacturer, exact type and transponder code.
+- Links to the official registry (FAA for N-numbers; UK, Canada and Australia search pages) and
+  Planespotters' airframe history.
+
+Pilots' identities aren't broadcast, so SkyWatch doesn't show them.
+
 ## Filtering
 
 - **Aircraft category** chips (multi-select, with live counts), using the ADS-B emitter category the

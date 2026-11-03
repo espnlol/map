@@ -24,6 +24,7 @@ const upstream: Record<string, string> = {
   adsblolglobe: 'https://globe.adsb.lol',
   airplanesliveglobe: 'https://globe.airplanes.live',
   planespotters: 'https://api.planespotters.net',
+  hexdb: 'https://hexdb.io',
 }
 
 // Keys end in "/" so "/proxy/adsblol/" doesn't also catch "/proxy/adsblolglobe/".
