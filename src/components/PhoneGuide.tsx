@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
 import QRCode from 'qrcode'
 
+/** Running from the PC (Start SkyWatch) rather than the hosted website. */
+export const isLocalServer = () => ['5173', '4173'].includes(location.port) || ['localhost', '127.0.0.1'].includes(location.hostname)
+
 function phoneUrls(): string[] {
   const local = ['localhost', '127.0.0.1', '::1', '[::1]'].includes(location.hostname)
-  if (!local) return [location.origin]
+  if (!local) return [location.origin + location.pathname]
   const port = location.port ? `:${location.port}` : ''
   return __LAN_ADDRESSES__.map((ip) => `http://${ip}${port}`)
 }
@@ -13,7 +16,9 @@ export default function PhoneGuide({ onClose }: { onClose: () => void }) {
   const [idx, setIdx] = useState(0)
   const [qr, setQr] = useState<string | null>(null)
   const url = urls[idx]
-  const onPhoneAlready = !['localhost', '127.0.0.1'].includes(location.hostname)
+  const hosted = !isLocalServer()
+  const isPhone = /iPhone|iPad|Android/i.test(navigator.userAgent)
+  const onPhoneAlready = hosted ? isPhone : !['localhost', '127.0.0.1'].includes(location.hostname)
 
   useEffect(() => {
     if (!url) return
@@ -54,7 +59,7 @@ export default function PhoneGuide({ onClose }: { onClose: () => void }) {
                 <p className="text-amber-300">This computer doesn't seem to be on a Wi-Fi or home network right now.</p>
               )}
               <ol className="list-decimal space-y-1.5 pl-5 text-slate-300">
-                <li>Make sure your iPhone is on the <b>same Wi-Fi</b> as this computer.</li>
+                {!hosted && <li>Make sure your iPhone is on the <b>same Wi-Fi</b> as this computer.</li>}
                 <li>Open the iPhone <b>Camera</b> and point it at the QR code.</li>
                 <li>Tap the yellow link that pops up. SkyWatch opens in Safari.</li>
                 <li>
@@ -74,22 +79,29 @@ export default function PhoneGuide({ onClose }: { onClose: () => void }) {
               <li>Open SkyWatch from its new icon. It runs full screen like an app.</li>
             </ol>
           )}
+          {hosted ? (
+            <div className="rounded-lg bg-slate-800/60 p-3 text-xs text-slate-400">
+              This is the online version of SkyWatch. It works anywhere you have internet, with no computer needed, and{' '}
+              <b className="text-slate-200">Near me</b> works too. It pauses while it's in the background to save battery.
+            </div>
+          ) : (
           <div className="space-y-1.5 rounded-lg bg-slate-800/60 p-3 text-xs text-slate-400">
-            <p>
-              <b className="text-slate-200">Your computer has to be on</b> with the Start SkyWatch window open, and your phone on
-              the same Wi-Fi. Away from home it won't load.
-            </p>
-            <p>
-              <b className="text-slate-200">Phone can't connect?</b> Windows may be blocking it. Open the Windows Start menu, search
-              "Allow an app through Windows Firewall", click <i>Change settings</i>, and tick both boxes next to{' '}
-              <i>Node.js JavaScript Runtime</i>.
-            </p>
-            <p>
-              <b className="text-slate-200">"Near me" doesn't work on the phone</b> in this setup (iPhones only share location with
-              secure websites). Pick an airport from the list or pan the map and tap <i>Track planes here</i>. SkyWatch remembers
-              your last spot.
-            </p>
-          </div>
+              <p>
+                <b className="text-slate-200">Your computer has to be on</b> with the Start SkyWatch window open, and your phone on
+                the same Wi-Fi. Away from home it won't load.
+              </p>
+              <p>
+                <b className="text-slate-200">Phone can't connect?</b> Windows may be blocking it. Open the Windows Start menu, search
+                "Allow an app through Windows Firewall", click <i>Change settings</i>, and tick both boxes next to{' '}
+                <i>Node.js JavaScript Runtime</i>.
+              </p>
+              <p>
+                <b className="text-slate-200">"Near me" doesn't work on the phone</b> in this setup (iPhones only share location with
+                secure websites). Pick an airport from the list or pan the map and tap <i>Track planes here</i>. SkyWatch remembers
+                your last spot.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>

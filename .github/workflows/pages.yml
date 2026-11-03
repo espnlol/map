@@ -1,0 +1,42 @@
+# Builds SkyWatch and publishes it to GitHub Pages (the gh-pages branch)
+# every time this branch is updated.
+name: Publish SkyWatch website
+
+on:
+  push:
+    branches: [claude/eager-mayer-5evp1u]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build for https://<owner>.github.io/<repo>/
+        run: npx tsc --noEmit && npx vite build --base=/${{ github.event.repository.name }}/
+
+      - name: Publish to the gh-pages branch
+        run: |
+          cd dist
+          touch .nojekyll
+          git init -q -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898699+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Publish SkyWatch from ${GITHUB_SHA::7}"
+          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" gh-pages

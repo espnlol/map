@@ -27,6 +27,14 @@ For every aircraft in range:
    opens on the app. Keep the black window open while you use it; close it to stop.
 3. To get the latest version, double-click **Update SkyWatch.bat**, then start it again.
 
+## Online version (GitHub Pages)
+
+Every push to this branch builds SkyWatch and publishes it to the `gh-pages` branch
+(`.github/workflows/pages.yml`). With **Settings → Pages → Deploy from a branch → gh-pages**
+turned on once, it's live at **https://espnlol.github.io/map/**. It works on any phone with
+internet, no computer needed, and "Near me" works because the site is HTTPS. Live data there
+depends on the flight-data services accepting requests from other websites.
+
 ## On your iPhone (free)
 
 With Start SkyWatch running and the phone on the same Wi-Fi, click **📱 Phone** in the app and

@@ -167,7 +167,21 @@ export function useTraffic(center: Center, radiusNm: number, mode: Mode): Traffi
       }
     }
 
+    // Pause while the app isn't on screen (saves phone battery and data).
+    let paused = false
+    const onVisible = () => {
+      if (!document.hidden && paused && !cancelled) {
+        paused = false
+        poll()
+      }
+    }
+    document.addEventListener('visibilitychange', onVisible)
+
     const poll = async () => {
+      if (document.hidden) {
+        paused = true
+        return
+      }
       try {
         if (demo) {
           const raw = demo.tick()
@@ -208,6 +222,7 @@ export function useTraffic(center: Center, radiusNm: number, mode: Mode): Traffi
     poll()
     return () => {
       cancelled = true
+      document.removeEventListener('visibilitychange', onVisible)
       if (timer) clearTimeout(timer)
     }
   }, [center.lat, center.lon, radiusNm, mode])
