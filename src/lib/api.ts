@@ -1,5 +1,6 @@
 import type { Airport, RawAircraft, Route } from '../types'
 import { distanceNm } from './geo'
+import { upstream } from './upstream'
 
 /**
  * Live data comes from community ADS-B networks that publish a free, keyless
@@ -12,21 +13,15 @@ interface Source {
   url: (lat: number, lon: number, nm: number) => string
 }
 
-const viaProxy = (prefix: string, path: string) => `/proxy/${prefix}${path}`
-
 function sources(): Source[] {
-  const proxied = import.meta.env.DEV || location.port === '4173'
-  const lol = (p: string) => (proxied ? viaProxy('adsblol', p) : `https://api.adsb.lol${p}`)
-  const live = (p: string) => (proxied ? viaProxy('airplaneslive', p) : `https://api.airplanes.live${p}`)
   return [
-    { name: 'adsb.lol', url: (lat, lon, nm) => lol(`/v2/lat/${lat.toFixed(4)}/lon/${lon.toFixed(4)}/dist/${nm}`) },
-    { name: 'airplanes.live', url: (lat, lon, nm) => live(`/v2/point/${lat.toFixed(4)}/${lon.toFixed(4)}/${nm}`) },
+    { name: 'adsb.lol', url: (lat, lon, nm) => `${upstream('adsblol')}/v2/lat/${lat.toFixed(4)}/lon/${lon.toFixed(4)}/dist/${nm}` },
+    { name: 'airplanes.live', url: (lat, lon, nm) => `${upstream('airplaneslive')}/v2/point/${lat.toFixed(4)}/${lon.toFixed(4)}/${nm}` },
   ]
 }
 
 function routesetUrl(): string {
-  const proxied = import.meta.env.DEV || location.port === '4173'
-  return proxied ? viaProxy('adsblol', '/api/0/routeset') : 'https://api.adsb.lol/api/0/routeset'
+  return `${upstream('adsblol')}/api/0/routeset`
 }
 
 let preferred = 0

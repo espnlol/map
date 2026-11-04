@@ -3,7 +3,7 @@
  * its flight history (where it has been) and a photo of the actual airframe.
  */
 
-const proxied = () => import.meta.env.DEV || location.port === '4173'
+import { upstream } from './upstream'
 
 /** [lat, lon, altitude in ft (null = on the ground), epoch ms] */
 export type PathPoint = [number, number, number | null, number]
@@ -21,8 +21,8 @@ interface TraceJson {
 }
 
 const TRACE_SOURCES = [
-  { name: 'adsb.lol', base: () => (proxied() ? '/proxy/adsblolglobe' : 'https://globe.adsb.lol') },
-  { name: 'airplanes.live', base: () => (proxied() ? '/proxy/airplanesliveglobe' : 'https://globe.airplanes.live') },
+  { name: 'adsb.lol', base: () => upstream('adsblolglobe') },
+  { name: 'airplanes.live', base: () => upstream('airplanesliveglobe') },
 ]
 
 /**
@@ -98,7 +98,7 @@ const photoCache = new Map<string, PlanePhoto | null>()
 export async function fetchPhoto(hex: string, registration?: string): Promise<PlanePhoto | null> {
   const key = hex.toLowerCase()
   if (photoCache.has(key)) return photoCache.get(key)!
-  const base = proxied() ? '/proxy/planespotters' : 'https://api.planespotters.net'
+  const base = upstream('planespotters')
   const urls = [`${base}/pub/photos/hex/${key.replace(/^~/, '')}`]
   if (registration) urls.push(`${base}/pub/photos/reg/${encodeURIComponent(registration)}`)
   for (const url of urls) {

@@ -7,7 +7,7 @@
  *   airline flights use a 3-letter ICAO airline code (AAL123 = American).
  */
 
-const proxied = () => import.meta.env.DEV || location.port === '4173'
+import { upstream } from './upstream'
 
 export interface OwnerRecord {
   registration?: string
@@ -23,7 +23,7 @@ export async function fetchOwner(hex: string): Promise<OwnerRecord | null> {
   const key = hex.replace(/^~/, '').toLowerCase()
   if (hex.startsWith('~')) return null // non-ICAO addresses aren't in registries
   if (cache.has(key)) return cache.get(key)!
-  const base = proxied() ? '/proxy/hexdb' : 'https://hexdb.io'
+  const base = upstream('hexdb')
   try {
     const res = await fetch(`${base}/api/v1/aircraft/${key}`, { headers: { Accept: 'application/json' } })
     if (!res.ok) throw new Error(String(res.status))

@@ -32,8 +32,11 @@ For every aircraft in range:
 Every push to this branch builds SkyWatch and publishes it to the `gh-pages` branch
 (`.github/workflows/pages.yml`). With **Settings → Pages → Deploy from a branch → gh-pages**
 turned on once, it's live at **https://espnlol.github.io/map/**. It works on any phone with
-internet, no computer needed, and "Near me" works because the site is HTTPS. Live data there
-depends on the flight-data services accepting requests from other websites.
+internet, no computer needed, and "Near me" works because the site is HTTPS. 
+The flight-data services don't allow web pages on other sites to call them, so the hosted version
+goes through a small relay: `worker/skywatch-relay.js`, pasted into a free Cloudflare Worker. Its
+address goes in `RELAY_URL` in `src/lib/upstream.ts`. To try a relay before it's built in, open
+`https://espnlol.github.io/map/?relay=<worker address>`; SkyWatch remembers it.
 
 ## On your iPhone (free)
 
