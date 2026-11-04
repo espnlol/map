@@ -10,7 +10,7 @@
  */
 
 /** Set this to your Cloudflare Worker's address, with no slash at the end. */
-export const RELAY_URL = ''
+export const RELAY_URL = 'https://skywatch-relay.thenameisespn.workers.dev'
 
 export const UPSTREAMS = {
   adsblol: 'https://api.adsb.lol',
