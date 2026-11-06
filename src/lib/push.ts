@@ -8,6 +8,7 @@ import { RELAY_URL } from './upstream'
 import { settings } from './settings'
 import { teams, teamHistory, type PlaneHistory } from './teams'
 import { RARE_TYPES, enabledTiers } from './rare'
+import { mergeRelayArrivals, milWatch, type MilArrival } from './milwatch'
 
 interface PushState {
   token: string | null
@@ -97,7 +98,8 @@ export async function syncPushConfig() {
     teams: teams.get().flatMap((t) => t.idents.map((ident) => ({ ident, team: t.name }))),
     home: s.home,
     radius: s.notifyRadius,
-    notify: { teams: s.notifyTeams, emergencies: s.notifyEmergencies, rare: s.notifyRare },
+    notify: { teams: s.notifyTeams, emergencies: s.notifyEmergencies, rare: s.notifyRare, mil: milWatch.get().notify },
+    milAirports: milWatch.get().airports.map(({ code, lat, lon, elevation }) => ({ code, lat, lon, elevation })),
     rareTypes: RARE_TYPES.filter((t) => tiers.includes(t.tier)).map((t) => ({ code: t.code, name: t.name })),
   }
   try {
@@ -124,7 +126,8 @@ export async function pullRelayState(): Promise<{ lastRun?: number; devices?: nu
   try {
     const res = await fetch(`${relay()}/push/state?token=${encodeURIComponent(token)}`)
     if (!res.ok) return null
-    const st = (await res.json()) as { planes?: Record<string, RelayPlane>; lastRun?: number; devices?: number }
+    const st = (await res.json()) as { planes?: Record<string, RelayPlane>; lastRun?: number; devices?: number; milLog?: MilArrival[] }
+    mergeRelayArrivals(st.milLog)
     teamHistory.set((all) => {
       const next = { ...all }
       for (const [ident, p] of Object.entries(st.planes ?? {})) {

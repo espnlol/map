@@ -24,9 +24,10 @@ interface Props {
   military: MilitaryPattern[]
   onOpenHex: (hex: string) => void
   onRareList: () => void
+  onMilWatch: () => void
 }
 
-export default function AlertsMenu({ onClose, hotspots, placeOf, onOpenRare, onOpenHotspot, onScan, scanning, rareOn, happeningOn, military, onOpenHex, onRareList }: Props) {
+export default function AlertsMenu({ onClose, hotspots, placeOf, onOpenRare, onOpenHotspot, onScan, scanning, rareOn, happeningOn, military, onOpenHex, onRareList, onMilWatch }: Props) {
   const rare = rareStore.use()
   useEffect(() => markRareViewed, [])
   const near = rare.current.filter((r) => r.nearby)
@@ -92,6 +93,11 @@ export default function AlertsMenu({ onClose, hotspots, placeOf, onOpenRare, onO
               </ul>
             )}
           </section>
+
+          <button onClick={onMilWatch} className="flex w-full items-center gap-2 border-t border-slate-800 px-4 py-2.5 text-left text-sm text-lime-200 hover:bg-slate-800/60">
+            🎖️ <span className="flex-1">Military arrival watch</span>
+            <span className="text-xs text-slate-400">Pick airports ›</span>
+          </button>
 
           {military.length > 0 && (
             <section className="border-t border-slate-800">

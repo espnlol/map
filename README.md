@@ -132,6 +132,14 @@ type code are looked up in the registry (hexdb.io) in the background.
   departure/arrival times in each airport's local time. Scheduled times need paid airline data, so
   the card links to FlightAware for those.
 
+## Military arrival watch
+
+*Insights → 🎖️ Military arrivals* (or 🔔 → Military arrival watch): pick airports and get a pop-up
+when a military-labelled aircraft is arriving (descending toward it within 40 nm, below 12,000 ft)
+or has landed. While the app is open it checks your map traffic plus adsb.lol's worldwide `/v2/mil`
+list every 2 minutes; with notifications on, the relay's 5-minute check sends a push and keeps a log
+the app pulls in. Watched airports are saved to your profile.
+
 ## Profiles
 
 *Settings → Profile*: create a profile (username + password) to keep your logbook, followed teams,

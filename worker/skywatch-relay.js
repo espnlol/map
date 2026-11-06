@@ -259,7 +259,7 @@ export async function runChecks(env) {
   const [config, subs] = await Promise.all([kv.get('config', 'json'), kv.get('subs', 'json')])
   if (!config) return
   const before = (await kv.get('state', 'json')) || {}
-  const state = { planes: { ...(before.planes || {}) }, emerg: { ...(before.emerg || {}) }, rare: { ...(before.rare || {}) } }
+  const state = { planes: { ...(before.planes || {}) }, emerg: { ...(before.emerg || {}) }, rare: { ...(before.rare || {}) }, milSeen: { ...(before.milSeen || {}) }, milLog: [...(before.milLog || [])] }
   const now = Date.now()
   const notes = []
   const home = config.home
@@ -335,8 +335,46 @@ export async function runChecks(env) {
     }
   }
 
+  // 4. Military aircraft arriving at / landing at watched airports.
+  const watched = (config.milAirports || []).slice(0, 25)
+  if (watched.length) {
+    try {
+      const data = await getJson('/v2/mil')
+      for (const a of data.ac || []) {
+        if (typeof a.lat !== 'number' || typeof a.lon !== 'number') continue
+        const onGround = a.alt_baro === 'ground'
+        const alt = typeof a.alt_baro === 'number' ? a.alt_baro : null
+        const vr = a.baro_rate ?? a.geom_rate ?? 0
+        for (const ap of watched) {
+          const d = distNm(a.lat, a.lon, ap.lat, ap.lon)
+          if (d > 40) continue
+          const agl = onGround ? 0 : (alt ?? 99999) - (ap.elevation || 0)
+          let status = null
+          if (d <= 4 && (onGround || agl < 400)) status = 'landed'
+          else if (!onGround && agl < 12000 && vr < -250) status = 'arriving'
+          if (!status) continue
+          const key = `${a.hex}-${ap.code}-${status}`
+          if (state.milSeen[key] && now - state.milSeen[key] < 3 * 3600e3) continue
+          state.milSeen[key] = now
+          const callsign = (a.flight || a.r || a.hex).trim()
+          state.milLog.unshift({ id: `${key}-${now}`, hex: a.hex, callsign, model: a.t, airport: ap.code, status, at: now, distanceNm: d, altitude: alt })
+          if (config.notify?.mil)
+            notes.push({
+              title: status === 'landed' ? `🎖️🛬 Military landed at ${ap.code}` : `🎖️ Military arriving at ${ap.code}`,
+              body: `${callsign}${a.t ? ` (${a.t})` : ''}${status === 'arriving' ? ` · ${Math.round(d * 1.15)} mi out, ${alt != null ? `${alt.toLocaleString()} ft` : 'descending'}` : ''}`,
+              url: `${APP_URL}?plane=${a.hex}`,
+              tag: key,
+            })
+        }
+      }
+      state.milLog = state.milLog.filter((e) => now - e.at < 7 * 86400e3).slice(0, 100)
+    } catch {
+      /* next run */
+    }
+  }
+
   // forget old de-duplication entries
-  for (const m of [state.emerg, state.rare]) for (const k of Object.keys(m)) if (now - m[k] > 24 * 3600e3) delete m[k]
+  for (const m of [state.emerg, state.rare, state.milSeen]) for (const k of Object.keys(m)) if (now - m[k] > 24 * 3600e3) delete m[k]
   state.lastRun = now
   await kv.put('state', JSON.stringify(state))
 

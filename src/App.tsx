@@ -30,6 +30,7 @@ import { useRef } from 'react'
 import Insights, { type InsightTab } from './components/Insights'
 import { detectGoArounds, findHolding, findMilitaryPatterns } from './lib/patterns'
 import { countOpen, recordTraffic } from './lib/records'
+import { checkArrivals, fromAircraft, milWatch, scanMilitary, type MilArrival } from './lib/milwatch'
 import { useTraffic, type Mode } from './lib/useTraffic'
 import { PRESETS } from './lib/presets'
 import { categoryKey } from './lib/categories'
@@ -260,6 +261,33 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [traffic.aircraft])
 
+  // ---- military arrival watch ----
+  const watch = milWatch.use()
+  const announceMil = (fresh: MilArrival[]) => {
+    for (const e of fresh.slice(0, 3)) {
+      pushToast({
+        tone: 'happening',
+        title: e.status === 'landed' ? `🎖️🛬 Military landed at ${e.airport}` : `🎖️ Military arriving at ${e.airport}`,
+        body: `${e.callsign}${e.model ? ` (${e.model})` : ''}${e.status === 'arriving' ? ` · ${fmtDist(e.distanceNm)} out` : ''}`,
+        onOpen: () => setSelected(e.hex),
+      })
+    }
+    if (fresh.length) beep('alert')
+  }
+  useEffect(() => {
+    if (mode !== 'live' || !watch.airports.length) return
+    announceMil(checkArrivals(traffic.aircraft.filter((a) => a.special.some((x) => x.tag === 'milgov')).map(fromAircraft)))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [traffic.aircraft])
+  useEffect(() => {
+    if (mode !== 'live' || !watch.airports.length) return
+    const run = () => !document.hidden && scanMilitary().then(announceMil)
+    run()
+    const t = setInterval(run, 2 * 60_000)
+    return () => clearInterval(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, watch.airports.length])
+
   // count how often you open each plane, for "Your most tracked"
   const countedFor = useRef<string | null>(null)
   useEffect(() => {
@@ -338,7 +366,7 @@ export default function App() {
     if (!push.token) return
     const t = setTimeout(syncPushConfig, 1500)
     return () => clearTimeout(t)
-  }, [push.token, followed, cfg.notifyTeams, cfg.notifyEmergencies, cfg.notifyRare, cfg.notifyRadius, cfg.home, cfg.rareLegendary, cfg.rareRare, cfg.rareUncommon])
+  }, [push.token, followed, watch, cfg.notifyTeams, cfg.notifyEmergencies, cfg.notifyRare, cfg.notifyRadius, cfg.home, cfg.rareLegendary, cfg.rareRare, cfg.rareUncommon])
   useEffect(() => {
     pullRelayState()
   }, [])
@@ -519,6 +547,10 @@ export default function App() {
           onRareList={() => {
             setShowAlerts(false)
             setInsights('rare')
+          }}
+          onMilWatch={() => {
+            setShowAlerts(false)
+            setInsights('milwatch')
           }}
         />
       )}

@@ -13,8 +13,9 @@ import { distanceNm } from '../lib/geo'
 import { fmtAlt, fmtClock, fmtRelative } from '../lib/format'
 import { fmtDist } from '../lib/format'
 import { scanWorld, world, type WorldFlight } from '../lib/world'
+import MilWatchPanel from './MilWatchPanel'
 
-export type InsightTab = 'records' | 'tracked' | 'disruptions' | 'rare'
+export type InsightTab = 'records' | 'tracked' | 'milwatch' | 'disruptions' | 'rare'
 
 interface Props {
   initialTab?: InsightTab
@@ -33,6 +34,7 @@ interface Props {
 const TABS: [InsightTab, string][] = [
   ['records', '🏆 Records'],
   ['tracked', '🔥 Most tracked'],
+  ['milwatch', '🎖️ Military arrivals'],
   ['disruptions', '🛑 Disruptions'],
   ['rare', '✨ Rare list'],
 ]
@@ -88,6 +90,7 @@ export default function Insights(p: Props) {
         <div className="min-h-0 flex-1 overflow-y-auto">
           {tab === 'records' && <Records {...p} />}
           {tab === 'tracked' && <Tracked {...p} />}
+          {tab === 'milwatch' && <MilWatchPanel airports={p.airports} aircraft={p.aircraft} onOpen={(hex) => p.onOpen(hex)} />}
           {tab === 'disruptions' && <Disruptions {...p} />}
           {tab === 'rare' && <RareList {...p} />}
         </div>

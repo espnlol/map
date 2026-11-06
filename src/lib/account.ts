@@ -9,6 +9,7 @@ import { logbook, logbookRemoved, planeKey, type LogEntry } from './logbook'
 import { teams, teamsRemoved, teamHistory, type Team, type PlaneHistory } from './teams'
 import { emergencyLog, type EmergencyRecord } from './emergencyLog'
 import { settings, settingsChangedAt, type Settings } from './settings'
+import { milWatch, type WatchedAirport } from './milwatch'
 
 interface AccountState {
   username: string | null
@@ -29,6 +30,7 @@ interface SyncedData {
   emergencies?: EmergencyRecord[]
   settings?: Settings
   settingsAt?: number
+  milAirports?: WatchedAirport[]
   updatedAt?: number
 }
 
@@ -136,7 +138,10 @@ export function mergeData(local: SyncedData, remote: SyncedData): SyncedData {
 
   // settings: whichever device changed them last wins
   const useRemote = (remote.settingsAt ?? 0) > (local.settingsAt ?? 0)
+  // watched airports: last device to change settings decides, otherwise combine
+  const mil = useRemote ? remote.milAirports ?? local.milAirports : local.milAirports?.length ? local.milAirports : remote.milAirports
   return {
+    milAirports: mil ?? [],
     settings: useRemote ? remote.settings : local.settings,
     settingsAt: useRemote ? remote.settingsAt : local.settingsAt,
     logbook: logbookOut,
@@ -157,6 +162,7 @@ const localData = (): SyncedData => ({
   emergencies: emergencyLog.get(),
   settings: settings.get(),
   settingsAt: settingsChangedAt.get(),
+  milAirports: milWatch.get().airports,
 })
 
 let applying = false
@@ -176,6 +182,7 @@ export async function syncNow() {
     teamsRemoved.set(merged.teamsRemoved!)
     teamHistory.set(merged.teamHistory!)
     emergencyLog.set(merged.emergencies!)
+    if (merged.milAirports) milWatch.set((w) => ({ ...w, airports: merged.milAirports! }))
     if (merged.settings && merged.settingsAt && merged.settingsAt > settingsChangedAt.get()) settings.replace(merged.settings, merged.settingsAt)
     applying = false
     const text = JSON.stringify(merged)
@@ -198,7 +205,7 @@ const schedule = () => {
   timer = setTimeout(syncNow, 4000)
 }
 export function startAutoSync() {
-  const unsubs = [logbook, logbookRemoved, teams, teamsRemoved, emergencyLog, settingsChangedAt].map((s) => s.subscribe(schedule))
+  const unsubs = [logbook, logbookRemoved, teams, teamsRemoved, emergencyLog, settingsChangedAt, milWatch].map((s) => s.subscribe(schedule))
   const onVisible = () => !document.hidden && account.get().token && syncNow()
   document.addEventListener('visibilitychange', onVisible)
   if (account.get().token) syncNow()
