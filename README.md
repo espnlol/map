@@ -72,6 +72,26 @@ Click a plane, then **Owner**:
 
 Pilots' identities aren't broadcast, so SkyWatch doesn't show them.
 
+## Airports, emergencies, logbook and teams
+
+- **Airports layer**: 5,282 large and medium airports with their runways (from
+  [OurAirports](https://ourairports.com), public domain; rebuild with
+  `python3 scripts/build-airports.py <dir with airports.csv and runways.csv>`). Large airports show
+  from zoom 6, medium from zoom 8, runways from zoom 10. The colour and number show how many
+  aircraft are on the ground or low nearby right now; tap one for details and *Track planes here*.
+- **Bigger areas**: 400 and 500 nm. The APIs cap one query at 250 nm, so SkyWatch covers bigger
+  areas with seven overlapping queries and refreshes every 15 s. Only aircraft near the visible
+  part of the map are drawn.
+- **Emergencies tab**: every real emergency seen is saved on the device with its codes, path and
+  outcome (landed, cleared, or out of range). Tap one to see its path.
+- **Logbook tab**: *📒 I saw this* on any plane saves it with its photo, owner and route, and
+  tells you when it's a type or airline you've never logged. Stored on the device.
+- **Teams tab**: follow a team's planes anywhere in the world by tail number or callsign. Checked
+  every minute while SkyWatch is open, with observed takeoff and landing times. The Patriots'
+  two team-owned 767s are offered as a preset.
+- **Phone layout**: on small screens the map fills the screen and the panel slides up from the
+  bottom (drag or tap the handle).
+
 ## Filtering
 
 - **Aircraft category** chips (multi-select, with live counts), using the ADS-B emitter category the

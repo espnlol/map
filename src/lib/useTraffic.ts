@@ -6,6 +6,7 @@ import { DemoTraffic } from './demo'
 import { detectEmergency } from './emergency'
 import { distanceNm } from './geo'
 import { detectSpecial } from './special'
+import { recordEmergencies } from './emergencyLog'
 
 export type Mode = 'live' | 'demo'
 
@@ -165,6 +166,8 @@ export function useTraffic(center: Center, radiusNm: number, mode: Mode): Traffi
       for (const [hex, a] of tracked.current) {
         if (!seen.has(hex) && now - a.lastSeen > STALE_MS) tracked.current.delete(hex)
       }
+      // Real emergencies only: demo ones are made up and would clutter the history.
+      if (mode === 'live') recordEmergencies([...tracked.current.values()], now)
     }
 
     // Pause while the app isn't on screen (saves phone battery and data).
@@ -216,7 +219,7 @@ export function useTraffic(center: Center, radiusNm: number, mode: Mode): Traffi
         if (!cancelled)
           setState((s) => ({ ...s, status: 'error', error: err instanceof Error ? err.message : String(err) }))
       } finally {
-        if (!cancelled) timer = setTimeout(poll, POLL_MS[mode])
+        if (!cancelled) timer = setTimeout(poll, mode === 'live' && radiusNm > 250 ? 15000 : POLL_MS[mode])
       }
     }
     poll()

@@ -5,6 +5,8 @@ import { squawkInfo } from '../lib/squawks'
 import { fetchPhoto, lookupLinks, type FlightPath, type PlanePhoto } from '../lib/history'
 import { useEffect, useState } from 'react'
 import OwnerTab from './OwnerTab'
+import { addToLogbook, logbook, patchLogEntry } from '../lib/logbook'
+import { fetchOwner } from '../lib/owner'
 import { PHASE_LABEL, airportCode, airportName, fmtAltFull, fmtMph, fmtSpeed, fmtTime, fmtVr } from '../lib/format'
 import { distanceNm } from '../lib/geo'
 
@@ -57,6 +59,26 @@ export default function DetailPanel({ aircraft: a, onClose, path, pathLoading, d
   const left = d?.lat != null ? distanceNm(a.lat, a.lon, d.lat, d.lon!) : null
   const progress = total && left != null ? Math.max(0, Math.min(1, 1 - left / total)) : null
   const [tab, setTab] = useState<'flight' | 'owner'>('flight')
+  const logged = logbook.use().filter((e) => e.hex === a.hex).length
+  const [saved, setSaved] = useState<string | null>(null)
+  useEffect(() => setSaved(null), [a.hex])
+
+  const logIt = () => {
+    const r = addToLogbook(a)
+    setSaved(
+      r.newType && a.model
+        ? `Saved! First time you've logged a ${a.model} 🎉`
+        : r.newAirline
+          ? `Saved! First ${r.entry.airline} plane in your logbook 🎉`
+          : r.timesBefore > 0
+            ? `Saved. You've logged this exact plane ${r.timesBefore + 1} times.`
+            : 'Saved to your logbook.',
+    )
+    if (!demo) {
+      fetchPhoto(a.hex, a.registration).then((p) => p && patchLogEntry(r.entry.id, { photo: p.thumb }))
+      fetchOwner(a.hex).then((o) => o?.owner && patchLogEntry(r.entry.id, { owner: o.owner }))
+    }
+  }
 
   return (
     <div className="flex flex-col gap-3 p-4">
@@ -78,6 +100,14 @@ export default function DetailPanel({ aircraft: a, onClose, path, pathLoading, d
           ✕
         </button>
       </div>
+
+      <button
+        onClick={logIt}
+        className="flex items-center justify-center gap-2 rounded-lg bg-amber-400/10 py-2 text-sm font-semibold text-amber-200 ring-1 ring-amber-400/40 hover:bg-amber-400/20"
+      >
+        📒 I saw this{logged ? <span className="font-normal text-amber-200/70">· logged {logged}×</span> : null}
+      </button>
+      {saved && <div className="-mt-1 text-center text-xs text-amber-200">{saved}</div>}
 
       <div className="flex rounded-lg bg-slate-800/60 p-1 text-sm font-semibold" role="tablist">
         {(['flight', 'owner'] as const).map((t) => (
@@ -245,7 +275,7 @@ function Photo({ hex, registration, demo, model }: { hex: string; registration?:
     return <div className="aspect-[16/9] w-full animate-pulse rounded-lg bg-slate-800" aria-label="Loading photo" />
   if (photo === null)
     return (
-      <div className="flex aspect-[16/9] w-full flex-col items-center justify-center gap-1 rounded-lg bg-slate-800/60 text-center text-xs text-slate-500">
+      <div className="flex h-20 w-full flex-col items-center justify-center gap-1 rounded-lg bg-slate-800/60 px-3 text-center text-xs text-slate-500">
         <span className="text-3xl opacity-40">✈</span>
         {demo ? 'Photos appear for real aircraft in LIVE mode' : `No photo of this exact aircraft yet${model ? ` (${model})` : ''}`}
       </div>

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { Aircraft } from '../types'
 import { categoryInfo } from '../lib/categories'
 import { SPECIAL_GROUPS } from '../lib/special'
@@ -11,11 +12,12 @@ interface Props {
 }
 
 export default function FlightList({ aircraft, selected, onSelect }: Props) {
+  const [limit, setLimit] = useState(200)
   if (aircraft.length === 0)
     return <p className="px-4 py-8 text-center text-sm text-slate-500">No aircraft match these filters.</p>
   return (
     <ul className="divide-y divide-slate-800">
-      {aircraft.map((a) => {
+      {aircraft.slice(0, limit).map((a) => {
         const info = categoryInfo(a.category)
         const isSel = a.hex === selected
         return (
@@ -60,6 +62,13 @@ export default function FlightList({ aircraft, selected, onSelect }: Props) {
           </li>
         )
       })}
+      {aircraft.length > limit && (
+        <li>
+          <button onClick={() => setLimit(aircraft.length)} className="w-full py-3 text-sm text-sky-300 hover:bg-slate-800/60">
+            Show all {aircraft.length} aircraft
+          </button>
+        </li>
+      )}
     </ul>
   )
 }

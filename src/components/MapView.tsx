@@ -1,8 +1,9 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import type { Aircraft, Center } from '../types'
 import { categoryInfo } from '../lib/categories'
 import type { FlightPath } from '../lib/history'
+import { busyness, loadAirports, type AirportInfo } from '../lib/airports'
 
 /** Altitude → colour, low = orange, high = violet (same idea as most flight trackers). */
 export function altColor(alt: number | null): string {
@@ -46,7 +47,18 @@ interface Props {
   radiusNm: number
   onSearchHere: (lat: number, lon: number) => void
   showTrails: boolean
+  showAirports: boolean
   path: FlightPath | null
+  highlight: Highlight | null
+  onClearHighlight: () => void
+  /** Height of anything covering the bottom of the map (the phone panel), in px. */
+  bottomInset: number
+}
+
+/** A saved path or spot to show on the map (an emergency or a logbook entry). */
+export interface Highlight {
+  points: [number, number, number | null][]
+  label: string
 }
 
 function planeSvg(color: string, rotation: number, size: number, isHeli: boolean) {
@@ -70,7 +82,7 @@ function iconFor(a: Aircraft, selected: boolean) {
   })
 }
 
-export default function MapView({ aircraft, selected, onSelect, center, radiusNm, onSearchHere, showTrails, path }: Props) {
+export default function MapView({ aircraft, selected, onSelect, center, radiusNm, onSearchHere, showTrails, showAirports, path, highlight, onClearHighlight, bottomInset }: Props) {
   const el = useRef<HTMLDivElement>(null)
   const map = useRef<L.Map | null>(null)
   const markers = useRef(new Map<string, { m: L.Marker; key: string }>())
@@ -78,6 +90,18 @@ export default function MapView({ aircraft, selected, onSelect, center, radiusNm
   const selPath = useRef<L.LayerGroup | null>(null)
   const renderer = useRef<L.Renderer>(L.canvas({ padding: 0.3 }))
   const fittedFor = useRef<string | null>(null)
+  const airportLayer = useRef<L.LayerGroup | null>(null)
+  const highlightLayer = useRef<L.LayerGroup | null>(null)
+  const insetRef = useRef(bottomInset)
+  insetRef.current = bottomInset
+  const airportMarkers = useRef(new Map<string, L.CircleMarker>())
+  const runwayLayer = useRef<L.LayerGroup | null>(null)
+  const [airports, setAirports] = useState<AirportInfo[]>([])
+  const [view, setView] = useState(0) // bumps on pan/zoom so the airport layer re-filters
+  const aircraftRef = useRef(aircraft)
+  aircraftRef.current = aircraft
+  const searchRef = useRef(onSearchHere)
+  searchRef.current = onSearchHere
   const routeLine = useRef<L.Polyline | null>(null)
   const ring = useRef<L.Circle | null>(null)
   const resizeObs = useRef<ResizeObserver | null>(null)
@@ -109,7 +133,20 @@ export default function MapView({ aircraft, selected, onSelect, center, radiusNm
     const ro = new ResizeObserver(() => m.invalidateSize())
     ro.observe(el.current)
     resizeObs.current = ro
+    runwayLayer.current = L.layerGroup().addTo(m)
+    highlightLayer.current = L.layerGroup().addTo(m)
+    airportLayer.current = L.layerGroup().addTo(m)
     trails.current = L.layerGroup().addTo(m)
+    m.on('moveend zoomend', () => setView((v) => v + 1))
+    m.on('popupopen', (e) => {
+      const btn = e.popup.getElement()?.querySelector<HTMLButtonElement>('[data-track]')
+      if (btn)
+        btn.onclick = () => {
+          const [la, lo] = btn.dataset.track!.split(',').map(Number)
+          m.closePopup()
+          searchRef.current(la, lo)
+        }
+    })
     selPath.current = L.layerGroup().addTo(m)
     m.on('click', () => selectRef.current(null))
     map.current = m
@@ -136,12 +173,13 @@ export default function MapView({ aircraft, selected, onSelect, center, radiusNm
       interactive: false,
     }).addTo(m)
     const bounds = ring.current.getBounds()
+    const fit = () => m.fitBounds(bounds, { paddingTopLeft: [20, 20], paddingBottomRight: [20, 20 + insetRef.current] })
     m.invalidateSize()
-    m.fitBounds(bounds, { padding: [20, 20] })
+    fit()
     // Re-fit once layout has settled, in case the map was still 0×0 above.
     const t = setTimeout(() => {
       m.invalidateSize()
-      m.fitBounds(bounds, { padding: [20, 20] })
+      fit()
     }, 250)
     return () => clearTimeout(t)
   }, [center.lat, center.lon, radiusNm])
@@ -151,7 +189,10 @@ export default function MapView({ aircraft, selected, onSelect, center, radiusNm
     const m = map.current
     if (!m) return
     const live = new Set<string>()
-    for (const a of aircraft) {
+    // Only draw aircraft near the visible part of the map (big areas can hold thousands).
+    const inView = m.getBounds().pad(0.25)
+    const visible = aircraft.filter((a) => a.hex === selected || inView.contains([a.lat, a.lon]))
+    for (const a of visible) {
       live.add(a.hex)
       const isSel = a.hex === selected
       const key = `${a.category}|${Math.round(a.track ?? 0)}|${a.onGround}|${a.emergency?.code ?? ''}|${isSel}`
@@ -185,7 +226,7 @@ export default function MapView({ aircraft, selected, onSelect, center, radiusNm
     // Short trails for every aircraft (where it's been while SkyWatch was open).
     trails.current?.clearLayers()
     if (showTrails) {
-      for (const a of aircraft) {
+      for (const a of visible) {
         if (a.hex === selected || a.trail.length < 2) continue
         L.polyline(a.trail.map(([la, lo]) => [la, lo] as [number, number]), {
           color: a.emergency ? '#ef4444' : categoryInfo(a.category).color,
@@ -218,7 +259,11 @@ export default function MapView({ aircraft, selected, onSelect, center, radiusNm
       }
       if (path && fittedFor.current !== sel.hex && pts.length > 1) {
         fittedFor.current = sel.hex
-        m.fitBounds(L.latLngBounds(pts.map(([la, lo]) => [la, lo] as [number, number])).extend([sel.lat, sel.lon]), { padding: [40, 40], maxZoom: 11 })
+        m.fitBounds(L.latLngBounds(pts.map(([la, lo]) => [la, lo] as [number, number])).extend([sel.lat, sel.lon]), {
+          paddingTopLeft: [40, 40],
+          paddingBottomRight: [40, 40 + insetRef.current],
+          maxZoom: 11,
+        })
       }
       const d = sel.route?.destination
       if (d?.lat != null && d.lon != null)
@@ -226,13 +271,93 @@ export default function MapView({ aircraft, selected, onSelect, center, radiusNm
     } else {
       fittedFor.current = null
     }
-  }, [aircraft, selected, showTrails, path])
+  }, [aircraft, selected, showTrails, path, view])
+
+  // A saved emergency path or logbook spot.
+  useEffect(() => {
+    const m = map.current
+    const layer = highlightLayer.current
+    if (!m || !layer) return
+    layer.clearLayers()
+    if (!highlight || highlight.points.length === 0) return
+    const pts = highlight.points
+    if (pts.length > 1) {
+      L.polyline(pts.map(([la, lo]) => [la, lo] as [number, number]), { color: '#0b1220', weight: 7, opacity: 0.7, interactive: false, renderer: renderer.current }).addTo(layer)
+      drawAltitudePath(pts, layer, renderer.current, 4)
+    }
+    const [la, lo] = pts[pts.length - 1]
+    L.circleMarker([la, lo], { radius: 7, color: '#f8fafc', weight: 2, fillColor: '#ef4444', fillOpacity: 1, renderer: renderer.current })
+      .bindTooltip(highlight.label, { permanent: true, direction: 'top', offset: [0, -8] })
+      .addTo(layer)
+    const b = L.latLngBounds(pts.map(([a, o]) => [a, o] as [number, number]))
+    m.fitBounds(b, { paddingTopLeft: [40, 40], paddingBottomRight: [40, 40 + insetRef.current], maxZoom: 10 })
+  }, [highlight])
+
+  useEffect(() => {
+    if (showAirports && airports.length === 0) loadAirports().then(setAirports)
+  }, [showAirports, airports.length])
+
+  // Airports + runways in view. Large airports from zoom 6, medium from zoom 8, runways from zoom 10.
+  useEffect(() => {
+    const m = map.current
+    const layer = airportLayer.current
+    const rw = runwayLayer.current
+    if (!m || !layer || !rw) return
+    rw.clearLayers()
+    if (!showAirports || airports.length === 0) {
+      layer.clearLayers()
+      airportMarkers.current.clear()
+      return
+    }
+    const z = m.getZoom()
+    const bounds = m.getBounds().pad(0.2)
+    const wanted = new Set<string>()
+    for (const ap of airports) {
+      if (z < 6 || (!ap.large && z < 8) || !bounds.contains([ap.lat, ap.lon])) continue
+      wanted.add(ap.ident)
+      const b = busyness(ap, aircraft)
+      const color = b.total >= 10 ? '#f87171' : b.total >= 4 ? '#fbbf24' : b.total >= 1 ? '#38bdf8' : '#64748b'
+      const radius = (ap.large ? 6 : 4) + Math.min(6, b.total * 0.4)
+      let mk = airportMarkers.current.get(ap.ident)
+      if (!mk) {
+        mk = L.circleMarker([ap.lat, ap.lon], { radius, color: '#0f172a', weight: 1.5, fillColor: color, fillOpacity: 0.9, renderer: renderer.current })
+          .bindPopup('', { maxWidth: 280 })
+          .addTo(layer)
+        airportMarkers.current.set(ap.ident, mk)
+      } else mk.setStyle({ fillColor: color }).setRadius(radius)
+      const code = ap.iata || ap.ident
+      const label = `<b>${code}</b>${b.total ? ` · ${b.total}` : ''}`
+      const permanent = z >= 9 || (ap.large && z >= 7)
+      const tip = mk.getTooltip()
+      if (!tip || tip.options.permanent !== permanent) {
+        mk.unbindTooltip().bindTooltip(label, { direction: 'right', offset: [8, 0], className: 'airport-label', permanent })
+      } else mk.setTooltipContent(label)
+      if (!mk.isPopupOpen()) mk.setPopupContent(airportPopup(ap, b))
+      if (z >= 10)
+        for (const r of ap.runways)
+          L.polyline([[r.lat1, r.lon1], [r.lat2, r.lon2]], { color: '#94a3b8', weight: z >= 13 ? 6 : 3, opacity: 0.8, interactive: false, renderer: renderer.current }).addTo(rw)
+    }
+    for (const [id, mk] of airportMarkers.current) {
+      if (!wanted.has(id)) {
+        mk.remove()
+        airportMarkers.current.delete(id)
+      }
+    }
+  }, [airports, showAirports, aircraft, view])
 
   return (
     <div className="relative h-full w-full">
       <div ref={el} className="h-full w-full" />
+      {highlight && (
+        <button
+          onClick={onClearHighlight}
+          className="absolute left-1/2 top-3 z-[500] -translate-x-1/2 rounded-full bg-slate-900/95 px-3 py-1.5 text-xs text-slate-200 shadow ring-1 ring-slate-700"
+        >
+          Showing {highlight.label} <span className="ml-1 text-slate-400">✕</span>
+        </button>
+      )}
       {selected && (
-        <div className="pointer-events-none absolute bottom-6 left-1/2 z-[500] -translate-x-1/2 rounded-lg bg-slate-900/90 px-3 py-1.5 text-[10px] text-slate-300 ring-1 ring-slate-700">
+        <div style={{ bottom: bottomInset + 24 }} className="pointer-events-none absolute left-1/2 z-[500] -translate-x-1/2 rounded-lg bg-slate-900/90 px-3 py-1.5 text-[10px] text-slate-300 ring-1 ring-slate-700">
           <div className="mb-1 text-center font-semibold uppercase tracking-wider text-slate-400">Path altitude</div>
           <div className="flex items-center gap-1.5">
             <span>Ground</span>
@@ -259,4 +384,23 @@ export default function MapView({ aircraft, selected, onSelect, center, radiusNm
 function tooltip(a: Aircraft) {
   const alt = a.onGround ? 'GND' : a.altitude != null ? `${a.altitude.toLocaleString()} ft` : ''
   return `<b>${a.callsign}</b> ${a.typeCode ?? ''}<br/>${alt}${a.emergency ? `<br/><span style="color:#ef4444">⚠ ${a.emergency.label}</span>` : ''}`
+}
+
+function esc(s: string) {
+  return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
+}
+
+function airportPopup(ap: AirportInfo, b: ReturnType<typeof busyness>) {
+  const codes = [ap.iata, ap.ident].filter(Boolean).join(' · ')
+  const runways = ap.runways
+    .slice(0, 8)
+    .map((r) => `${esc(r.name)} <span style="color:#94a3b8">${r.lengthFt ? r.lengthFt.toLocaleString() + ' ft' : ''}</span>`)
+    .join('<br/>')
+  return `<div style="font-size:12px;line-height:1.45">
+    <div style="font-weight:700;font-size:14px">${esc(ap.name)}</div>
+    <div style="color:#64748b">${esc(codes)} · ${esc([ap.city, ap.country].filter(Boolean).join(', '))}${ap.elevation != null ? ` · ${ap.elevation.toLocaleString()} ft` : ''}</div>
+    <div style="margin-top:6px"><b>Right now:</b> ${b.onGround} on the ground, ${b.arriving} arriving, ${b.departing} departing</div>
+    ${runways ? `<div style="margin-top:6px"><b>Runways</b><br/>${runways}</div>` : ''}
+    <button data-track="${ap.lat},${ap.lon}" style="margin-top:8px;width:100%;padding:6px;border-radius:6px;background:#0ea5e9;color:#020617;font-weight:600">Track planes here</button>
+  </div>`
 }

@@ -1,5 +1,5 @@
 import type { Airport, RawAircraft, Route } from '../types'
-import { distanceNm } from './geo'
+import { destinationPoint, distanceNm } from './geo'
 import { upstream } from './upstream'
 
 /**
@@ -26,7 +26,45 @@ function routesetUrl(): string {
 
 let preferred = 0
 
+/** The live APIs cap one query at 250 nm. */
+export const MAX_QUERY_NM = 250
+
+/**
+ * Aircraft within radiusNm of a point. Up to 250 nm is one query; beyond that
+ * the area is covered by a centre circle plus a ring of six 250 nm circles
+ * (good to ~490 nm), merged and de-duplicated.
+ */
 export async function fetchLiveAircraft(
+  lat: number,
+  lon: number,
+  radiusNm: number,
+): Promise<{ aircraft: RawAircraft[]; source: string }> {
+  if (radiusNm <= MAX_QUERY_NM) return fetchArea(lat, lon, radiusNm)
+  const ring = Math.min(400, radiusNm - 100)
+  const tiles: [number, number][] = [[lat, lon], ...[0, 60, 120, 180, 240, 300].map((b) => destinationPoint(lat, lon, b, ring))]
+  const results: { aircraft: RawAircraft[]; source: string }[] = []
+  let lastErr: unknown
+  // two at a time, to stay polite to the free APIs
+  for (let i = 0; i < tiles.length; i += 2) {
+    const batch = await Promise.allSettled(tiles.slice(i, i + 2).map(([la, lo]) => fetchArea(la, lo, MAX_QUERY_NM)))
+    for (const r of batch) {
+      if (r.status === 'fulfilled') results.push(r.value)
+      else lastErr = r.reason
+    }
+  }
+  if (results.length === 0) throw lastErr instanceof Error ? lastErr : new Error('All live data sources failed')
+  const byHex = new Map<string, RawAircraft>()
+  for (const { aircraft } of results)
+    for (const a of aircraft) {
+      if (typeof a.lat !== 'number' || typeof a.lon !== 'number') continue
+      if (distanceNm(lat, lon, a.lat, a.lon) > radiusNm) continue
+      const prev = byHex.get(a.hex)
+      if (!prev || (a.seen ?? 99) < (prev.seen ?? 99)) byHex.set(a.hex, a)
+    }
+  return { aircraft: [...byHex.values()], source: results[0].source + (results.length < tiles.length ? ' (partial)' : '') }
+}
+
+async function fetchArea(
   lat: number,
   lon: number,
   radiusNm: number,
