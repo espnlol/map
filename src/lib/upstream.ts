@@ -20,6 +20,7 @@ export const UPSTREAMS = {
   planespotters: 'https://api.planespotters.net',
   hexdb: 'https://hexdb.io',
   airportdata: 'https://www.airport-data.com',
+  faa: 'https://nasstatus.faa.gov',
 } as const
 
 export type UpstreamName = keyof typeof UPSTREAMS

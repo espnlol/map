@@ -28,6 +28,8 @@ export interface Settings {
   rareToasts: boolean
   happening: boolean
   happeningIgnoreAirports: boolean
+  militaryPatterns: boolean
+  goAroundAlerts: boolean
   // notifications while the app is closed (needs the relay set up for it)
   notifyTeams: boolean
   notifyEmergencies: boolean
@@ -58,6 +60,8 @@ export const DEFAULT_SETTINGS: Settings = {
   rareToasts: true,
   happening: true,
   happeningIgnoreAirports: true,
+  militaryPatterns: true,
+  goAroundAlerts: true,
   notifyTeams: true,
   notifyEmergencies: true,
   notifyRare: false,

@@ -19,6 +19,8 @@ const firstCircling = new Map<string, number>()
 /** How many full turns an aircraft has made recently, and how tightly. */
 function circling(a: Aircraft, now: number): { turns: number; lat: number; lon: number; spread: number } | null {
   if (a.onGround || (a.altitude ?? 0) > 12000) return null
+  // airliners looping at altitude are holding for an airport, not "something happening"
+  if (['A3', 'A4', 'A5'].includes(a.category) && (a.altitude ?? 0) > 5000) return null
   const pts = a.trail.filter((p) => (p[3] ?? now) >= now - WINDOW_MS)
   if (pts.length < 12) return null
   let lat = 0

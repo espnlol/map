@@ -179,3 +179,15 @@ body {
 .safe-toasts {
   top: calc(env(safe-area-inset-top, 0px) + 3.5rem);
 }
+
+.mil-label span {
+  display: inline-block;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+  background: rgba(163, 230, 53, 0.9);
+  color: #0f172a;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 9999px;
+}

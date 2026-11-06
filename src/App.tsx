@@ -27,6 +27,9 @@ import { pullRelayState, pushStore, syncPushConfig } from './lib/push'
 import { beep } from './lib/sound'
 import { account, startAutoSync } from './lib/account'
 import { useRef } from 'react'
+import Insights, { type InsightTab } from './components/Insights'
+import { detectGoArounds, findHolding, findMilitaryPatterns } from './lib/patterns'
+import { countOpen, recordTraffic } from './lib/records'
 import { useTraffic, type Mode } from './lib/useTraffic'
 import { PRESETS } from './lib/presets'
 import { categoryKey } from './lib/categories'
@@ -62,6 +65,7 @@ export default function App() {
   const showAirports = cfg.airports
   const [showSettings, setShowSettings] = useState(false)
   const [showAlerts, setShowAlerts] = useState(false)
+  const [insights, setInsights] = useState<InsightTab | null>(null)
   const [toasts, setToasts] = useState<Toast[]>([])
   const pushToast = (t: Omit<Toast, 'id'>) => setToasts((all) => [{ ...t, id: `${Date.now()}-${Math.random()}` }, ...all].slice(0, 4))
   const [path, setPath] = useState<FlightPath | null>(null)
@@ -230,6 +234,41 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hotspots])
 
+  // ---- military patterns, holding and go-arounds ----
+  const military = useMemo(() => (cfg.militaryPatterns ? findMilitaryPatterns(traffic.aircraft) : []), [traffic.aircraft, cfg.militaryPatterns])
+  const holding = useMemo(() => findHolding(traffic.aircraft, airportList), [traffic.aircraft, airportList])
+  const seenMil = useRef(new Set<string>())
+  useEffect(() => {
+    for (const m of military) {
+      if (seenMil.current.has(m.hex)) continue
+      seenMil.current.add(m.hex)
+      pushToast({ tone: 'happening', title: `🎖️ ${m.kind}`, body: `${m.callsign}${m.model ? ` (${m.model})` : ''} looping for ${Math.round(m.minutes)} min`, onOpen: () => setSelected(m.hex) })
+      beep('info')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [military])
+  useEffect(() => {
+    if (mode !== 'live') return
+    recordTraffic(traffic.aircraft)
+    const fresh = detectGoArounds(traffic.aircraft, airportList)
+    if (cfg.goAroundAlerts)
+      for (const g of fresh) {
+        pushToast({ tone: 'info', title: `🔁 Go-around at ${g.airport}`, body: `${g.callsign} aborted its landing and climbed away`, onOpen: () => setSelected(g.hex) })
+        beep('info')
+      }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [traffic.aircraft])
+
+  // count how often you open each plane, for "Your most tracked"
+  const countedFor = useRef<string | null>(null)
+  useEffect(() => {
+    if (!selected) countedFor.current = null
+    else if (selectedAc && countedFor.current !== selected && mode === 'live') {
+      countedFor.current = selected
+      countOpen(selectedAc)
+    }
+  }, [selected, selectedAc, mode])
+
   // ---- a beep for each new emergency ----
   const seenEmerg = useRef(new Set<string>())
   useEffect(() => {
@@ -282,8 +321,8 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cfg.rareSpotter, cfg.rareWorldwide, cfg.rareLegendary, cfg.rareRare, cfg.rareUncommon, mode, center.lat, center.lon, radius])
   const rare = rareStore.use()
-  const alertCount = (cfg.rareSpotter ? rare.current.length : 0) + hotspots.length
-  const alertNew = (cfg.rareSpotter ? unseenRare(rare) : 0) + hotspots.length
+  const alertCount = (cfg.rareSpotter ? rare.current.length : 0) + hotspots.length + military.length
+  const alertNew = (cfg.rareSpotter ? unseenRare(rare) : 0) + hotspots.length + military.length
 
   // pop-ups fade after a few seconds
   useEffect(() => {
@@ -471,6 +510,34 @@ export default function App() {
           scanning={scanning}
           rareOn={cfg.rareSpotter}
           happeningOn={cfg.happening}
+          military={military}
+          onOpenHex={(hex) => {
+            setShowAlerts(false)
+            setSelected(hex)
+          }}
+          onRareList={() => {
+            setShowAlerts(false)
+            setInsights('rare')
+          }}
+        />
+      )}
+      {insights && (
+        <Insights
+          initialTab={insights}
+          onClose={() => setInsights(null)}
+          aircraft={traffic.aircraft}
+          hotspots={hotspots}
+          military={military}
+          holding={holding}
+          airports={airportList}
+          center={center}
+          radiusNm={radius}
+          live={mode === 'live'}
+          onOpen={(hex, lat, lon, callsign) => {
+            setInsights(null)
+            if (lat != null && lon != null) jumpTo(hex, lat, lon, callsign ?? hex)
+            else setSelected(hex)
+          }}
         />
       )}
       <Toasts toasts={toasts} onDismiss={(id) => setToasts((all) => all.filter((t) => t.id !== id))} />
@@ -524,6 +591,9 @@ export default function App() {
               <>
                 <div className="fixed inset-0 z-[900]" onClick={() => setMenuOpen(false)} />
                 <div className="absolute right-0 top-full z-[901] mt-1 w-52 overflow-hidden rounded-lg bg-slate-800 text-sm shadow-xl ring-1 ring-slate-700">
+                  <button className="block w-full px-4 py-2.5 text-left hover:bg-slate-700" onClick={() => (setMenuOpen(false), setInsights('records'))}>
+                    📊 Insights
+                  </button>
                   <button className="block w-full px-4 py-2.5 text-left hover:bg-slate-700" onClick={() => (setMenuOpen(false), setShowSettings(true))}>
                     ⚙ Settings
                   </button>
@@ -565,6 +635,9 @@ export default function App() {
             </button>
             <button onClick={() => setShowPhone(true)} className={iconBtn}>
               📱 Phone
+            </button>
+            <button onClick={() => setInsights('records')} className={iconBtn}>
+              📊 Insights
             </button>
             <div className="ml-auto flex items-center gap-2">
               {bell}
@@ -634,6 +707,7 @@ export default function App() {
             onClearHighlight={() => setHighlight(null)}
             bottomInset={isMobile ? sheetPx : 0}
             hotspots={hotspots}
+            military={military}
           />
         </main>
 

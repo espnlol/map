@@ -6,6 +6,7 @@ import { fetchPhoto, lookupLinks, type FlightPath } from '../lib/history'
 import { useEffect, useState } from 'react'
 import OwnerTab from './OwnerTab'
 import PhotoGallery from './PhotoGallery'
+import FlightCard from './FlightCard'
 import { addToLogbook, logbook, patchLogEntry, planeKey } from '../lib/logbook'
 import { fetchOwner } from '../lib/owner'
 import { PHASE_LABEL, airportCode, airportName, fmtAltFull, fmtAltOther, fmtMph, fmtSpeed, fmtTime, fmtVr } from '../lib/format'
@@ -157,44 +158,19 @@ export default function DetailPanel({ aircraft: a, onClose, path, pathLoading, d
         <div className="rounded-lg bg-emerald-500/10 px-3 py-1.5 text-xs text-emerald-300">No emergency declared</div>
       )}
 
-      <div className="rounded-lg bg-slate-800/60 p-3">
-        {r ? (
-          <>
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <div className="text-[10px] uppercase tracking-wider text-slate-400">From</div>
-                <div className="font-mono text-xl font-semibold">{airportCode(o)}</div>
-                <div className="truncate text-[11px] text-slate-400">{airportName(o)}</div>
-              </div>
-              <div className="text-slate-500">✈</div>
-              <div className="min-w-0 text-right">
-                <div className="text-[10px] uppercase tracking-wider text-slate-400">To</div>
-                <div className="font-mono text-xl font-semibold">{airportCode(d)}</div>
-                <div className="truncate text-[11px] text-slate-400">{airportName(d)}</div>
-              </div>
-            </div>
-            {progress != null && (
-              <div className="mt-2">
-                <div className="h-1.5 overflow-hidden rounded-full bg-slate-700">
-                  <div className="h-full bg-sky-400" style={{ width: `${progress * 100}%` }} />
-                </div>
-                <div className="mt-1 flex justify-between text-[11px] text-slate-500">
-                  <span>{Math.round(total! - left!)} nm flown</span>
-                  <span>{Math.round(left!)} nm to go</span>
-                </div>
-              </div>
-            )}
-            {!r.plausible && <div className="mt-2 text-[11px] text-amber-300">Route match looks unreliable for this callsign.</div>}
-          </>
-        ) : (
-          <div className="text-xs text-slate-400">Origin and destination aren't known for this callsign (common for private, military and some cargo flights).</div>
-        )}
-      </div>
-
-      <div className="flex gap-2">
-        <TimeBlock label="Takeoff" t={a.takeoff} fallback={a.onGround ? 'Not departed yet' : 'Unknown'} />
-        <TimeBlock label="Touchdown" t={a.touchdown} fallback={a.onGround ? 'On the ground' : 'Unknown'} />
-      </div>
+      {r ? (
+        <FlightCard a={a} />
+      ) : (
+        <>
+          <div className="rounded-lg bg-slate-800/60 p-3 text-xs text-slate-400">
+            Origin and destination aren't known for this callsign (common for private, military and some cargo flights).
+          </div>
+          <div className="flex gap-2">
+            <TimeBlock label="Takeoff" t={a.takeoff} fallback={a.onGround ? 'Not departed yet' : 'Unknown'} />
+            <TimeBlock label="Touchdown" t={a.touchdown} fallback={a.onGround ? 'On the ground' : 'Unknown'} />
+          </div>
+        </>
+      )}
 
       <div className="grid grid-cols-2 gap-2 [&>*:last-child]:col-span-2">
         <Stat label="Altitude" value={fmtAltFull(a.altitude, a.onGround)} sub={fmtAltOther(a.altitude)} />

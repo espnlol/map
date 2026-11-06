@@ -18,13 +18,14 @@ const UPSTREAMS = {
   planespotters: 'https://api.planespotters.net',
   hexdb: 'https://hexdb.io',
   airportdata: 'https://www.airport-data.com',
+  faa: 'https://nasstatus.faa.gov',
 }
 
 // Websites allowed to use this relay.
 const ALLOWED_ORIGINS = [/^https:\/\/espnlol\.github\.io$/, /^http:\/\/localhost(:\d+)?$/]
 
 // How long (seconds) to reuse an answer.
-const CACHE_SECONDS = { adsblol: 2, airplaneslive: 2, adsblolglobe: 30, airplanesliveglobe: 30, planespotters: 86400, hexdb: 86400, airportdata: 86400 }
+const CACHE_SECONDS = { adsblol: 2, airplaneslive: 2, adsblolglobe: 30, airplanesliveglobe: 30, planespotters: 86400, hexdb: 86400, airportdata: 86400, faa: 120 }
 // Worldwide lookups (rare types, a tail number) change slowly; share them for a minute.
 const SLOW_PATHS = /^\/v2\/(type|reg|callsign|hex|mil)\//
 

@@ -23,7 +23,7 @@ export interface TrafficState {
 
 const POLL_MS = { live: 6000, demo: 2000 }
 const STALE_MS = 60_000
-const TRAIL_LEN = 400
+const TRAIL_LEN = 600
 
 function phaseOf(onGround: boolean, alt: number | null, vr: number | null): Phase {
   if (onGround) return 'ground'

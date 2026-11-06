@@ -88,6 +88,8 @@ export default function SettingsPanel({ onClose, center }: { onClose: () => void
           <Section title="Something's happening">
             <Toggle k="happening" label="Spot planes circling one place" hint="Police, news and medical helicopters circling usually means something is going on" />
             {s.happening && <Toggle k="happeningIgnoreAirports" label="Ignore circling right at airports" hint="Training flights loop around airports all day" />}
+            <Toggle k="militaryPatterns" label="Military patterns" hint="Tankers, surveillance planes and fighters flying long loops, outlined on the map" />
+            <Toggle k="goAroundAlerts" label="Go-arounds" hint="A pop-up when a plane aborts its landing and climbs away" />
           </Section>
 
           <Section title="Alerts in the app">

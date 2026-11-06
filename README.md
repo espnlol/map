@@ -109,6 +109,21 @@ Pilots' identities aren't broadcast, so SkyWatch doesn't show them.
   VAPID keys), and keeps exact team takeoff/landing times that the app pulls in when opened. On an
   iPhone, notifications only work from the Home Screen app (iOS 16.4+).
 
+## Insights, patterns and the flight card
+
+- **📊 Insights**: *Records* (fastest, highest, lowest, slowest, steepest climb/descent, longest
+  route, highest/fastest helicopter, fastest small plane, highest military, plus today's counts
+  and most common airlines/types), *Most tracked* (the most interesting flights near you right
+  now, and the planes you open most), *Disruptions* (FAA ground stops/delay programs/delays/closures
+  for US airports via the relay, plus holding, go-arounds, nearby emergencies and bad weather at big
+  airports in your area) and *Rare list* (every rare type ranked by tier, with what you've logged).
+- **Military patterns**: tankers, surveillance aircraft and fighters looping for 12+ minutes are
+  outlined on the map and listed under 🔔 (`src/lib/patterns.ts`). Airliners circling near an airport
+  count as holding; a plane that drops low near a runway and climbs away is a go-around.
+- **Flight card**: origin/destination with city, UTC offset and current weather (Open-Meteo), and
+  departure/arrival times in each airport's local time. Scheduled times need paid airline data, so
+  the card links to FlightAware for those.
+
 ## Profiles
 
 *Settings → Profile*: create a profile (username + password) to keep your logbook, followed teams

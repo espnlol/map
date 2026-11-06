@@ -6,6 +6,7 @@ import type { FlightPath } from '../lib/history'
 import { busyness, loadAirports, type AirportInfo } from '../lib/airports'
 import { settings, type BaseMap } from '../lib/settings'
 import type { Hotspot } from '../lib/happening'
+import type { MilitaryPattern } from '../lib/patterns'
 
 /** Altitude → colour, low = orange, high = violet (same idea as most flight trackers). */
 export function altColor(alt: number | null): string {
@@ -56,6 +57,7 @@ interface Props {
   /** Height of anything covering the bottom of the map (the phone panel), in px. */
   bottomInset: number
   hotspots: Hotspot[]
+  military: MilitaryPattern[]
 }
 
 /** A saved path or spot to show on the map (an emergency or a logbook entry). */
@@ -87,7 +89,7 @@ function iconFor(a: Aircraft, selected: boolean, label: boolean) {
   })
 }
 
-export default function MapView({ aircraft, selected, onSelect, center, radiusNm, onSearchHere, showTrails, showAirports, path, highlight, onClearHighlight, bottomInset, hotspots }: Props) {
+export default function MapView({ aircraft, selected, onSelect, center, radiusNm, onSearchHere, showTrails, showAirports, path, highlight, onClearHighlight, bottomInset, hotspots, military }: Props) {
   const cfg = settings.use()
   const [zoom, setZoom] = useState(8)
   const showLabels = cfg.labels && zoom >= 9
@@ -309,6 +311,23 @@ export default function MapView({ aircraft, selected, onSelect, center, radiusNm
     if (cfg.rangeRing) ring.current.addTo(m)
     else ring.current.remove()
   }, [cfg.rangeRing])
+
+  // Military loops, outlined.
+  const milLayer = useRef<L.LayerGroup | null>(null)
+  useEffect(() => {
+    const m = map.current
+    if (!m) return
+    if (!milLayer.current) milLayer.current = L.layerGroup().addTo(m)
+    milLayer.current.clearLayers()
+    for (const p of military) {
+      if (p.hull.length < 3) continue
+      L.polygon(p.hull, { color: '#a3e635', weight: 1.5, dashArray: '6 5', fillColor: '#a3e635', fillOpacity: 0.06, interactive: false }).addTo(milLayer.current)
+      L.marker([p.lat, p.lon], {
+        interactive: false,
+        icon: L.divIcon({ className: 'mil-label', html: `<span>🎖️ ${p.kind}</span>`, iconSize: [0, 0] }),
+      }).addTo(milLayer.current)
+    }
+  }, [military])
 
   // Places where aircraft are circling.
   useEffect(() => {

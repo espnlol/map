@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { markRareViewed, rareStore, type RareSighting } from '../lib/rare'
 import type { Hotspot } from '../lib/happening'
+import type { MilitaryPattern } from '../lib/patterns'
 import { fmtAlt, fmtClock, fmtRelative } from '../lib/format'
 
 const TIER_STYLE = {
@@ -19,9 +20,12 @@ interface Props {
   scanning: boolean
   rareOn: boolean
   happeningOn: boolean
+  military: MilitaryPattern[]
+  onOpenHex: (hex: string) => void
+  onRareList: () => void
 }
 
-export default function AlertsMenu({ onClose, hotspots, placeOf, onOpenRare, onOpenHotspot, onScan, scanning, rareOn, happeningOn }: Props) {
+export default function AlertsMenu({ onClose, hotspots, placeOf, onOpenRare, onOpenHotspot, onScan, scanning, rareOn, happeningOn, military, onOpenHex, onRareList }: Props) {
   const rare = rareStore.use()
   useEffect(() => markRareViewed, [])
   const near = rare.current.filter((r) => r.nearby)
@@ -88,9 +92,35 @@ export default function AlertsMenu({ onClose, hotspots, placeOf, onOpenRare, onO
             )}
           </section>
 
+          {military.length > 0 && (
+            <section className="border-t border-slate-800">
+              <h3 className="px-4 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-wider text-lime-300">Military activity</h3>
+              <ul className="divide-y divide-slate-800">
+                {military.map((m) => (
+                  <li key={m.hex}>
+                    <button onClick={() => onOpenHex(m.hex)} className="flex w-full flex-col gap-0.5 px-4 py-2.5 text-left hover:bg-slate-800/60">
+                      <div className="text-sm font-semibold">
+                        {m.kind}
+                        {placeOf(m.lat, m.lon) && <span className="font-normal text-slate-400"> · {placeOf(m.lat, m.lon)}</span>}
+                      </div>
+                      <div className="text-xs text-slate-400">
+                        <span className="font-mono text-slate-200">{m.callsign}</span>
+                        {m.model ? ` (${m.model})` : ''} · {fmtAlt(m.altitude, false)} · {Math.round(m.minutes)} min, {m.turns} loops over {Math.round(m.spreadNm * 2)} nm
+                      </div>
+                      <div className="text-[11px] text-slate-500">{m.why}</div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           <section className="border-t border-slate-800">
             <div className="flex items-center gap-2 px-4 pb-1 pt-3">
               <h3 className="text-[10px] font-semibold uppercase tracking-wider text-amber-300">Rare planes in the air</h3>
+              <button onClick={onRareList} className="text-xs text-slate-400 underline">
+                full list
+              </button>
               {rareOn && (
                 <button onClick={onScan} disabled={scanning} className="ml-auto text-xs text-sky-300 disabled:opacity-50">
                   {scanning ? 'Checking…' : 'Check now'}
