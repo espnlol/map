@@ -38,6 +38,14 @@ const TYPES: Record<string, string> = {
   C17: 'Boeing C-17 Globemaster III', C130: 'Lockheed C-130 Hercules', C30J: 'Lockheed C-130J',
   K35R: 'Boeing KC-135 Stratotanker', F16: 'General Dynamics F-16', F18S: 'Boeing F/A-18 Super Hornet',
   F35: 'Lockheed F-35', V22: 'Bell Boeing V-22 Osprey', BALL: 'Balloon', GLID: 'Glider',
+  VC25: 'Boeing VC-25 (Air Force One)', E4: 'Boeing E-4B Nightwatch', B52: 'Boeing B-52 Stratofortress', B1: 'Rockwell B-1 Lancer',
+  A124: 'Antonov An-124 Ruslan', A3ST: 'Airbus Beluga', A337: 'Airbus BelugaXL', SGUP: 'Aero Spacelines Super Guppy',
+  B17: 'Boeing B-17 Flying Fortress', B29: 'Boeing B-29 Superfortress', CONI: 'Lockheed Constellation', ER2: 'NASA ER-2',
+  WB57: 'Martin WB-57', B74S: 'Boeing 747SP', BLCF: 'Boeing 747 Dreamlifter', C5M: 'Lockheed C-5M Galaxy',
+  E3TF: 'Boeing E-3 Sentry', E3CF: 'Boeing E-3 Sentry', E6: 'Boeing E-6 Mercury', U2: 'Lockheed U-2', R135: 'Boeing RC-135',
+  DC3: 'Douglas DC-3', DC6: 'Douglas DC-6', P51: 'North American P-51 Mustang', SPIT: 'Supermarine Spitfire',
+  L101: 'Lockheed L-1011 TriStar', DC10: 'McDonnell Douglas DC-10', IL76: 'Ilyushin Il-76', A388: 'Airbus A380',
+  A400: 'Airbus A400M Atlas',
 }
 
 export function modelName(typeCode?: string, desc?: string): string | undefined {
