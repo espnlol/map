@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { Aircraft } from '../types'
 import type { AirportInfo } from '../lib/airports'
-import { milArrivals, milWatch, nearWatched, scanMilitary } from '../lib/milwatch'
+import { milArrivals, milWatch, nearWatched, scanMilitary, type MilArrival } from '../lib/milwatch'
 import { settingsChangedAt } from '../lib/settings'
 import { fmtAlt, fmtClock, fmtDist, fmtRelative } from '../lib/format'
 
@@ -9,9 +9,10 @@ interface Props {
   airports: AirportInfo[]
   aircraft: Aircraft[]
   onOpen: (hex: string) => void
+  onOpenArrival: (e: MilArrival) => void
 }
 
-export default function MilWatchPanel({ airports, aircraft, onOpen }: Props) {
+export default function MilWatchPanel({ airports, aircraft, onOpen, onOpenArrival }: Props) {
   const w = milWatch.use()
   const log = milArrivals.use()
   const [q, setQ] = useState('')
@@ -139,7 +140,7 @@ export default function MilWatchPanel({ airports, aircraft, onOpen }: Props) {
           <ul className="divide-y divide-slate-800">
             {log.slice(0, 40).map((e) => (
               <li key={e.id}>
-                <button onClick={() => onOpen(e.hex)} className="flex w-full items-center gap-3 py-2 text-left">
+                <button onClick={() => onOpenArrival(e)} className="flex w-full items-center gap-3 py-2 text-left hover:bg-slate-800/40">
                   <span className="text-lg">{e.status === 'landed' ? '🛬' : '🎖️'}</span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm">
@@ -154,6 +155,8 @@ export default function MilWatchPanel({ airports, aircraft, onOpen }: Props) {
                     {fmtClock(e.at)}
                     <br />
                     {fmtRelative(e.at)}
+                    <br />
+                    <span className="text-sky-300">Show path ›</span>
                   </span>
                 </button>
               </li>

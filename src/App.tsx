@@ -202,6 +202,33 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Open a military arrival: the live plane if it's still broadcasting anywhere,
+  // otherwise the path it flew today (ending where it landed), otherwise the airport.
+  const openArrival = async (e: MilArrival) => {
+    setInsights(null)
+    setShowAlerts(false)
+    if (liveHexes.has(e.hex)) {
+      setHighlight(null)
+      setSelected(e.hex)
+      return
+    }
+    const label = `${e.callsign} ${e.status === 'landed' ? 'landed at' : 'arriving at'} ${e.airport} ${fmtClock(e.at)}`
+    const live = await findByHex(e.hex, center).catch(() => null)
+    if (live) {
+      jumpTo(live.hex, live.lat, live.lon, live.callsign)
+      return
+    }
+    const path = await fetchFlightPath(e.hex).catch(() => null)
+    if (path && path.points.length > 1) {
+      setSelected(null)
+      setHighlight({ points: path.points.map(([la, lo, al]) => [la, lo, al]), label })
+      if (isMobile) setSheet('peek')
+      return
+    }
+    const ap = watch.airports.find((a) => a.code === e.airport)
+    if (ap) focusPoint(e.hex, ap.lat, ap.lon, label)
+  }
+
   // ---- airports, for "where is this" labels and the circling detector ----
   const [airportList, setAirportList] = useState<AirportInfo[]>([])
   useEffect(() => {
@@ -269,7 +296,7 @@ export default function App() {
         tone: 'happening',
         title: e.status === 'landed' ? `🎖️🛬 Military landed at ${e.airport}` : `🎖️ Military arriving at ${e.airport}`,
         body: `${e.callsign}${e.model ? ` (${e.model})` : ''}${e.status === 'arriving' ? ` · ${fmtDist(e.distanceNm)} out` : ''}`,
-        onOpen: () => setSelected(e.hex),
+        onOpen: () => openArrival(e),
       })
     }
     if (fresh.length) beep('alert')
@@ -566,6 +593,7 @@ export default function App() {
           center={center}
           radiusNm={radius}
           live={mode === 'live'}
+          onOpenArrival={openArrival}
           onOpen={(hex, lat, lon, callsign) => {
             setInsights(null)
             if (lat != null && lon != null) jumpTo(hex, lat, lon, callsign ?? hex)

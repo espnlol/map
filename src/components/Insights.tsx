@@ -14,6 +14,7 @@ import { fmtAlt, fmtClock, fmtRelative } from '../lib/format'
 import { fmtDist } from '../lib/format'
 import { scanWorld, world, type WorldFlight } from '../lib/world'
 import MilWatchPanel from './MilWatchPanel'
+import type { MilArrival } from '../lib/milwatch'
 
 export type InsightTab = 'records' | 'tracked' | 'milwatch' | 'disruptions' | 'rare'
 
@@ -29,6 +30,7 @@ interface Props {
   radiusNm: number
   live: boolean
   onOpen: (hex: string, lat?: number, lon?: number, callsign?: string) => void
+  onOpenArrival: (e: MilArrival) => void
 }
 
 const TABS: [InsightTab, string][] = [
@@ -90,7 +92,7 @@ export default function Insights(p: Props) {
         <div className="min-h-0 flex-1 overflow-y-auto">
           {tab === 'records' && <Records {...p} />}
           {tab === 'tracked' && <Tracked {...p} />}
-          {tab === 'milwatch' && <MilWatchPanel airports={p.airports} aircraft={p.aircraft} onOpen={(hex) => p.onOpen(hex)} />}
+          {tab === 'milwatch' && <MilWatchPanel airports={p.airports} aircraft={p.aircraft} onOpen={(hex) => p.onOpen(hex)} onOpenArrival={p.onOpenArrival} />}
           {tab === 'disruptions' && <Disruptions {...p} />}
           {tab === 'rare' && <RareList {...p} />}
         </div>
