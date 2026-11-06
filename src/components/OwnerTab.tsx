@@ -1,6 +1,36 @@
 import { useEffect, useState } from 'react'
 import type { Aircraft } from '../types'
-import { fetchOwner, airlineName, operatorFromCallsign, registrationCountry, registryLinks, type OwnerRecord } from '../lib/owner'
+import { fetchOwner, registrationCountry, registryLinks, type OwnerRecord } from '../lib/owner'
+import { classifyOwner, guessOperator, typeHint } from '../lib/operator'
+import { fetchTodaysLegs, type Leg } from '../lib/history'
+import { loadAirports, type AirportInfo } from '../lib/airports'
+import { distanceNm } from '../lib/geo'
+import { fmtClock } from '../lib/format'
+
+const BASIS_LABEL = {
+  callsign: 'From the callsign',
+  owner: 'From the registered owner',
+  type: 'Best guess from the aircraft type',
+  military: 'Military / government flag',
+  none: '',
+} as const
+
+function placeName(lat: number, lon: number, airports: AirportInfo[]): string {
+  let best: AirportInfo | null = null
+  let bd = Infinity
+  for (const p of airports) {
+    if (Math.abs(p.lat - lat) > 1 || Math.abs(p.lon - lon) > 1.4) continue
+    const d = distanceNm(lat, lon, p.lat, p.lon)
+    if (d < bd) {
+      bd = d
+      best = p
+    }
+  }
+  if (!best) return `${lat.toFixed(2)}, ${lon.toFixed(2)}`
+  const code = best.iata || best.ident
+  const city = best.city || best.name
+  return bd < 4 ? `${city} (${code})` : `${Math.round(bd)} nm from ${city} (${code})`
+}
 
 function Row({ label, value }: { label: string; value?: string }) {
   return (
@@ -29,38 +59,36 @@ export default function OwnerTab({ a, demo }: { a: Aircraft; demo: boolean }) {
   const owner = rec?.owner ?? a.operator
   const ownerSource = rec?.owner ? 'Public aircraft registry data via hexdb.io' : a.operator ? 'Reported by the ADS-B network' : undefined
 
-  // Who flies it: the airline in this flight's callsign, else the operator on file.
-  const fromCallsign = operatorFromCallsign(a.callsign)
-  const fileCode = rec?.operatorCode
-  const milgov = a.special.find((s) => s.tag === 'milgov')
-  let flownBy: string | undefined
-  let flownHow: string
-  if (fromCallsign) {
-    flownBy = fromCallsign.name ?? `Operator code ${fromCallsign.code}`
-    flownHow = `This flight's callsign (${a.callsign}) starts with ${fromCallsign.code}, the code for this operator.`
-  } else if (fileCode && airlineName(fileCode)) {
-    flownBy = airlineName(fileCode)
-    flownHow = `The aircraft database lists ${fileCode} as its usual operator.`
-  } else if (milgov) {
-    flownBy = 'Military / government'
-    flownHow = milgov.reason
-  } else {
-    flownHow =
-      'No airline is linked to this aircraft. Private planes are usually flown by their owner, or by a management or charter company the owner hires.'
-  }
+  const guess = guessOperator(a, owner, rec?.operatorCode)
+  const ownerClass = classifyOwner(owner)
+  const hint = typeHint(a.typeCode)
+  const differs = guess.basis === 'callsign' && owner && !owner.toLowerCase().includes(guess.headline.split(' ')[0].toLowerCase())
 
-  const differs = owner && flownBy && !owner.toLowerCase().includes(flownBy.split(' ')[0].toLowerCase())
+  // Today's flights for this airframe
+  const [legs, setLegs] = useState<Leg[] | null | undefined>(undefined)
+  const [airports, setAirports] = useState<AirportInfo[]>([])
+  useEffect(() => {
+    loadAirports().then(setAirports)
+  }, [])
+  useEffect(() => {
+    if (demo) return
+    let stop = false
+    setLegs(undefined)
+    fetchTodaysLegs(a.hex).then((l) => !stop && setLegs(l))
+    return () => {
+      stop = true
+    }
+  }, [a.hex, demo])
 
   if (demo)
     return (
       <div className="rounded-lg bg-slate-800/60 p-3 text-sm text-slate-400">
         Demo planes are made up, so they have no real owner. Switch to <b className="text-slate-200">LIVE</b> to see who real
         aircraft are registered to.
-        {flownBy && (
-          <div className="mt-2 text-slate-300">
-            Callsign airline: <b>{flownBy}</b>
-          </div>
-        )}
+        <div className="mt-2 text-slate-300">
+          Best guess: <b>{guess.headline}</b>
+          <div className="text-xs text-slate-500">{guess.detail}</div>
+        </div>
       </div>
     )
 
@@ -80,15 +108,64 @@ export default function OwnerTab({ a, demo }: { a: Aircraft; demo: boolean }) {
         )}
       </section>
 
+      {ownerClass && owner && guess.headline !== ownerClass.role && (
+        <div className="-mt-1 px-1 text-xs text-slate-400">
+          <b className="text-slate-300">What that means:</b> {ownerClass.role}. {ownerClass.detail}
+        </div>
+      )}
+
       <section className="rounded-lg bg-slate-800/60 p-3">
-        <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Usually flown by</div>
-        <div className="mt-0.5 text-lg font-semibold text-slate-100">{flownBy ?? 'Owner or a private operator'}</div>
-        <div className="text-xs text-slate-400">{flownHow}</div>
+        <div className="flex items-center gap-2">
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Usually flown by</div>
+          {BASIS_LABEL[guess.basis] && <span className="rounded bg-slate-700 px-1.5 text-[10px] text-slate-300">{BASIS_LABEL[guess.basis]}</span>}
+        </div>
+        {loading && guess.basis !== 'callsign' ? (
+          <div className="mt-1 h-5 w-1/2 animate-pulse rounded bg-slate-700" />
+        ) : (
+          <>
+            <div className="mt-0.5 text-lg font-semibold text-slate-100">{guess.headline}</div>
+            <div className="text-xs text-slate-400">{guess.detail}</div>
+          </>
+        )}
+        {hint && guess.basis !== 'type' && !guess.detail.includes(hint) && <div className="mt-1.5 text-xs text-slate-500">{hint}</div>}
         {differs && (
           <div className="mt-2 text-xs text-slate-500">
-            The owner and the operator are often different. Airlines lease many of their planes, so the registered owner can
-            be a leasing company, bank or trust.
+            The owner and the airline are different. Airlines lease many of their planes, so the registered owner is often a
+            leasing company, bank or trust.
           </div>
+        )}
+      </section>
+
+      <section className="rounded-lg bg-slate-800/60 p-3">
+        <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">This plane today</div>
+        {legs === undefined ? (
+          <div className="h-5 w-2/3 animate-pulse rounded bg-slate-700" />
+        ) : !legs || legs.length === 0 ? (
+          <p className="text-xs text-slate-500">No flight history for today yet.</p>
+        ) : (
+          <>
+            <p className="mb-1.5 text-xs text-slate-300">
+              {legs.length === 1 ? '1 flight' : `${legs.length} flights`} so far today
+              {legs.length >= 4 ? ', a busy schedule typical of airlines, charters or training' : ''}.
+            </p>
+            <ol className="space-y-1.5">
+              {legs.map((l, i) => (
+                <li key={i} className="rounded-md bg-slate-900/60 px-2.5 py-1.5 text-xs">
+                  <div className="flex flex-wrap items-baseline gap-x-1.5">
+                    <span className="font-mono text-slate-300">{fmtClock(l.departedAt)}</span>
+                    <span className="text-slate-200">{l.fromGround ? placeName(l.departLat, l.departLon, airports) : `first seen ${placeName(l.departLat, l.departLon, airports)}`}</span>
+                  </div>
+                  <div className="flex flex-wrap items-baseline gap-x-1.5">
+                    <span className="font-mono text-slate-300">{l.ongoing ? 'now' : fmtClock(l.arrivedAt)}</span>
+                    <span className="text-slate-200">
+                      → {l.ongoing ? 'in the air' : l.landed ? placeName(l.arriveLat, l.arriveLon, airports) : `last seen ${placeName(l.arriveLat, l.arriveLon, airports)}`}
+                    </span>
+                    {l.maxAltitude > 0 && <span className="text-slate-500">· up to {Math.round(l.maxAltitude / 100) * 100} ft</span>}
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </>
         )}
       </section>
 

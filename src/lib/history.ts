@@ -30,21 +30,100 @@ const TRACE_SOURCES = [
  * files and cut it down to the current flight (since the last time it was on
  * the ground or the network marked a new leg).
  */
-export async function fetchFlightPath(hex: string): Promise<FlightPath | null> {
-  const h = hex.toLowerCase()
+const traceCache = new Map<string, { at: number; json: TraceJson; source: string } | null>()
+
+/** Today's raw track file for an aircraft (shared by the path and the "today's flights" list). */
+async function fetchTrace(hex: string): Promise<{ json: TraceJson; source: string } | null> {
+  const h = hex.toLowerCase().replace(/^~/, '')
+  const hit = traceCache.get(h)
+  if (hit && Date.now() - hit.at < 50_000) return hit
   const file = `/data/traces/${h.slice(-2)}/trace_full_${h}.json`
   for (const src of TRACE_SOURCES) {
     try {
       const res = await fetch(src.base() + file, { headers: { Accept: 'application/json' } })
       if (!res.ok) continue
       const json = (await res.json()) as TraceJson
-      const path = parseTrace(json)
-      if (path) return { ...path, source: src.name }
+      if (!json || !Array.isArray(json.trace)) continue
+      const entry = { at: Date.now(), json, source: src.name }
+      traceCache.set(h, entry)
+      return entry
     } catch {
       // try the next source
     }
   }
   return null
+}
+
+export async function fetchFlightPath(hex: string): Promise<FlightPath | null> {
+  const t = await fetchTrace(hex)
+  if (!t) return null
+  const path = parseTrace(t.json)
+  return path ? { ...path, source: t.source } : null
+}
+
+export interface Leg {
+  departedAt: number
+  departLat: number
+  departLon: number
+  fromGround: boolean // we saw it on the ground before takeoff
+  arrivedAt: number
+  arriveLat: number
+  arriveLon: number
+  landed: boolean // we saw it on the ground after
+  ongoing: boolean
+  maxAltitude: number
+}
+
+/** Split today's track into separate flights. */
+export function parseLegs(json: TraceJson): Leg[] {
+  if (!json || typeof json.timestamp !== 'number' || !Array.isArray(json.trace)) return []
+  const pts: { t: number; lat: number; lon: number; alt: number | null; newLeg: boolean }[] = []
+  for (const row of json.trace) {
+    const [dt, lat, lon, alt, , , flags] = row as [number, number, number, number | 'ground' | null, unknown, unknown, number]
+    if (typeof lat !== 'number' || typeof lon !== 'number') continue
+    pts.push({ t: (json.timestamp + dt) * 1000, lat, lon, alt: alt === 'ground' ? null : typeof alt === 'number' ? alt : 0, newLeg: typeof flags === 'number' && (flags & 2) === 2 })
+  }
+  const legs: Leg[] = []
+  // Coverage gaps (oceans, remote areas) can last a while; only a long one splits a flight.
+  const GAP = 90 * 60 * 1000
+  let i = 0
+  while (i < pts.length) {
+    if (pts[i].alt === null) {
+      i++
+      continue
+    }
+    // an airborne run
+    const start = i
+    let maxAlt = 0
+    while (i < pts.length && pts[i].alt !== null && (i === start || (!pts[i].newLeg && pts[i].t - pts[i - 1].t < GAP))) {
+      maxAlt = Math.max(maxAlt, pts[i].alt ?? 0)
+      i++
+    }
+    const end = i - 1
+    const before = start > 0 && pts[start - 1].alt === null && pts[start].t - pts[start - 1].t < 15 * 60 * 1000 ? pts[start - 1] : null
+    const after = i < pts.length && pts[i].alt === null && pts[i].t - pts[end].t < 15 * 60 * 1000 ? pts[i] : null
+    const first = before ?? pts[start]
+    const last = after ?? pts[end]
+    if (last.t - first.t < 4 * 60 * 1000 && !after) continue // a blip, not a flight
+    legs.push({
+      departedAt: pts[start].t,
+      departLat: first.lat,
+      departLon: first.lon,
+      fromGround: !!before,
+      arrivedAt: after ? after.t : pts[end].t,
+      arriveLat: last.lat,
+      arriveLon: last.lon,
+      landed: !!after,
+      ongoing: !after && end === pts.length - 1 && Date.now() - pts[end].t < 10 * 60 * 1000,
+      maxAltitude: maxAlt,
+    })
+  }
+  return legs
+}
+
+export async function fetchTodaysLegs(hex: string): Promise<Leg[] | null> {
+  const t = await fetchTrace(hex)
+  return t ? parseLegs(t.json) : null
 }
 
 export function parseTrace(json: TraceJson): Omit<FlightPath, 'source'> | null {

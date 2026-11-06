@@ -70,10 +70,19 @@ const AIRLINES: Record<string, string> = {
   QFA: 'Qantas', ANZ: 'Air New Zealand', VOZ: 'Virgin Australia', AIC: 'Air India', ETH: 'Ethiopian Airlines',
   RCH: 'US Air Force (Air Mobility Command)', SAM: 'US Air Force (Special Air Mission)', CNV: 'US Navy', PAT: 'US Army',
   NASA: 'NASA',
+  AMF: 'Ameriflight (cargo feeder)', MTN: 'Mountain Air Cargo (flies for FedEx)', WGN: 'Western Global Airlines (cargo)',
+  NCR: 'National Airlines (charter & cargo)', KAP: 'Cape Air', SIL: 'Silver Airways', CLX: 'Cargolux', GEC: 'Lufthansa Cargo',
+  BOX: 'AeroLogic (DHL cargo)', DHK: 'DHL Air UK', BCS: 'European Air Transport (DHL)', CAO: 'Air China Cargo',
+  LOF: 'Trans States Airlines', ENT: 'Enter Air', TOM: 'TUI Airways', EXS: 'Jet2', SXS: 'SunExpress',
+  AFL: 'Aeroflot', CSZ: 'Shenzhen Airlines', HVN: 'Vietnam Airlines', THA: 'Thai Airways', MAS: 'Malaysia Airlines',
+  GIA: 'Garuda Indonesia', PAL: 'Philippine Airlines', ASL: 'Air Serbia', AUI: 'Ukraine International',
+  MSR: 'EgyptAir', RAM: 'Royal Air Maroc', SAA: 'South African Airways', KQA: 'Kenya Airways', OMA: 'Oman Air',
+  GFA: 'Gulf Air', KAC: 'Kuwait Airways', PIA: 'Pakistan International', JST: 'Jetstar',
+  FLE: 'Flair Airlines', SWG: 'Sunwing Airlines', CJT: 'Cargojet',
 }
 
 export function airlineName(code?: string): string | undefined {
-  return code ? AIRLINES[code.toUpperCase()] : undefined
+  return code ? AIRLINES[code.toUpperCase()] || undefined : undefined
 }
 
 /** The operator implied by a callsign like "DAL1234", if it's an airline-style one. */
