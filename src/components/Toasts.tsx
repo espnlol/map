@@ -15,7 +15,7 @@ const TONE = {
 export default function Toasts({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id: string) => void }) {
   if (toasts.length === 0) return null
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-14 z-[1500] flex flex-col items-center gap-2 px-3">
+    <div className="pointer-events-none safe-toasts fixed inset-x-0 z-[1500] flex flex-col items-center gap-2 px-3">
       {toasts.slice(0, 3).map((t) => (
         <div key={t.id} className={`pointer-events-auto flex w-full max-w-sm items-start gap-2 rounded-xl px-3 py-2.5 shadow-xl ring-1 ${TONE[t.tone]}`}>
           <button

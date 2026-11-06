@@ -28,7 +28,7 @@ export default function PhoneGuide({ onClose }: { onClose: () => void }) {
   }, [url])
 
   return (
-    <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+    <div className="safe-overlay fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
       <div
         className="flex max-h-full w-full max-w-md flex-col overflow-y-auto rounded-xl bg-slate-900 ring-1 ring-slate-700"
         onClick={(e) => e.stopPropagation()}

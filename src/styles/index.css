@@ -6,14 +6,54 @@
   color-scheme: dark;
 }
 
+/* SkyWatch is a one-screen app: the page itself never scrolls (only panels
+   inside it do), so iOS can't leave it shifted up under the status bar after
+   the keyboard closes. */
 html,
-body,
-#root {
+body {
   height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 body {
   @apply bg-slate-950 text-slate-100;
+  position: fixed;
+  inset: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* A solid band behind the iPhone status bar / Dynamic Island, so nothing
+   scrolls or shows through underneath it. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0 0 auto;
+  height: env(safe-area-inset-top, 0px);
+  background: #0f172a;
+  z-index: 3000;
+  pointer-events: none;
+}
+
+#root {
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Scrolling panels keep their scroll to themselves. */
+.overflow-y-auto {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* iPhones zoom the whole page into any text box smaller than 16px. */
+@media (max-width: 767px) {
+  input[type='text'],
+  input:not([type]),
+  input[type='search'],
+  textarea {
+    font-size: 16px !important;
+  }
 }
 
 /* Keep clear of the iPhone notch / home bar when opened from the Home Screen. */
@@ -118,4 +158,13 @@ body {
 }
 @media (prefers-reduced-motion: reduce) {
   .hotspot-ring, .emergency-ring { animation: none; }
+}
+
+/* Pop-ups stay below the status bar and above the home bar. */
+.safe-overlay {
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.safe-toasts {
+  top: calc(env(safe-area-inset-top, 0px) + 3.5rem);
 }

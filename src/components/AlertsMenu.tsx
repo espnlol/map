@@ -46,7 +46,7 @@ export default function AlertsMenu({ onClose, hotspots, placeOf, onOpenRare, onO
   )
 
   return (
-    <div className="fixed inset-0 z-[2000] flex items-end justify-center bg-black/60 md:items-start md:justify-end md:p-4 md:pt-14" onClick={onClose}>
+    <div className="safe-overlay fixed inset-0 z-[2000] flex items-end justify-center bg-black/60 md:items-start md:justify-end md:p-4 md:pt-14" onClick={onClose}>
       <div
         className="flex max-h-[85%] w-full max-w-md flex-col overflow-hidden rounded-t-2xl bg-slate-900 ring-1 ring-slate-700 md:max-h-[80vh] md:rounded-xl"
         onClick={(e) => e.stopPropagation()}

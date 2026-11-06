@@ -54,7 +54,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 export default function SettingsPanel({ onClose, center }: { onClose: () => void; center: { lat: number; lon: number; label: string } }) {
   const s = settings.use()
   return (
-    <div className="fixed inset-0 z-[2000] flex items-end justify-center bg-black/60 md:items-center md:p-4" onClick={onClose}>
+    <div className="safe-overlay fixed inset-0 z-[2000] flex items-end justify-center bg-black/60 md:items-center md:p-4" onClick={onClose}>
       <div
         className="flex max-h-[92%] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-slate-900 ring-1 ring-slate-700 md:max-h-full md:rounded-xl"
         onClick={(e) => e.stopPropagation()}

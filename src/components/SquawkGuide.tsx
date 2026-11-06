@@ -8,7 +8,7 @@ const LEVEL_STYLE: Record<SquawkLevel, string> = {
 
 export default function SquawkGuide({ onClose, current }: { onClose: () => void; current: Set<string> }) {
   return (
-    <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+    <div className="safe-overlay fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
       <div
         className="flex max-h-full w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-slate-900 ring-1 ring-slate-700"
         onClick={(e) => e.stopPropagation()}
