@@ -24,7 +24,29 @@ export interface LogEntry {
 
 export const logbook = createStore<LogEntry[]>('skywatch.logbook', [])
 
-export function addToLogbook(a: Aircraft): { entry: LogEntry; newType: boolean; newAirline: boolean; timesBefore: number } {
+/** One logbook entry per plane: matched by tail number, or transponder code if there isn't one. */
+export const planeKey = (e: { hex: string; registration?: string }) =>
+  e.registration ? `reg:${e.registration.toUpperCase().replace(/-/g, '')}` : `hex:${e.hex.toLowerCase()}`
+
+export const findLogged = (a: { hex: string; registration?: string }) =>
+  logbook.get().find((e) => planeKey(e) === planeKey(a) || e.hex.toLowerCase() === a.hex.toLowerCase())
+
+// Clean up duplicates saved before this rule existed: keep the first sighting,
+// but keep a photo or owner that a later copy found.
+{
+  const all = logbook.get()
+  const byKey = new Map<string, LogEntry>()
+  for (const e of [...all].sort((x, y) => x.at - y.at)) {
+    const k = planeKey(e)
+    const first = byKey.get(k)
+    if (!first) byKey.set(k, e)
+    else byKey.set(k, { ...first, photo: first.photo ?? e.photo, owner: first.owner ?? e.owner })
+  }
+  if (byKey.size !== all.length) logbook.set([...byKey.values()].sort((x, y) => y.at - x.at))
+}
+
+export function addToLogbook(a: Aircraft): { entry: LogEntry; newType: boolean; newAirline: boolean } | null {
+  if (findLogged(a)) return null
   const all = logbook.get()
   const op = operatorFromCallsign(a.callsign)
   const entry: LogEntry = {
@@ -45,9 +67,8 @@ export function addToLogbook(a: Aircraft): { entry: LogEntry; newType: boolean; 
   }
   const newType = !!a.typeCode && !all.some((e) => e.typeCode === a.typeCode)
   const newAirline = !!entry.airline && !all.some((e) => e.airline === entry.airline)
-  const timesBefore = all.filter((e) => e.hex === a.hex).length
   logbook.set([entry, ...all])
-  return { entry, newType, newAirline, timesBefore }
+  return { entry, newType, newAirline }
 }
 
 export function patchLogEntry(id: string, patch: Partial<LogEntry>) {
@@ -61,7 +82,7 @@ export function removeLogEntry(id: string) {
 export function logStats(all: LogEntry[]) {
   return {
     sightings: all.length,
-    planes: new Set(all.map((e) => e.hex)).size,
+    planes: new Set(all.map(planeKey)).size,
     types: new Set(all.map((e) => e.typeCode).filter(Boolean)).size,
     airlines: new Set(all.map((e) => e.airline).filter(Boolean)).size,
   }

@@ -5,7 +5,7 @@ import { squawkInfo } from '../lib/squawks'
 import { fetchPhoto, lookupLinks, type FlightPath, type PlanePhoto } from '../lib/history'
 import { useEffect, useState } from 'react'
 import OwnerTab from './OwnerTab'
-import { addToLogbook, logbook, patchLogEntry } from '../lib/logbook'
+import { addToLogbook, logbook, patchLogEntry, planeKey } from '../lib/logbook'
 import { fetchOwner } from '../lib/owner'
 import { PHASE_LABEL, airportCode, airportName, fmtAltFull, fmtAltOther, fmtMph, fmtSpeed, fmtTime, fmtVr } from '../lib/format'
 import { distanceNm } from '../lib/geo'
@@ -59,20 +59,19 @@ export default function DetailPanel({ aircraft: a, onClose, path, pathLoading, d
   const left = d?.lat != null ? distanceNm(a.lat, a.lon, d.lat, d.lon!) : null
   const progress = total && left != null ? Math.max(0, Math.min(1, 1 - left / total)) : null
   const [tab, setTab] = useState<'flight' | 'owner'>('flight')
-  const logged = logbook.use().filter((e) => e.hex === a.hex).length
+  const loggedEntry = logbook.use().find((e) => planeKey(e) === planeKey(a) || e.hex === a.hex)
   const [saved, setSaved] = useState<string | null>(null)
   useEffect(() => setSaved(null), [a.hex])
 
   const logIt = () => {
     const r = addToLogbook(a)
+    if (!r) return
     setSaved(
       r.newType && a.model
         ? `Saved! First time you've logged a ${a.model} 🎉`
         : r.newAirline
           ? `Saved! First ${r.entry.airline} plane in your logbook 🎉`
-          : r.timesBefore > 0
-            ? `Saved. You've logged this exact plane ${r.timesBefore + 1} times.`
-            : 'Saved to your logbook.',
+          : 'Saved to your logbook.',
     )
     if (!demo) {
       fetchPhoto(a.hex, a.registration).then((p) => p && patchLogEntry(r.entry.id, { photo: p.thumb }))
@@ -101,12 +100,21 @@ export default function DetailPanel({ aircraft: a, onClose, path, pathLoading, d
         </button>
       </div>
 
-      <button
-        onClick={logIt}
-        className="flex items-center justify-center gap-2 rounded-lg bg-amber-400/10 py-2 text-sm font-semibold text-amber-200 ring-1 ring-amber-400/40 hover:bg-amber-400/20"
-      >
-        📒 I saw this{logged ? <span className="font-normal text-amber-200/70">· logged {logged}×</span> : null}
-      </button>
+      {loggedEntry ? (
+        <div className="flex items-center justify-center gap-2 rounded-lg bg-emerald-500/10 py-2 text-sm font-semibold text-emerald-300 ring-1 ring-emerald-500/30">
+          ✓ In your logbook
+          <span className="font-normal text-emerald-300/70">
+            · logged {new Date(loggedEntry.at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+          </span>
+        </div>
+      ) : (
+        <button
+          onClick={logIt}
+          className="flex items-center justify-center gap-2 rounded-lg bg-amber-400/10 py-2 text-sm font-semibold text-amber-200 ring-1 ring-amber-400/40 hover:bg-amber-400/20"
+        >
+          📒 I saw this
+        </button>
+      )}
       {saved && <div className="-mt-1 text-center text-xs text-amber-200">{saved}</div>}
 
       <div className="flex rounded-lg bg-slate-800/60 p-1 text-sm font-semibold" role="tablist">
