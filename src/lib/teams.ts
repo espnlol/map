@@ -30,6 +30,14 @@ export const TEAM_PRESETS: TeamPreset[] = [
 ]
 
 export const teams = createStore<Team[]>('skywatch.teams', [])
+/** Teams you stopped following (name → when), so syncing doesn't bring them back. */
+export const teamsRemoved = createStore<Record<string, number>>('skywatch.teamsRemoved', {})
+
+export function removeTeam(id: string) {
+  const t = teams.get().find((x) => x.id === id)
+  if (t) teamsRemoved.set((r) => ({ ...r, [t.name.toLowerCase()]: Date.now() }))
+  teams.set((all) => all.filter((x) => x.id !== id))
+}
 
 export type PlaneState = 'airborne' | 'ground' | 'offline'
 

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { settings, type Settings } from '../lib/settings'
 import NotifySection from './NotifySection'
+import ProfileSection from './ProfileSection'
 
 function Toggle({ k, label, hint }: { k: keyof Settings; label: string; hint?: string }) {
   const s = settings.use()
@@ -68,6 +69,7 @@ export default function SettingsPanel({ onClose, center }: { onClose: () => void
           </button>
         </div>
         <div className="overflow-y-auto divide-y divide-slate-800">
+          <ProfileSection />
           <NotifySection center={center} />
 
           <Section title="Rare plane spotter">

@@ -3,7 +3,9 @@
 // 1. Relay: the flight-data sites don't let web pages on other websites call
 //    them directly, so the hosted SkyWatch asks this Worker instead. It only
 //    talks to the services below and only answers SkyWatch's own websites.
-// 2. Background checks (optional): with a KV namespace bound as SKYWATCH and a
+// 2. Accounts (optional, needs the same KV): sign in to keep your logbook,
+//    teams and emergency history safe and on every device.
+// 3. Background checks (optional): with a KV namespace bound as SKYWATCH and a
 //    cron trigger, it checks your team planes, emergencies near home and rare
 //    planes every few minutes and sends notifications to your phone, even when
 //    SkyWatch is closed.
@@ -49,6 +51,7 @@ export default {
     if (!allowed) return new Response('Not allowed', { status: 403, headers: cors })
 
     if (url.pathname.startsWith('/push/')) return handlePush(request, url, env, cors)
+    if (url.pathname.startsWith('/account/')) return handleAccount(request, url, env, cors)
 
     if (request.method !== 'GET' && request.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: cors })
     const [, name, ...rest] = url.pathname.split('/')
@@ -128,6 +131,89 @@ async function handlePush(request, url, env, cors) {
   if (route === 'unregister') {
     const subs = (await kv.get('subs', 'json')) || []
     await kv.put('subs', JSON.stringify(subs.filter((s) => s.endpoint !== body.endpoint)))
+    return json({ ok: true })
+  }
+  return json({ error: 'Unknown' }, 404)
+}
+
+// ---------------------------------------------------------------------------
+// Accounts: keep a person's logbook, teams and emergency history safe.
+//
+// The app stretches the password on the phone (PBKDF2, 150,000 rounds) and
+// sends only that result ("proof"); the relay stores a salted SHA-256 of it.
+// So the password never leaves the phone and the stored value can't be
+// turned back into it. Sessions are random tokens that expire after 180 days.
+// ---------------------------------------------------------------------------
+
+const SESSION_TTL = 180 * 24 * 3600
+const MAX_FAILS = 10
+
+async function sha256hex(text) {
+  const buf = await crypto.subtle.digest('SHA-256', enc.encode(text))
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+function sameString(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false
+  let d = 0
+  for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  return d === 0
+}
+
+async function handleAccount(request, url, env, cors) {
+  const json = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
+  const kv = env.SKYWATCH
+  if (!kv) return json({ error: 'Accounts need the SKYWATCH storage on the relay.' }, 501)
+  const route = url.pathname.slice('/account/'.length)
+  const body = request.method === 'POST' ? await request.json().catch(() => ({})) : {}
+
+  if (route === 'signup' || route === 'login') {
+    const name = String(body.username || '').trim().toLowerCase()
+    const proof = String(body.proof || '')
+    if (!/^[a-z0-9_.-]{3,24}$/.test(name)) return json({ error: 'Usernames are 3–24 letters, numbers, dots, dashes or underscores.' }, 400)
+    if (!/^[A-Za-z0-9_-]{40,}$/.test(proof)) return json({ error: 'Bad sign-in request.' }, 400)
+    const key = `user:${name}`
+    const user = await kv.get(key, 'json')
+    if (route === 'signup') {
+      if (user) return json({ error: 'That username is taken. Pick another, or sign in.' }, 409)
+      const salt = randomToken()
+      await kv.put(key, JSON.stringify({ name, salt, verifier: await sha256hex(salt + proof), created: Date.now() }))
+    } else {
+      if (!user) return json({ error: 'No profile with that username.' }, 404)
+      const failsKey = `fails:${name}`
+      const fails = Number((await kv.get(failsKey)) || 0)
+      if (fails >= MAX_FAILS) return json({ error: 'Too many wrong passwords. Try again in 15 minutes.' }, 429)
+      if (!sameString(await sha256hex(user.salt + proof), user.verifier)) {
+        await kv.put(failsKey, String(fails + 1), { expirationTtl: 900 })
+        return json({ error: 'Wrong password.' }, 401)
+      }
+      if (fails) await kv.delete(failsKey)
+    }
+    const token = randomToken() + randomToken()
+    await kv.put(`session:${token}`, name, { expirationTtl: SESSION_TTL })
+    return json({ token, username: name })
+  }
+
+  const token = body.token || url.searchParams.get('token') || ''
+  const name = token ? await kv.get(`session:${token}`) : null
+  if (!name) return json({ error: 'Signed out. Please sign in again.' }, 401)
+
+  if (route === 'data' && request.method === 'GET') {
+    return json((await kv.get(`data:${name}`, 'json')) || { updatedAt: 0 })
+  }
+  if (route === 'data' && request.method === 'POST') {
+    const data = body.data || {}
+    const text = JSON.stringify({ ...data, updatedAt: Date.now() })
+    if (text.length > 5_000_000) return json({ error: 'Too much data to save.' }, 413)
+    await kv.put(`data:${name}`, text)
+    return json({ ok: true })
+  }
+  if (route === 'logout') {
+    await kv.delete(`session:${token}`)
+    return json({ ok: true })
+  }
+  if (route === 'delete') {
+    await Promise.all([kv.delete(`user:${name}`), kv.delete(`data:${name}`), kv.delete(`session:${token}`)])
     return json({ ok: true })
   }
   return json({ error: 'Unknown' }, 404)

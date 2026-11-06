@@ -25,6 +25,7 @@ import { findByHex } from './lib/search'
 import { loadAirports, type AirportInfo } from './lib/airports'
 import { pullRelayState, pushStore, syncPushConfig } from './lib/push'
 import { beep } from './lib/sound'
+import { account, startAutoSync } from './lib/account'
 import { useRef } from 'react'
 import { useTraffic, type Mode } from './lib/useTraffic'
 import { PRESETS } from './lib/presets'
@@ -301,6 +302,8 @@ export default function App() {
   useEffect(() => {
     pullRelayState()
   }, [])
+  useEffect(() => startAutoSync(), [])
+  const profile = account.use()
 
   const activeFilters = cats.size + (emergOnly ? 1 : 0) + (hideGround ? 1 : 0) + (query ? 1 : 0)
   const showFilterBlock = !isMobile || filtersOpen
@@ -413,6 +416,13 @@ export default function App() {
               focusPoint(r.hex, last?.[0] ?? center.lat, last?.[1] ?? center.lon, `${r.callsign}: ${r.codes[0]?.label ?? 'emergency'}`, r.path.map(([la, lo, al]) => [la, lo, al]))
             }}
           />
+        )}
+        {tab === 'logbook' && !profile.token && (
+          <button onClick={() => setShowSettings(true)} className="flex w-full items-center gap-2 border-b border-slate-800 bg-sky-500/10 px-4 py-2 text-left text-xs text-sky-200">
+            <span>👤</span>
+            <span className="flex-1">Sign in or create a profile so you never lose your logbook.</span>
+            <span className="font-semibold">Set up ›</span>
+          </button>
         )}
         {tab === 'logbook' && <Logbook liveHexes={liveHexes} onOpen={(e) => focusPoint(e.hex, e.lat, e.lon, `${e.callsign} (logged ${fmtClock(e.at)})`)} />}
         {tab === 'teams' && (

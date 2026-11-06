@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { TEAM_PRESETS, normalizeIdent, refreshTeams, teamHistory, teamStatus, teams, type PlaneStatus, type Team } from '../lib/teams'
+import { TEAM_PRESETS, normalizeIdent, refreshTeams, removeTeam, teamHistory, teamStatus, teams, teamsRemoved, type PlaneStatus, type Team } from '../lib/teams'
 import { fmtClock, fmtRelative } from '../lib/format'
 
 const STATE_STYLE = {
@@ -25,9 +25,13 @@ export default function TeamsPanel({ onShow }: { onShow: (s: PlaneStatus) => voi
 
   const add = (t: Omit<Team, 'id'>) => {
     teams.set((all) => [...all, { ...t, id: `${Date.now()}` }])
+    teamsRemoved.set((r) => {
+      const { [t.name.toLowerCase()]: _, ...rest } = r
+      return rest
+    })
     setTimeout(refreshTeams, 0)
   }
-  const remove = (id: string) => teams.set((all) => all.filter((t) => t.id !== id))
+  const remove = removeTeam
   const presets = TEAM_PRESETS.filter((p) => !list.some((t) => t.name === p.name))
 
   return (

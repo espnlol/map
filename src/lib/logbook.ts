@@ -68,6 +68,10 @@ export function addToLogbook(a: Aircraft): { entry: LogEntry; newType: boolean; 
   const newType = !!a.typeCode && !all.some((e) => e.typeCode === a.typeCode)
   const newAirline = !!entry.airline && !all.some((e) => e.airline === entry.airline)
   logbook.set([entry, ...all])
+  logbookRemoved.set((r) => {
+    const { [planeKey(entry)]: _, ...rest } = r
+    return rest
+  })
   return { entry, newType, newAirline }
 }
 
@@ -75,8 +79,13 @@ export function patchLogEntry(id: string, patch: Partial<LogEntry>) {
   logbook.set((all) => all.map((e) => (e.id === id ? { ...e, ...patch } : e)))
 }
 
+/** Planes you removed (plane key → when), so syncing doesn't bring them back. */
+export const logbookRemoved = createStore<Record<string, number>>('skywatch.logbookRemoved', {})
+
 export function removeLogEntry(id: string) {
-  logbook.set((all) => all.filter((e) => e.id !== id))
+  const e = logbook.get().find((x) => x.id === id)
+  if (e) logbookRemoved.set((r) => ({ ...r, [planeKey(e)]: Date.now() }))
+  logbook.set((all) => all.filter((x) => x.id !== id))
 }
 
 export function logStats(all: LogEntry[]) {

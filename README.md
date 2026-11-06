@@ -109,6 +109,14 @@ Pilots' identities aren't broadcast, so SkyWatch doesn't show them.
   VAPID keys), and keeps exact team takeoff/landing times that the app pulls in when opened. On an
   iPhone, notifications only work from the Home Screen app (iOS 16.4+).
 
+## Profiles
+
+*Settings → Profile*: create a profile (username + password) to keep your logbook, followed teams
+and emergency history on the relay's KV storage and sync them across devices. The password is
+stretched on the device (PBKDF2-SHA256, 150,000 rounds) and only that result is sent; the relay
+stores a salted SHA-256 of it, and locks a username for 15 minutes after 10 wrong passwords.
+Removals are remembered so a sync never brings back a plane or team you deleted.
+
 ## Filtering
 
 - **Aircraft category** chips (multi-select, with live counts), using the ADS-B emitter category the

@@ -25,5 +25,5 @@ export function createStore<T>(key: string, initial: T) {
     return () => listeners.delete(l)
   }
   const use = () => useSyncExternalStore(subscribe, get, get)
-  return { get, set, use }
+  return { get, set, use, subscribe }
 }
