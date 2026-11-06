@@ -25,6 +25,25 @@ export const fmtSpeed = (kt: number | null) => {
   return `${Math.round(kt * f)} ${u}`
 }
 
+/** The distance unit: chosen in Settings, or matching the speed unit. */
+export function distUnit(): 'mi' | 'nm' | 'km' {
+  const s = settings.get()
+  if (s.distUnit !== 'auto') return s.distUnit
+  return s.speedUnit === 'mph' ? 'mi' : s.speedUnit === 'kmh' ? 'km' : 'nm'
+}
+
+const DIST = { mi: 1.15078, nm: 1, km: 1.852 } as const
+
+/** A distance given in nautical miles, shown in your unit: "58 mi". */
+export const fmtDist = (nm: number) => `${Math.round(nm * DIST[distUnit()]).toLocaleString()} ${distUnit()}`
+
+/** A rounded distance for menus: "30 mi" rather than "29 mi". */
+export const fmtDistRound = (nm: number) => {
+  const v = nm * DIST[distUnit()]
+  const step = v >= 100 ? 10 : 5
+  return `${Math.round(v / step) * step} ${distUnit()}`
+}
+
 /** A secondary speed line in a different unit from the main one. */
 export const fmtMph = (kt: number | null) => {
   if (kt == null) return ''

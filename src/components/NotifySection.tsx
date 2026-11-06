@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { settings, type Settings } from '../lib/settings'
 import { disablePush, enablePush, linkWithCode, pullRelayState, pushStore, pushSupport, sendTestPush, syncPushConfig } from '../lib/push'
 import { fmtClock, fmtRelative } from '../lib/format'
+import { fmtDistRound } from '../lib/format'
 
 function Check({ k, label }: { k: keyof Settings; label: string }) {
   const s = settings.use()
@@ -81,7 +82,7 @@ export default function NotifySection({ center }: { center: { lat: number; lon: 
           >
             {[25, 50, 100, 150, 250].map((r) => (
               <option key={r} value={r}>
-                {r} nm
+                {fmtDistRound(r)}
               </option>
             ))}
           </select>

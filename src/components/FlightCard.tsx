@@ -4,6 +4,7 @@ import { distanceNm } from '../lib/geo'
 import { fmtOffset, fmtTemp, placeInfo, weatherLabel, type PlaceInfo } from '../lib/weather'
 import { settings } from '../lib/settings'
 import { fmtClock } from '../lib/format'
+import { fmtDist } from '../lib/format'
 
 function usePlace(ap?: Airport) {
   const [p, setP] = useState<PlaceInfo | null>(null)
@@ -101,8 +102,8 @@ export default function FlightCard({ a }: { a: Aircraft }) {
             <div className="h-full bg-amber-300" style={{ width: `${progress * 100}%` }} />
           </div>
           <div className="mt-1 flex justify-between text-[10px] text-slate-500">
-            <span>{Math.round(total! - left!).toLocaleString()} nm flown</span>
-            <span>{Math.round(left!).toLocaleString()} nm to go</span>
+            <span>{fmtDist(total! - left!)} flown</span>
+            <span>{fmtDist(left!)} to go</span>
           </div>
         </div>
       )}

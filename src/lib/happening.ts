@@ -1,6 +1,7 @@
 import type { Aircraft } from '../types'
 import { bearingDeg, distanceNm } from './geo'
 import type { AirportInfo } from './airports'
+import { fmtDist } from './format'
 
 /** A place where one or more aircraft are flying circles. */
 export interface Hotspot {
@@ -100,5 +101,5 @@ export function describePlace(lat: number, lon: number, airports: AirportInfo[])
     }
   }
   if (!best) return null
-  return `${Math.round(bd)} nm from ${best.city || best.name} (${best.iata || best.ident})`
+  return `${fmtDist(bd)} from ${best.city || best.name} (${best.iata || best.ident})`
 }

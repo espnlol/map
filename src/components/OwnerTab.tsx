@@ -6,6 +6,7 @@ import { fetchTodaysLegs, type Leg } from '../lib/history'
 import { loadAirports, type AirportInfo } from '../lib/airports'
 import { distanceNm } from '../lib/geo'
 import { fmtClock } from '../lib/format'
+import { fmtDist } from '../lib/format'
 
 const BASIS_LABEL = {
   callsign: 'From the callsign',
@@ -29,7 +30,7 @@ function placeName(lat: number, lon: number, airports: AirportInfo[]): string {
   if (!best) return `${lat.toFixed(2)}, ${lon.toFixed(2)}`
   const code = best.iata || best.ident
   const city = best.city || best.name
-  return bd < 4 ? `${city} (${code})` : `${Math.round(bd)} nm from ${city} (${code})`
+  return bd < 4 ? `${city} (${code})` : `${fmtDist(bd)} from ${city} (${code})`
 }
 
 function Row({ label, value }: { label: string; value?: string }) {

@@ -110,6 +110,7 @@ export default function SettingsPanel({ onClose, center }: { onClose: () => void
           <Section title="Units & time">
             <Choice k="altUnit" label="Altitude" options={[['ft', 'Feet'], ['m', 'Metres']]} />
             <Choice k="speedUnit" label="Speed" options={[['kt', 'Knots'], ['mph', 'mph'], ['kmh', 'km/h']]} />
+            <Choice k="distUnit" label="Distance" options={[['auto', 'Match speed'], ['mi', 'Miles'], ['nm', 'NM'], ['km', 'km']]} />
             <Toggle k="clock24" label="24-hour clock" />
           </Section>
 

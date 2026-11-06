@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { TEAM_PRESETS, normalizeIdent, refreshTeams, removeTeam, teamHistory, teamStatus, teams, teamsRemoved, type PlaneStatus, type Team } from '../lib/teams'
 import { fmtClock, fmtRelative } from '../lib/format'
+import { fmtSpeed } from '../lib/format'
 
 const STATE_STYLE = {
   airborne: ['In the air', 'bg-emerald-500 text-slate-950'],
@@ -71,7 +72,7 @@ export default function TeamsPanel({ onShow }: { onShow: (s: PlaneStatus) => voi
                   {s?.state === 'airborne' && (
                     <div className="mt-1 text-slate-300">
                       {s.altitude != null ? `${s.altitude.toLocaleString()} ft` : ''}
-                      {s.speed ? ` · ${Math.round(s.speed)} kt` : ''}
+                      {s.speed ? ` · ${fmtSpeed(s.speed)}` : ''}
                       {s.from || s.to ? ` · ${s.from ?? '?'} → ${s.to ?? '?'}` : ''}
                     </div>
                   )}

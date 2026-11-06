@@ -14,6 +14,7 @@ export interface Settings {
   // units & time
   altUnit: 'ft' | 'm'
   speedUnit: 'kt' | 'mph' | 'kmh'
+  distUnit: 'auto' | 'mi' | 'nm' | 'km'
   clock24: boolean
   // updates
   refresh: 'fast' | 'normal' | 'saver'
@@ -48,6 +49,7 @@ export const DEFAULT_SETTINGS: Settings = {
   groundVehicles: true,
   altUnit: 'ft',
   speedUnit: 'kt',
+  distUnit: 'auto',
   clock24: false,
   refresh: 'normal',
   emergencyBanner: true,

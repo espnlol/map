@@ -3,6 +3,7 @@ import type { Aircraft } from '../types'
 import { createStore } from './store'
 import { distanceNm } from './geo'
 import { airlineName } from './owner'
+import { fmtDist, fmtSpeed } from './format'
 
 export interface RecordHolder {
   value: number
@@ -34,16 +35,16 @@ let lastFlush = 0
 
 /** The records SkyWatch keeps, with how to show each one. */
 export const RECORD_DEFS: { key: string; title: string; icon: string; fmt: (v: number) => string; best: 'max' | 'min' }[] = [
-  { key: 'fastest', title: 'Fastest', icon: '🚀', fmt: (v) => `${Math.round(v)} kt (${Math.round(v * 1.15078)} mph)`, best: 'max' },
+  { key: 'fastest', title: 'Fastest', icon: '🚀', fmt: (v) => fmtSpeed(v), best: 'max' },
   { key: 'highest', title: 'Highest', icon: '🏔️', fmt: (v) => `${Math.round(v).toLocaleString()} ft`, best: 'max' },
   { key: 'lowest', title: 'Lowest in the air', icon: '🐜', fmt: (v) => `${Math.round(v).toLocaleString()} ft`, best: 'min' },
-  { key: 'slowest', title: 'Slowest in the air', icon: '🐢', fmt: (v) => `${Math.round(v)} kt`, best: 'min' },
+  { key: 'slowest', title: 'Slowest in the air', icon: '🐢', fmt: (v) => fmtSpeed(v), best: 'min' },
   { key: 'climb', title: 'Steepest climb', icon: '📈', fmt: (v) => `${Math.round(v).toLocaleString()} ft/min`, best: 'max' },
   { key: 'dive', title: 'Steepest descent', icon: '📉', fmt: (v) => `${Math.round(Math.abs(v)).toLocaleString()} ft/min`, best: 'min' },
-  { key: 'longest', title: 'Longest route', icon: '🌍', fmt: (v) => `${Math.round(v).toLocaleString()} nm`, best: 'max' },
+  { key: 'longest', title: 'Longest route', icon: '🌍', fmt: (v) => fmtDist(v), best: 'max' },
   { key: 'heliHigh', title: 'Highest helicopter', icon: '🚁', fmt: (v) => `${Math.round(v).toLocaleString()} ft`, best: 'max' },
-  { key: 'heliFast', title: 'Fastest helicopter', icon: '💨', fmt: (v) => `${Math.round(v)} kt`, best: 'max' },
-  { key: 'smallFast', title: 'Fastest small plane', icon: '🛩️', fmt: (v) => `${Math.round(v)} kt`, best: 'max' },
+  { key: 'heliFast', title: 'Fastest helicopter', icon: '💨', fmt: (v) => fmtSpeed(v), best: 'max' },
+  { key: 'smallFast', title: 'Fastest small plane', icon: '🛩️', fmt: (v) => fmtSpeed(v), best: 'max' },
   { key: 'highestMil', title: 'Highest military', icon: '🎖️', fmt: (v) => `${Math.round(v).toLocaleString()} ft`, best: 'max' },
 ]
 
@@ -79,8 +80,8 @@ export function recordTraffic(aircraft: Aircraft[], now = Date.now()) {
     if (alt != null && alt >= 100 && (gs ?? 0) > 30) consider('lowest', alt, a)
     if (gs != null && gs >= 15 && (alt ?? 0) > 500) consider('slowest', gs, a)
     if (a.verticalRate != null && Math.abs(a.verticalRate) < 15000) {
-      consider('climb', a.verticalRate, a)
-      consider('dive', a.verticalRate, a)
+      if (a.verticalRate > 0) consider('climb', a.verticalRate, a)
+      if (a.verticalRate < 0) consider('dive', a.verticalRate, a)
     }
     const o = a.route?.origin
     const d = a.route?.destination

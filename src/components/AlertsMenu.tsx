@@ -3,6 +3,7 @@ import { markRareViewed, rareStore, type RareSighting } from '../lib/rare'
 import type { Hotspot } from '../lib/happening'
 import type { MilitaryPattern } from '../lib/patterns'
 import { fmtAlt, fmtClock, fmtRelative } from '../lib/format'
+import { fmtDist } from '../lib/format'
 
 const TIER_STYLE = {
   legendary: 'bg-amber-400 text-slate-950',
@@ -41,7 +42,7 @@ export default function AlertsMenu({ onClose, hotspots, placeOf, onOpenRare, onO
         </div>
         <div className="text-xs text-slate-400">
           <span className="font-mono text-slate-200">{r.callsign}</span> · {fmtAlt(r.altitude, false)}
-          {r.distance != null && ` · ${Math.round(r.distance).toLocaleString()} nm away`}
+          {r.distance != null && ` · ${fmtDist(r.distance)} away`}
           {placeOf(r.lat, r.lon) && ` · ${placeOf(r.lat, r.lon)}`}
         </div>
         <div className="text-[11px] text-slate-500">{r.type.why}</div>
@@ -105,7 +106,7 @@ export default function AlertsMenu({ onClose, hotspots, placeOf, onOpenRare, onO
                       </div>
                       <div className="text-xs text-slate-400">
                         <span className="font-mono text-slate-200">{m.callsign}</span>
-                        {m.model ? ` (${m.model})` : ''} · {fmtAlt(m.altitude, false)} · {Math.round(m.minutes)} min, {m.turns} loops over {Math.round(m.spreadNm * 2)} nm
+                        {m.model ? ` (${m.model})` : ''} · {fmtAlt(m.altitude, false)} · {Math.round(m.minutes)} min, {m.turns} loops over {fmtDist(m.spreadNm * 2)}
                       </div>
                       <div className="text-[11px] text-slate-500">{m.why}</div>
                     </button>

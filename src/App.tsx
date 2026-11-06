@@ -34,6 +34,7 @@ import { useTraffic, type Mode } from './lib/useTraffic'
 import { PRESETS } from './lib/presets'
 import { categoryKey } from './lib/categories'
 import { fmtClock } from './lib/format'
+import { fmtDist, fmtDistRound } from './lib/format'
 import type { Aircraft, Center } from './types'
 
 type SortKey = 'callsign' | 'altitude' | 'speed' | 'emergency'
@@ -301,7 +302,7 @@ export default function App() {
           pushToast({
             tone: 'rare',
             title: `✨ ${r.type.name}`,
-            body: `${r.callsign} · ${r.nearby ? 'in your area' : `${Math.round(r.distance ?? 0).toLocaleString()} nm away`}`,
+            body: `${r.callsign} · ${r.nearby ? 'in your area' : `${fmtDist(r.distance ?? 0)} away`}`,
             onOpen: () => openRare(r),
           })
       if (scannedOnce.current && fresh.length) beep('info')
@@ -574,7 +575,7 @@ export default function App() {
         >
           {RADII.map((r) => (
             <option key={r} value={r}>
-              {r} nm{r > 250 ? ' (slower)' : ''}
+              {fmtDistRound(r)}{r > 250 ? ' (slower)' : ''}
             </option>
           ))}
         </select>

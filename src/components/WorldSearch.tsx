@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { searchPlans, searchWorld, type WorldResult } from '../lib/search'
 import { fmtAlt } from '../lib/format'
+import { fmtDist } from '../lib/format'
 
 interface Props {
   query: string
@@ -57,7 +58,7 @@ export default function WorldSearch({ query, from, onOpen }: Props) {
                   </div>
                   <div className="shrink-0 text-right font-mono text-xs">
                     <div>{fmtAlt(r.altitude, r.altitude == null)}</div>
-                    <div className="text-slate-500">{Math.round(r.distance).toLocaleString()} nm</div>
+                    <div className="text-slate-500">{fmtDist(r.distance)}</div>
                   </div>
                 </button>
               </li>

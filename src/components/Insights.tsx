@@ -11,6 +11,7 @@ import type { AirportInfo } from '../lib/airports'
 import { placeInfo, weatherTrouble } from '../lib/weather'
 import { distanceNm } from '../lib/geo'
 import { fmtAlt, fmtClock, fmtRelative } from '../lib/format'
+import { fmtDist } from '../lib/format'
 import { scanWorld, world, type WorldFlight } from '../lib/world'
 
 export type InsightTab = 'records' | 'tracked' | 'disruptions' | 'rare'
@@ -235,7 +236,7 @@ function worldPlace(lat: number, lon: number, airports: AirportInfo[]) {
   }
   if (!best || bd > 600) return 'over open ocean or remote land'
   const where = `${best.city || best.name}${best.country ? `, ${best.country}` : ''}`
-  return bd < 15 ? `near ${where}` : `${Math.round(bd)} nm from ${where}`
+  return bd < 15 ? `near ${where}` : `${fmtDist(bd)} from ${where}`
 }
 
 function TrackedWorld({ airports, center, onOpen }: Props) {
@@ -290,7 +291,7 @@ function TrackedWorld({ airports, center, onOpen }: Props) {
                   <span className="shrink-0 text-right font-mono text-[11px] text-slate-400">
                     {fmtAlt(f.altitude, false)}
                     <br />
-                    <span className="text-slate-500">{Math.round(far).toLocaleString()} nm</span>
+                    <span className="text-slate-500">{fmtDist(far)}</span>
                   </span>
                 </button>
               </li>
