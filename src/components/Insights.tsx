@@ -11,6 +11,7 @@ import type { AirportInfo } from '../lib/airports'
 import { placeInfo, weatherTrouble } from '../lib/weather'
 import { distanceNm } from '../lib/geo'
 import { fmtAlt, fmtClock, fmtRelative } from '../lib/format'
+import { scanWorld, world, type WorldFlight } from '../lib/world'
 
 export type InsightTab = 'records' | 'tracked' | 'disruptions' | 'rare'
 
@@ -189,7 +190,119 @@ function Records({ onOpen, live }: Props) {
 
 // ---------------------------------------------------------------------------
 
-function Tracked({ aircraft, onOpen, hotspots, military }: Props) {
+function Tracked(p: Props) {
+  const [scope, setScope] = useState<'near' | 'world'>('near')
+  return (
+    <>
+      <div className="flex gap-1.5 px-4 pt-3">
+        {(['near', 'world'] as const).map((s) => (
+          <button
+            key={s}
+            onClick={() => setScope(s)}
+            className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${scope === s ? 'bg-sky-500 text-slate-950 ring-sky-400' : 'bg-slate-800 text-slate-300 ring-slate-700'}`}
+          >
+            {s === 'near' ? '📍 Near you' : '🌍 Around the world'}
+          </button>
+        ))}
+      </div>
+      {scope === 'near' ? <TrackedNear {...p} /> : <TrackedWorld {...p} />}
+    </>
+  )
+}
+
+const KIND_STYLE: Record<WorldFlight['kind'], [string, string]> = {
+  emergency: ['Emergency', 'bg-red-500 text-white'],
+  vip: ['VIP', 'bg-amber-400 text-slate-950'],
+  legendary: ['Legendary', 'bg-amber-400 text-slate-950'],
+  bomber: ['Bomber', 'bg-lime-400 text-slate-950'],
+  rare: ['Rare', 'bg-violet-400 text-slate-950'],
+  surveillance: ['Surveillance', 'bg-lime-400 text-slate-950'],
+  tanker: ['Tanker', 'bg-lime-400 text-slate-950'],
+  military: ['Military', 'bg-lime-400 text-slate-950'],
+  uncommon: ['Uncommon', 'bg-slate-600 text-slate-100'],
+}
+
+function worldPlace(lat: number, lon: number, airports: AirportInfo[]) {
+  let best: AirportInfo | null = null
+  let bd = Infinity
+  for (const a of airports) {
+    if (!a.large || Math.abs(a.lat - lat) > 8) continue
+    const d = distanceNm(lat, lon, a.lat, a.lon)
+    if (d < bd) {
+      bd = d
+      best = a
+    }
+  }
+  if (!best || bd > 600) return 'over open ocean or remote land'
+  const where = `${best.city || best.name}${best.country ? `, ${best.country}` : ''}`
+  return bd < 15 ? `near ${where}` : `${Math.round(bd)} nm from ${where}`
+}
+
+function TrackedWorld({ airports, center, onOpen }: Props) {
+  const w = world.use()
+  const [loading, setLoading] = useState(false)
+  const refresh = () => {
+    setLoading(true)
+    scanWorld().finally(() => setLoading(false))
+  }
+  useEffect(() => {
+    if (Date.now() - w.checkedAt > 2 * 60 * 1000) refresh()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  const counts = w.flights.reduce<Record<string, number>>((m, f) => ((m[f.kind] = (m[f.kind] ?? 0) + 1), m), {})
+  return (
+    <Section
+      title="Most interesting in the world right now"
+      note="Emergencies anywhere, notable military (VIP transports, bombers, surveillance, tankers) and rare planes, ranked by SkyWatch."
+    >
+      <div className="mb-2 flex flex-wrap items-center gap-1.5 text-[11px]">
+        <span className="rounded-full bg-red-500/20 px-2 py-0.5 text-red-200">⚠️ {w.emergencyCount} emergenc{w.emergencyCount === 1 ? 'y' : 'ies'}</span>
+        <span className="rounded-full bg-lime-400/15 px-2 py-0.5 text-lime-200">🎖️ {w.militaryCount.toLocaleString()} military in the air</span>
+        {counts.legendary || counts.rare ? (
+          <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-amber-200">✨ {(counts.legendary ?? 0) + (counts.rare ?? 0)} rare</span>
+        ) : null}
+        <button onClick={refresh} disabled={loading} className="ml-auto text-sky-300 disabled:opacity-50">
+          {loading ? 'Checking…' : w.checkedAt ? `Updated ${fmtRelative(w.checkedAt)} · refresh` : 'Check now'}
+        </button>
+      </div>
+      {w.error && <p className="mb-2 text-xs text-red-300">{w.error}</p>}
+      {w.flights.length === 0 ? (
+        <p className="text-xs text-slate-500">{loading ? 'Looking around the world…' : 'Nothing found yet.'}</p>
+      ) : (
+        <ol className="divide-y divide-slate-800">
+          {w.flights.map((f, i) => {
+            const [label, style] = KIND_STYLE[f.kind]
+            const far = distanceNm(center.lat, center.lon, f.lat, f.lon)
+            return (
+              <li key={f.hex}>
+                <button onClick={() => onOpen(f.hex, f.lat, f.lon, f.callsign)} className="flex w-full items-start gap-3 py-2 text-left">
+                  <span className="w-5 shrink-0 pt-0.5 text-right font-mono text-sm text-slate-500">{i + 1}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      <span className="font-mono text-sm font-semibold">{f.callsign}</span>
+                      <span className={`rounded px-1.5 text-[10px] font-bold uppercase ${style}`}>{label}</span>
+                    </span>
+                    <span className="block truncate text-xs text-slate-300">{f.tags.join(' · ')}</span>
+                    <span className="block truncate text-[11px] text-slate-500">
+                      {f.model ?? f.typeCode ?? 'Unknown type'} · {worldPlace(f.lat, f.lon, airports)}
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-right font-mono text-[11px] text-slate-400">
+                    {fmtAlt(f.altitude, false)}
+                    <br />
+                    <span className="text-slate-500">{Math.round(far).toLocaleString()} nm</span>
+                  </span>
+                </button>
+              </li>
+            )
+          })}
+        </ol>
+      )}
+    </Section>
+  )
+}
+
+function TrackedNear({ aircraft, onOpen, hotspots, military }: Props) {
   const mine = Object.values(opens.use())
     .sort((a, b) => b.count - a.count || b.lastAt - a.lastAt)
     .slice(0, 10)

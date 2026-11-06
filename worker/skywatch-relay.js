@@ -27,7 +27,7 @@ const ALLOWED_ORIGINS = [/^https:\/\/espnlol\.github\.io$/, /^http:\/\/localhost
 // How long (seconds) to reuse an answer.
 const CACHE_SECONDS = { adsblol: 2, airplaneslive: 2, adsblolglobe: 30, airplanesliveglobe: 30, planespotters: 86400, hexdb: 86400, airportdata: 86400, faa: 120 }
 // Worldwide lookups (rare types, a tail number) change slowly; share them for a minute.
-const SLOW_PATHS = /^\/v2\/(type|reg|callsign|hex|mil)\//
+const SLOW_PATHS = /^\/v2\/(type|reg|callsign|hex|mil|sqk)\b/
 
 const APP_URL = 'https://espnlol.github.io/map/'
 const UA = 'SkyWatch relay (personal flight tracker)'

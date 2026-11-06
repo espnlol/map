@@ -69,7 +69,7 @@ function convexHull(points: [number, number][]): [number, number][] {
 // Military patterns
 // ---------------------------------------------------------------------------
 
-const TANKERS = /^(K35R|KC46|K46|KC10|DC10|A332|A339|MRTT|KC2|KC30|KC39|KC135|K135|C130|C30J|KC13)$/
+const TANKERS = /^(K35R|KC46|K46|KC10|DC10|A332|A339|MRTT|KC2|KC30|KC39|KC135|K135|KC13)$/
 const SURVEILLANCE = /^(E3TF|E3CF|E6|E6B|E8|P8|R135|RC35|E7|E2|U2|Q4|RQ4|MQ9|Q9|GLEX|GL5T|C12|B350|BE20|EP3|P3|E737)$/
 const FIGHTERS = /^(F15|F16|F18|F18S|F18H|F22|F35|F5|T38|T6|T45|A10|EUFI|RFAL|GRIF|TOR|HAWK)$/
 
