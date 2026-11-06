@@ -14,6 +14,18 @@ import { useIsMobile } from './lib/useIsMobile'
 import { emergencyLog } from './lib/emergencyLog'
 import { refreshTeams, teams } from './lib/teams'
 import type { Highlight } from './components/MapView'
+import SettingsPanel from './components/SettingsPanel'
+import AlertsMenu from './components/AlertsMenu'
+import Toasts, { type Toast } from './components/Toasts'
+import WorldSearch from './components/WorldSearch'
+import { settings } from './lib/settings'
+import { rareStore, scanRare, unseenRare } from './lib/rare'
+import { describePlace, findHotspots, type Hotspot } from './lib/happening'
+import { findByHex } from './lib/search'
+import { loadAirports, type AirportInfo } from './lib/airports'
+import { pullRelayState, pushStore, syncPushConfig } from './lib/push'
+import { beep } from './lib/sound'
+import { useRef } from 'react'
 import { useTraffic, type Mode } from './lib/useTraffic'
 import { PRESETS } from './lib/presets'
 import { categoryKey } from './lib/categories'
@@ -44,10 +56,13 @@ export default function App() {
   const [highlight, setHighlight] = useState<Highlight | null>(null)
   const [showSquawks, setShowSquawks] = useState(false)
   const [showPhone, setShowPhone] = useState(false)
-  const [showTrails, setShowTrails] = useState<boolean>(() => load('skywatch.trails', true))
-  useEffect(() => save('skywatch.trails', showTrails), [showTrails])
-  const [showAirports, setShowAirports] = useState<boolean>(() => load('skywatch.airports', true))
-  useEffect(() => save('skywatch.airports', showAirports), [showAirports])
+  const cfg = settings.use()
+  const showTrails = cfg.trails
+  const showAirports = cfg.airports
+  const [showSettings, setShowSettings] = useState(false)
+  const [showAlerts, setShowAlerts] = useState(false)
+  const [toasts, setToasts] = useState<Toast[]>([])
+  const pushToast = (t: Omit<Toast, 'id'>) => setToasts((all) => [{ ...t, id: `${Date.now()}-${Math.random()}` }, ...all].slice(0, 4))
   const [path, setPath] = useState<FlightPath | null>(null)
   const [pathLoading, setPathLoading] = useState(false)
 
@@ -58,6 +73,7 @@ export default function App() {
     const q = query.trim().toUpperCase()
     const list = traffic.aircraft.filter((a) => {
       if (cats.size && !cats.has(categoryKey(a.category)) && !a.special.some((sp) => cats.has(sp.tag))) return false
+      if (!cfg.groundVehicles && categoryKey(a.category) === 'C') return false
       if (emergOnly && !a.emergency) return false
       if (hideGround && a.onGround) return false
       if (q) {
@@ -84,7 +100,7 @@ export default function App() {
       }
     })
     return list
-  }, [traffic.aircraft, cats, query, sort, emergOnly, hideGround])
+  }, [traffic.aircraft, cats, query, sort, emergOnly, hideGround, cfg.groundVehicles])
 
   const selectedAc = traffic.aircraft.find((a) => a.hex === selected) ?? null
 
@@ -155,6 +171,135 @@ export default function App() {
     else setHighlight({ points: [[lat, lon, null]], label })
     if (isMobile) setSheet('peek')
   }
+
+  // ---- jump to any aircraft in the world ----
+  const jumpTo = (hex: string, lat: number, lon: number, label: string) => {
+    setHighlight(null)
+    if (liveHexes.has(hex)) {
+      setSelected(hex)
+      return
+    }
+    setCenter({ lat, lon, label })
+    setRadius((r) => Math.min(r, 100))
+    setSelected(hex)
+    if (isMobile) setSheet('half')
+  }
+
+  // Links from notifications and shares: ?plane=<transponder code>
+  useEffect(() => {
+    const hex = new URLSearchParams(location.search).get('plane')
+    if (!hex) return
+    history.replaceState(null, '', location.pathname)
+    findByHex(hex, center).then((r) => r && jumpTo(r.hex, r.lat, r.lon, r.callsign))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // ---- airports, for "where is this" labels and the circling detector ----
+  const [airportList, setAirportList] = useState<AirportInfo[]>([])
+  useEffect(() => {
+    loadAirports().then(setAirportList)
+  }, [])
+  const placeOf = (lat: number, lon: number) => describePlace(lat, lon, airportList)
+
+  // ---- something's happening ----
+  const hotspots = useMemo(
+    () => (cfg.happening ? findHotspots(traffic.aircraft, airportList, cfg.happeningIgnoreAirports) : []),
+    [traffic.aircraft, airportList, cfg.happening, cfg.happeningIgnoreAirports],
+  )
+  const openHotspot = (h: Hotspot) => {
+    setShowAlerts(false)
+    setHighlight(null)
+    setSelected(h.aircraft[0].hex)
+  }
+  const seenSpots = useRef(new Set<string>())
+  useEffect(() => {
+    for (const h of hotspots) {
+      if (seenSpots.current.has(h.id)) continue
+      seenSpots.current.add(h.id)
+      const where = placeOf(h.lat, h.lon)
+      pushToast({
+        tone: 'happening',
+        title: `👀 ${h.aircraft[0].heli ? 'Helicopter' : 'Aircraft'} circling`,
+        body: `${h.aircraft.map((a) => a.callsign).join(', ')}${where ? ` · ${where}` : ''}`,
+        onOpen: () => openHotspot(h),
+      })
+      beep('info')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hotspots])
+
+  // ---- a beep for each new emergency ----
+  const seenEmerg = useRef(new Set<string>())
+  useEffect(() => {
+    for (const a of traffic.aircraft) {
+      if (!a.emergency) continue
+      const k = `${a.hex}-${a.emergency.code}`
+      if (seenEmerg.current.has(k)) continue
+      seenEmerg.current.add(k)
+      beep('alert')
+    }
+  }, [traffic.aircraft])
+
+  // ---- rare plane spotter ----
+  const [scanning, setScanning] = useState(false)
+  const trafficRef = useRef(traffic.aircraft)
+  trafficRef.current = traffic.aircraft
+  const scannedOnce = useRef(false)
+  const openRare = (r: { hex: string; lat: number; lon: number; callsign: string }) => {
+    setShowAlerts(false)
+    jumpTo(r.hex, r.lat, r.lon, r.callsign)
+  }
+  const runRareScan = async () => {
+    if (!settings.get().rareSpotter) return
+    setScanning(true)
+    try {
+      const fresh = await scanRare(trafficRef.current, center, radius, settings.get().rareWorldwide && mode === 'live')
+      // the first check of a session finds "everything", so only pop up for later finds
+      if (scannedOnce.current && settings.get().rareToasts)
+        for (const r of fresh.slice(0, 2))
+          pushToast({
+            tone: 'rare',
+            title: `✨ ${r.type.name}`,
+            body: `${r.callsign} · ${r.nearby ? 'in your area' : `${Math.round(r.distance ?? 0).toLocaleString()} nm away`}`,
+            onOpen: () => openRare(r),
+          })
+      if (scannedOnce.current && fresh.length) beep('info')
+      scannedOnce.current = true
+    } finally {
+      setScanning(false)
+    }
+  }
+  useEffect(() => {
+    if (!cfg.rareSpotter) return
+    const first = setTimeout(runRareScan, 4000)
+    const t = setInterval(() => !document.hidden && runRareScan(), mode === 'live' ? 5 * 60_000 : 30_000)
+    return () => {
+      clearTimeout(first)
+      clearInterval(t)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cfg.rareSpotter, cfg.rareWorldwide, cfg.rareLegendary, cfg.rareRare, cfg.rareUncommon, mode, center.lat, center.lon, radius])
+  const rare = rareStore.use()
+  const alertCount = (cfg.rareSpotter ? rare.current.length : 0) + hotspots.length
+  const alertNew = (cfg.rareSpotter ? unseenRare(rare) : 0) + hotspots.length
+
+  // pop-ups fade after a few seconds
+  useEffect(() => {
+    if (toasts.length === 0) return
+    const t = setTimeout(() => setToasts((all) => all.slice(0, -1)), 7000)
+    return () => clearTimeout(t)
+  }, [toasts])
+
+  // ---- background checks on the relay ----
+  const push = pushStore.use()
+  useEffect(() => {
+    if (!push.token) return
+    const t = setTimeout(syncPushConfig, 1500)
+    return () => clearTimeout(t)
+  }, [push.token, followed, cfg.notifyTeams, cfg.notifyEmergencies, cfg.notifyRare, cfg.notifyRadius, cfg.home, cfg.rareLegendary, cfg.rareRare, cfg.rareUncommon])
+  useEffect(() => {
+    pullRelayState()
+  }, [])
 
   const activeFilters = cats.size + (emergOnly ? 1 : 0) + (hideGround ? 1 : 0) + (query ? 1 : 0)
   const showFilterBlock = !isMobile || filtersOpen
@@ -233,10 +378,10 @@ export default function App() {
                     <input type="checkbox" checked={hideGround} onChange={(e) => setHideGround(e.target.checked)} /> Hide on ground
                   </label>
                   <label className="flex items-center gap-1">
-                    <input type="checkbox" checked={showTrails} onChange={(e) => setShowTrails(e.target.checked)} /> Trails
+                    <input type="checkbox" checked={showTrails} onChange={(e) => settings.update({ trails: e.target.checked })} /> Trails
                   </label>
                   <label className="flex items-center gap-1">
-                    <input type="checkbox" checked={showAirports} onChange={(e) => setShowAirports(e.target.checked)} /> Airports
+                    <input type="checkbox" checked={showAirports} onChange={(e) => settings.update({ airports: e.target.checked })} /> Airports
                   </label>
                   <select className="ml-auto rounded bg-slate-800 px-1.5 py-1 ring-1 ring-slate-700" value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
                     <option value="emergency">Sort: emergencies first</option>
@@ -251,6 +396,9 @@ export default function App() {
               <p className="px-4 py-8 text-center text-sm text-slate-500">Loading aircraft…</p>
             ) : (
               <FlightList aircraft={visible} selected={selected} onSelect={setSelected} />
+            )}
+            {query.trim().length >= 2 && mode === 'live' && (
+              <WorldSearch query={query} from={center} onOpen={(r) => jumpTo(r.hex, r.lat, r.lon, r.callsign)} />
             )}
           </>
         )}
@@ -286,10 +434,35 @@ export default function App() {
   )
 
   const iconBtn = 'rounded-md bg-slate-800 px-2.5 py-1.5 text-sm ring-1 ring-slate-700 hover:bg-slate-700'
+  const bell = (
+    <button onClick={() => setShowAlerts(true)} className={`${iconBtn} relative shrink-0 px-2 md:px-2.5`} aria-label={`Alerts (${alertCount})`}>
+      🔔<span className="hidden md:inline"> Alerts</span>
+      {alertCount > 0 && (
+        <span className={`absolute -right-1.5 -top-1.5 min-w-[18px] rounded-full px-1 text-center text-[10px] font-bold leading-[18px] ${alertNew ? 'bg-red-500 text-white' : 'bg-slate-600 text-slate-100'}`}>
+          {alertCount}
+        </span>
+      )}
+    </button>
+  )
 
   return (
     <div className="flex h-full flex-col">
       {showPhone && <PhoneGuide onClose={() => setShowPhone(false)} />}
+      {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} center={center} />}
+      {showAlerts && (
+        <AlertsMenu
+          onClose={() => setShowAlerts(false)}
+          hotspots={hotspots}
+          placeOf={placeOf}
+          onOpenRare={openRare}
+          onOpenHotspot={openHotspot}
+          onScan={runRareScan}
+          scanning={scanning}
+          rareOn={cfg.rareSpotter}
+          happeningOn={cfg.happening}
+        />
+      )}
+      <Toasts toasts={toasts} onDismiss={(id) => setToasts((all) => all.filter((t) => t.id !== id))} />
       {showSquawks && (
         <SquawkGuide onClose={() => setShowSquawks(false)} current={new Set(traffic.aircraft.map((a) => a.squawk ?? ''))} />
       )}
@@ -330,6 +503,7 @@ export default function App() {
         <button onClick={useMyLocation} className={`${iconBtn} shrink-0 px-2 md:px-2.5`} aria-label="Near me">
           📍<span className="hidden md:inline"> Near me</span>
         </button>
+        {isMobile && bell}
         {isMobile ? (
           <div className="relative shrink-0">
             <button onClick={() => setMenuOpen((o) => !o)} className={`${iconBtn} px-2.5`} aria-label="More">
@@ -339,16 +513,19 @@ export default function App() {
               <>
                 <div className="fixed inset-0 z-[900]" onClick={() => setMenuOpen(false)} />
                 <div className="absolute right-0 top-full z-[901] mt-1 w-52 overflow-hidden rounded-lg bg-slate-800 text-sm shadow-xl ring-1 ring-slate-700">
+                  <button className="block w-full px-4 py-2.5 text-left hover:bg-slate-700" onClick={() => (setMenuOpen(false), setShowSettings(true))}>
+                    ⚙ Settings
+                  </button>
                   <button className="block w-full px-4 py-2.5 text-left hover:bg-slate-700" onClick={() => (setMenuOpen(false), setShowSquawks(true))}>
                     Squawk codes
                   </button>
                   <button className="block w-full px-4 py-2.5 text-left hover:bg-slate-700" onClick={() => (setMenuOpen(false), setShowPhone(true))}>
                     📱 Add to Home Screen
                   </button>
-                  <button className="block w-full px-4 py-2.5 text-left hover:bg-slate-700" onClick={() => setShowAirports((v) => !v)}>
+                  <button className="block w-full px-4 py-2.5 text-left hover:bg-slate-700" onClick={() => settings.update({ airports: !showAirports })}>
                     {showAirports ? '✓ ' : ''}Airports on map
                   </button>
-                  <button className="block w-full px-4 py-2.5 text-left hover:bg-slate-700" onClick={() => setShowTrails((v) => !v)}>
+                  <button className="block w-full px-4 py-2.5 text-left hover:bg-slate-700" onClick={() => settings.update({ trails: !showTrails })}>
                     {showTrails ? '✓ ' : ''}Trails on map
                   </button>
                   <div className="flex border-t border-slate-700">
@@ -378,7 +555,11 @@ export default function App() {
             <button onClick={() => setShowPhone(true)} className={iconBtn}>
               📱 Phone
             </button>
-            <div className="ml-auto flex items-center gap-3">
+            <div className="ml-auto flex items-center gap-2">
+              {bell}
+              <button onClick={() => setShowSettings(true)} className={iconBtn} aria-label="Settings">
+                ⚙
+              </button>
               <div className="flex overflow-hidden rounded-md ring-1 ring-slate-700">
                 {(['live', 'demo'] as Mode[]).map((m) => (
                   <button
@@ -414,7 +595,7 @@ export default function App() {
         </div>
       )}
 
-      {emergencies.length > 0 && (
+      {cfg.emergencyBanner && emergencies.length > 0 && (
         <div className="no-scrollbar flex items-center gap-2 overflow-x-auto whitespace-nowrap bg-red-600 px-3 py-1.5 text-sm font-semibold text-white md:flex-wrap">
           <span className="shrink-0 animate-pulse">⚠ {emergencies.length}</span>
           {emergencies.map((a) => (
@@ -441,6 +622,7 @@ export default function App() {
             highlight={highlight}
             onClearHighlight={() => setHighlight(null)}
             bottomInset={isMobile ? 132 : 0}
+            hotspots={hotspots}
           />
         </main>
 

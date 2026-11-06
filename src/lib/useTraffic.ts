@@ -7,6 +7,7 @@ import { detectEmergency } from './emergency'
 import { distanceNm } from './geo'
 import { detectSpecial } from './special'
 import { recordEmergencies } from './emergencyLog'
+import { pollMs } from './settings'
 
 export type Mode = 'live' | 'demo'
 
@@ -140,7 +141,7 @@ export function useTraffic(center: Center, radiusNm: number, mode: Mode): Traffi
 
         const last = a.trail[a.trail.length - 1]
         if (!last || last[0] !== a.lat || last[1] !== a.lon)
-          a.trail = [...a.trail, [a.lat, a.lon, onGround ? null : altitude] as [number, number, number | null]].slice(-TRAIL_LEN)
+          a.trail = [...a.trail, [a.lat, a.lon, onGround ? null : altitude, now] as [number, number, number | null, number]].slice(-TRAIL_LEN)
 
         // Observed transitions beat estimates.
         let observedTakeoff = prev?.takeoff?.kind === 'observed' ? prev.takeoff : null
@@ -219,7 +220,7 @@ export function useTraffic(center: Center, radiusNm: number, mode: Mode): Traffi
         if (!cancelled)
           setState((s) => ({ ...s, status: 'error', error: err instanceof Error ? err.message : String(err) }))
       } finally {
-        if (!cancelled) timer = setTimeout(poll, mode === 'live' && radiusNm > 250 ? 15000 : POLL_MS[mode])
+        if (!cancelled) timer = setTimeout(poll, mode === 'live' ? pollMs(radiusNm) : POLL_MS.demo)
       }
     }
     poll()

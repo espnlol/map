@@ -54,3 +54,5 @@ function titleCase(s: string): string {
     .replace(/\b([a-z])/g, (m) => m.toUpperCase())
     .replace(/\b(Ii|Iii|Iv|Er|Lr|Neo|Max)\b/g, (m) => (m === 'Neo' ? 'neo' : m.toUpperCase()))
 }
+
+export const isKnownType = (code: string) => code.toUpperCase() in TYPES

@@ -93,6 +93,7 @@ export class DemoTraffic {
   private home: Airport
   private lastTick = Date.now()
   private emergencyIssued = false
+  private rareIssued = false
 
   constructor(private center: { lat: number; lon: number; label: string }, private radiusNm: number) {
     const code = /\(([A-Z]{3})\)/.exec(center.label)?.[1]
@@ -133,6 +134,10 @@ export class DemoTraffic {
         special = 'sports'
         tpl = pick([{ t: 'A320', category: 'A3' }, { t: 'B763', category: 'A5' }])
         flight = 'GXA' + Math.floor(rand(100, 999))
+      } else if (kind === 'overflight' && (Math.random() < 0.06 || (initial && !this.rareIssued))) {
+        this.rareIssued = true
+        tpl = pick([{ t: 'B52', category: 'A5' }, { t: 'A124', category: 'A5' }, { t: 'BLCF', category: 'A5' }, { t: 'B74S', category: 'A5' }, { t: 'A388', category: 'A5' }])
+        flight = tpl.t === 'B52' ? 'DEATH' + Math.floor(rand(10, 99)) : pick(AIRLINES) + Math.floor(rand(10, 2999))
       } else {
         tpl = Math.random() < 0.12 ? pick(BIZJETS) : pick(AIRLINE_TYPES)
         flight = tpl.category === 'A2' && BIZJETS.includes(tpl) ? reg() : pick(AIRLINES) + Math.floor(rand(10, 2999))

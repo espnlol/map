@@ -92,6 +92,23 @@ Pilots' identities aren't broadcast, so SkyWatch doesn't show them.
 - **Phone layout**: on small screens the map fills the screen and the panel slides up from the
   bottom (drag or tap the handle).
 
+## Alerts, search, settings and background checks
+
+- **🔔 Alerts menu**: *Something's happening* lists aircraft circling one spot (police, news and
+  medical helicopters usually), with an orange pulsing area on the map. *Rare planes* lists rare
+  aircraft in the air near you and worldwide (Legendary / Rare / Uncommon, see `src/lib/rare.ts`),
+  checked every 5 minutes through adsb.lol's `/v2/type/<code>` lookup. New finds pop up and can beep.
+- **Worldwide flight search**: type a flight number (DL123), callsign (DAL123), tail number
+  (N123DL), transponder code (a1b2c3) or aircraft type (A388) and tap *Search the whole world*.
+- **⚙ Settings**: map style, trails, airports, callsign labels, range ring, follow the selected
+  plane, ground vehicles, feet/metres, knots/mph/km/h, 24-hour clock, refresh speed, emergency banner,
+  sounds, rare spotter levels, circling detector and notifications.
+- **Notifications while closed**: the relay (`worker/skywatch-relay.js`) can run on a Cloudflare
+  cron trigger with a KV namespace bound as `SKYWATCH`. Every few minutes it checks your team
+  planes, emergencies near home and rare planes, sends Web Push notifications (it creates its own
+  VAPID keys), and keeps exact team takeoff/landing times that the app pulls in when opened. On an
+  iPhone, notifications only work from the Home Screen app (iOS 16.4+).
+
 ## Filtering
 
 - **Aircraft category** chips (multi-select, with live counts), using the ADS-B emitter category the

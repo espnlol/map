@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react'
 import OwnerTab from './OwnerTab'
 import { addToLogbook, logbook, patchLogEntry } from '../lib/logbook'
 import { fetchOwner } from '../lib/owner'
-import { PHASE_LABEL, airportCode, airportName, fmtAltFull, fmtMph, fmtSpeed, fmtTime, fmtVr } from '../lib/format'
+import { PHASE_LABEL, airportCode, airportName, fmtAltFull, fmtAltOther, fmtMph, fmtSpeed, fmtTime, fmtVr } from '../lib/format'
 import { distanceNm } from '../lib/geo'
 
 interface Props {
@@ -188,7 +188,7 @@ export default function DetailPanel({ aircraft: a, onClose, path, pathLoading, d
       </div>
 
       <div className="grid grid-cols-2 gap-2 [&>*:last-child]:col-span-2">
-        <Stat label="Altitude" value={fmtAltFull(a.altitude, a.onGround)} sub={a.altitude != null ? `${Math.round(a.altitude * 0.3048).toLocaleString()} m` : undefined} />
+        <Stat label="Altitude" value={fmtAltFull(a.altitude, a.onGround)} sub={fmtAltOther(a.altitude)} />
         <Stat label="Ground speed" value={fmtSpeed(a.groundSpeed)} sub={fmtMph(a.groundSpeed)} />
         <Stat label="Vertical rate" value={fmtVr(a.verticalRate)} />
         <Stat label="Heading" value={a.track != null ? `${Math.round(a.track)}°` : '—'} />

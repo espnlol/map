@@ -4,6 +4,8 @@ import type { Aircraft, Center } from '../types'
 import { categoryInfo } from '../lib/categories'
 import type { FlightPath } from '../lib/history'
 import { busyness, loadAirports, type AirportInfo } from '../lib/airports'
+import { settings, type BaseMap } from '../lib/settings'
+import type { Hotspot } from '../lib/happening'
 
 /** Altitude → colour, low = orange, high = violet (same idea as most flight trackers). */
 export function altColor(alt: number | null): string {
@@ -53,6 +55,7 @@ interface Props {
   onClearHighlight: () => void
   /** Height of anything covering the bottom of the map (the phone panel), in px. */
   bottomInset: number
+  hotspots: Hotspot[]
 }
 
 /** A saved path or spot to show on the map (an emergency or a logbook entry). */
@@ -68,7 +71,7 @@ function planeSvg(color: string, rotation: number, size: number, isHeli: boolean
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" style="transform: rotate(${rotation}deg)">${body}</svg>`
 }
 
-function iconFor(a: Aircraft, selected: boolean) {
+function iconFor(a: Aircraft, selected: boolean, label: boolean) {
   const info = categoryInfo(a.category)
   const color = a.emergency ? '#ef4444' : a.onGround ? '#64748b' : info.color
   const size = selected ? 34 : a.category === 'A5' ? 28 : a.category === 'A1' || a.category === 'A7' ? 20 : 24
@@ -76,13 +79,18 @@ function iconFor(a: Aircraft, selected: boolean) {
   const sel = selected ? `<span style="position:absolute;inset:-4px;border-radius:9999px;border:2px solid #fff"></span>` : ''
   return L.divIcon({
     className: 'plane-icon',
-    html: `<div style="position:relative;width:${size}px;height:${size}px">${ring}${sel}${planeSvg(color, a.track ?? 0, size, a.category === 'A7')}</div>`,
+    html: `<div style="position:relative;width:${size}px;height:${size}px">${ring}${sel}${planeSvg(color, a.track ?? 0, size, a.category === 'A7')}${
+      label ? `<span class="plane-label">${a.callsign}</span>` : ''
+    }</div>`,
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
   })
 }
 
-export default function MapView({ aircraft, selected, onSelect, center, radiusNm, onSearchHere, showTrails, showAirports, path, highlight, onClearHighlight, bottomInset }: Props) {
+export default function MapView({ aircraft, selected, onSelect, center, radiusNm, onSearchHere, showTrails, showAirports, path, highlight, onClearHighlight, bottomInset, hotspots }: Props) {
+  const cfg = settings.use()
+  const [zoom, setZoom] = useState(8)
+  const showLabels = cfg.labels && zoom >= 9
   const el = useRef<HTMLDivElement>(null)
   const map = useRef<L.Map | null>(null)
   const markers = useRef(new Map<string, { m: L.Marker; key: string }>())
@@ -105,6 +113,8 @@ export default function MapView({ aircraft, selected, onSelect, center, radiusNm
   const routeLine = useRef<L.Polyline | null>(null)
   const ring = useRef<L.Circle | null>(null)
   const resizeObs = useRef<ResizeObserver | null>(null)
+  const baseLayers = useRef<Record<BaseMap, L.Layer> | null>(null)
+  const hotspotLayer = useRef<L.LayerGroup | null>(null)
   const selectRef = useRef(onSelect)
   selectRef.current = onSelect
 
@@ -126,8 +136,15 @@ export default function MapView({ aircraft, selected, onSelect, center, radiusNm
       L.tileLayer(`${esri}/World_Imagery/MapServer/tile/{z}/{y}/{x}`, { attribution: `${esriAttr} &mdash; Maxar, Earthstar Geographics`, maxNativeZoom: 18, maxZoom: 19 }),
       L.tileLayer(`${esri}/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}`, { maxNativeZoom: 18, maxZoom: 19 }),
     ])
-    dark.addTo(m)
+    const bases: Record<BaseMap, L.Layer> = { dark, streets, satellite }
+    bases[settings.get().baseMap].addTo(m)
+    baseLayers.current = bases
     L.control.layers({ Dark: dark, Streets: streets, Satellite: satellite }, undefined, { position: 'topleft' }).addTo(m)
+    m.on('baselayerchange', (e) => {
+      const name = e.name.toLowerCase() as BaseMap
+      if (settings.get().baseMap !== name) settings.update({ baseMap: name })
+    })
+    m.on('zoomend', () => setZoom(m.getZoom()))
     // The container can be sized after Leaflet initialises (flex layout), so
     // keep Leaflet in sync or it zooms/positions against a 0×0 box.
     const ro = new ResizeObserver(() => m.invalidateSize())
@@ -137,6 +154,7 @@ export default function MapView({ aircraft, selected, onSelect, center, radiusNm
     highlightLayer.current = L.layerGroup().addTo(m)
     airportLayer.current = L.layerGroup().addTo(m)
     trails.current = L.layerGroup().addTo(m)
+    hotspotLayer.current = L.layerGroup().addTo(m)
     m.on('moveend zoomend', () => setView((v) => v + 1))
     m.on('popupopen', (e) => {
       const btn = e.popup.getElement()?.querySelector<HTMLButtonElement>('[data-track]')
@@ -171,7 +189,8 @@ export default function MapView({ aircraft, selected, onSelect, center, radiusNm
       fill: false,
       dashArray: '4 6',
       interactive: false,
-    }).addTo(m)
+    })
+    if (settings.get().rangeRing) ring.current.addTo(m)
     const bounds = ring.current.getBounds()
     const fit = () => m.fitBounds(bounds, { paddingTopLeft: [20, 20], paddingBottomRight: [20, 20 + insetRef.current] })
     m.invalidateSize()
@@ -195,18 +214,18 @@ export default function MapView({ aircraft, selected, onSelect, center, radiusNm
     for (const a of visible) {
       live.add(a.hex)
       const isSel = a.hex === selected
-      const key = `${a.category}|${Math.round(a.track ?? 0)}|${a.onGround}|${a.emergency?.code ?? ''}|${isSel}`
+      const key = `${a.category}|${Math.round(a.track ?? 0)}|${a.onGround}|${a.emergency?.code ?? ''}|${isSel}|${showLabels ? a.callsign : ''}`
       const existing = markers.current.get(a.hex)
       if (existing) {
         existing.m.setLatLng([a.lat, a.lon])
         if (existing.key !== key) {
-          existing.m.setIcon(iconFor(a, isSel))
+          existing.m.setIcon(iconFor(a, isSel, showLabels))
           existing.key = key
         }
         existing.m.setTooltipContent(tooltip(a))
         existing.m.setZIndexOffset(isSel ? 1000 : a.emergency ? 500 : 0)
       } else {
-        const mk = L.marker([a.lat, a.lon], { icon: iconFor(a, isSel), zIndexOffset: a.emergency ? 500 : 0 })
+        const mk = L.marker([a.lat, a.lon], { icon: iconFor(a, isSel, showLabels), zIndexOffset: a.emergency ? 500 : 0 })
           .bindTooltip(tooltip(a), { direction: 'top', offset: [0, -10], className: '' })
           .on('click', (e) => {
             L.DomEvent.stopPropagation(e)
@@ -244,7 +263,7 @@ export default function MapView({ aircraft, selected, onSelect, center, radiusNm
     routeLine.current = null
     const sel = aircraft.find((a) => a.hex === selected)
     if (sel) {
-      let pts: [number, number, number | null][] = sel.trail
+      let pts: [number, number, number | null][] = sel.trail.map(([la, lo, al]) => [la, lo, al])
       if (path && path.points.length > 1) {
         const lastT = path.points[path.points.length - 1][3]
         pts = path.points.map(([la, lo, al]) => [la, lo, al] as [number, number, number | null])
@@ -271,7 +290,39 @@ export default function MapView({ aircraft, selected, onSelect, center, radiusNm
     } else {
       fittedFor.current = null
     }
-  }, [aircraft, selected, showTrails, path, view])
+    if (sel && settings.get().followSelected && !m.getBounds().pad(-0.25).contains([sel.lat, sel.lon])) m.panTo([sel.lat, sel.lon])
+  }, [aircraft, selected, showTrails, path, view, showLabels])
+
+  // Map style and range ring follow Settings.
+  useEffect(() => {
+    const m = map.current
+    const bases = baseLayers.current
+    if (!m || !bases) return
+    for (const [name, layer] of Object.entries(bases)) {
+      if (name === cfg.baseMap && !m.hasLayer(layer)) layer.addTo(m)
+      if (name !== cfg.baseMap && m.hasLayer(layer)) m.removeLayer(layer)
+    }
+  }, [cfg.baseMap])
+  useEffect(() => {
+    const m = map.current
+    if (!m || !ring.current) return
+    if (cfg.rangeRing) ring.current.addTo(m)
+    else ring.current.remove()
+  }, [cfg.rangeRing])
+
+  // Places where aircraft are circling.
+  useEffect(() => {
+    const layer = hotspotLayer.current
+    if (!layer) return
+    layer.clearLayers()
+    for (const h of hotspots) {
+      L.circle([h.lat, h.lon], { radius: (h.radiusNm + 0.3) * 1852, color: '#fb923c', weight: 2, fillColor: '#fb923c', fillOpacity: 0.12, className: 'hotspot-ring', interactive: false }).addTo(layer)
+      L.marker([h.lat, h.lon], {
+        interactive: false,
+        icon: L.divIcon({ className: 'hotspot-label', html: `<span>👀 ${h.aircraft.length > 1 ? `${h.aircraft.length} circling` : 'Circling'}</span>`, iconSize: [0, 0] }),
+      }).addTo(layer)
+    }
+  }, [hotspots])
 
   // A saved emergency path or logbook spot.
   useEffect(() => {
