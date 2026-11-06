@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Aircraft, Center, FlightEvent, Phase, RawAircraft, Route, TimeValue } from '../types'
 import { cachedRoute, fetchLiveAircraft, fetchLiveRoutes } from './api'
-import { modelName } from './aircraftTypes'
+import { inferCategory, modelName } from './aircraftTypes'
+import { cachedOwner, fetchOwner } from './owner'
 import { DemoTraffic } from './demo'
 import { detectEmergency } from './emergency'
 import { distanceNm } from './geo'
@@ -80,6 +81,8 @@ function hexLabel(hex: string): string {
   return hex.replace(/^~/, '').toUpperCase()
 }
 
+const lookupQueue = new Set<string>()
+
 export function useTraffic(center: Center, radiusNm: number, mode: Mode): TrafficState {
   const [state, setState] = useState<TrafficState>({ aircraft: [], events: [], status: 'loading', mode })
   const tracked = useRef(new Map<string, Aircraft>())
@@ -112,15 +115,19 @@ export function useTraffic(center: Center, radiusNm: number, mode: Mode): Traffi
         const emergency = detectEmergency(r.squawk, r.emergency)
         const route = callsign ? routeFor(callsign) ?? undefined : undefined
         const label = callsign || r.r || hexLabel(r.hex)
+        // Planes that don't send a type code: use the registry's, once it has been looked up.
+        const reg = !r.t ? cachedOwner(r.hex) : undefined
+        if (!r.t && reg === undefined && mode === 'live') lookupQueue.add(r.hex)
+        const typeCode = r.t || reg?.typeCode || undefined
 
         const a: Aircraft = {
           hex: r.hex,
           callsign: label,
-          registration: r.r,
-          typeCode: r.t,
-          model: modelName(r.t, r.desc),
+          registration: r.r || reg?.registration,
+          typeCode,
+          model: modelName(typeCode, r.desc) ?? reg?.type,
           operator: r.ownOp,
-          category: r.category ?? '',
+          category: r.category && r.category !== 'A0' ? r.category : inferCategory(typeCode),
           lat: r.lat,
           lon: r.lon,
           altitude,
@@ -166,6 +173,11 @@ export function useTraffic(center: Center, radiusNm: number, mode: Mode): Traffi
       }
       for (const [hex, a] of tracked.current) {
         if (!seen.has(hex) && now - a.lastSeen > STALE_MS) tracked.current.delete(hex)
+      }
+      // Look up a few untyped planes in the registry each update (results show next update).
+      for (const hex of [...lookupQueue].slice(0, 6)) {
+        lookupQueue.delete(hex)
+        if (!hex.startsWith('~')) void fetchOwner(hex)
       }
       // Real emergencies only: demo ones are made up and would clutter the history.
       if (mode === 'live') recordEmergencies([...tracked.current.values()], now)

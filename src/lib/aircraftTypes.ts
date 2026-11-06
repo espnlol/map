@@ -45,13 +45,74 @@ const TYPES: Record<string, string> = {
   E3TF: 'Boeing E-3 Sentry', E3CF: 'Boeing E-3 Sentry', E6: 'Boeing E-6 Mercury', U2: 'Lockheed U-2', R135: 'Boeing RC-135',
   DC3: 'Douglas DC-3', DC6: 'Douglas DC-6', P51: 'North American P-51 Mustang', SPIT: 'Supermarine Spitfire',
   L101: 'Lockheed L-1011 TriStar', DC10: 'McDonnell Douglas DC-10', IL76: 'Ilyushin Il-76',
-  A400: 'Airbus A400M Atlas',
+  A400: 'Airbus A400M Atlas', KODI: 'Daher Kodiak 100', K100: 'Daher Kodiak 100', TBM7: 'Daher TBM 700', TBM8: 'Daher TBM 850', EA50: 'Eclipse 500', PC21: 'Pilatus PC-21', DA62: 'Diamond DA62', C25M: 'Cessna Citation M2', AS3B: 'Airbus H175',
+}
+
+// The full ICAO type list (public/aircraft-types.json, built by scripts/build-types.py):
+// code -> [name, ICAO class like "L2J", wake category L/M/H/J]
+let DB: Record<string, [string, string, string]> = {}
+export const typeDbReady = fetch(`${import.meta.env.BASE_URL}aircraft-types.json`)
+  .then((r) => (r.ok ? r.json() : {}))
+  .then((d) => {
+    DB = d
+  })
+  .catch(() => {})
+
+const ENGINE: Record<string, string> = { J: 'jet', T: 'turboprop', P: 'piston', E: 'electric', R: 'rocket' }
+const COUNT: Record<string, string> = { '1': 'Single', '2': 'Twin', '3': 'Three-engine', '4': 'Four-engine', '6': 'Six-engine', '8': 'Eight-engine' }
+
+/** "Twin-turboprop plane", "Single-engine helicopter" … from an ICAO class like L2T. */
+function describeClass(cls?: string): string | undefined {
+  if (!cls || cls.length < 3) return undefined
+  const [kind, n, e] = cls
+  if (kind === 'H') return `${COUNT[n] ? `${COUNT[n]}-engine ` : ''}helicopter`.replace(/^./, (c) => c.toUpperCase())
+  if (kind === 'G') return 'Gyrocopter'
+  if (kind === 'T') return 'Tilt-rotor aircraft'
+  if (kind === 'B') return 'Balloon or airship'
+  if (kind === 'A') return 'Amphibious plane'
+  if (kind === 'S') return 'Seaplane'
+  if (n === '0') return 'Glider'
+  const eng = ENGINE[e]
+  if (!eng) return undefined
+  return n === '1' ? `Single-engine ${eng} plane` : `${COUNT[n] ?? `${n}-engine`} ${eng} plane`
 }
 
 export function modelName(typeCode?: string, desc?: string): string | undefined {
   if (desc && desc.trim()) return titleCase(desc.trim())
   if (!typeCode) return undefined
-  return TYPES[typeCode.toUpperCase()] ?? typeCode
+  const code = typeCode.toUpperCase()
+  return TYPES[code] ?? (DB[code]?.[0] || describeClass(DB[code]?.[1])) ?? typeCode
+}
+
+// Size info for a few common types the type list doesn't have yet.
+const EXTRA_CLASS: Record<string, [string, string, string]> = {
+  KODI: ['', 'L1T', 'L'],
+  K100: ['', 'L1T', 'L'],
+  AS3B: ['', 'H2T', 'M'],
+}
+
+// Airliner families that count as "Large" (75,000–300,000 lb) even though their wake category is Medium.
+const LARGE_FAMILIES = /^(A3[12]\d|A2[01]N|A31[89]|B73\d|B3[789X]M|B7[0-2]\d|MD[89]\d|B712|BCS[13]|E19\d|E29\d|C130|C30J|A400|P8|IL76|T204|A148|SU95|C919|E75[LS]|CRJ[79X])$/
+
+/**
+ * A size category for aircraft that don't broadcast one, worked out from the
+ * type's ICAO class and wake category. Returns '' if it can't tell.
+ */
+export function inferCategory(typeCode?: string): string {
+  if (!typeCode) return ''
+  const code = typeCode.toUpperCase()
+  const t = DB[code] ?? EXTRA_CLASS[code]
+  if (!t) return ''
+  const [, cls, wtc] = t
+  const kind = cls[0]
+  if (code === 'B752' || code === 'B753') return 'A4'
+  if (kind === 'H' || kind === 'G') return 'A7'
+  if (kind === 'B') return 'B2'
+  if (cls[1] === '0' || code === 'GLID') return 'B1'
+  if (wtc === 'H' || wtc === 'J') return 'A5'
+  if (wtc === 'M') return LARGE_FAMILIES.test(code) ? 'A3' : 'A2'
+  if (wtc === 'L') return 'A1'
+  return ''
 }
 
 function titleCase(s: string): string {

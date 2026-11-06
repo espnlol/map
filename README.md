@@ -109,6 +109,14 @@ Pilots' identities aren't broadcast, so SkyWatch doesn't show them.
   VAPID keys), and keeps exact team takeoff/landing times that the app pulls in when opened. On an
   iPhone, notifications only work from the Home Screen app (iOS 16.4+).
 
+## Aircraft names and sizes
+
+`public/aircraft-types.json` holds ~2,800 ICAO type codes with a name, ICAO class (e.g. L2J) and
+wake category, built by `scripts/build-types.py` from the tar1090-db / Mictronics database. Planes
+are named from it (with a hand-tuned list in `src/lib/aircraftTypes.ts` taking priority), planes
+that don't broadcast a size category get one worked out from their type, and planes that send no
+type code are looked up in the registry (hexdb.io) in the background.
+
 ## Insights, patterns and the flight card
 
 - **📊 Insights**: *Records* (fastest, highest, lowest, slowest, steepest climb/descent, longest

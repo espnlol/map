@@ -15,9 +15,13 @@ export interface OwnerRecord {
   type?: string
   owner?: string
   operatorCode?: string
+  typeCode?: string
 }
 
 const cache = new Map<string, OwnerRecord | null>()
+
+/** What a previous lookup found, without asking again (undefined = never looked up). */
+export const cachedOwner = (hex: string) => cache.get(hex.replace(/^~/, '').toLowerCase())
 
 export async function fetchOwner(hex: string): Promise<OwnerRecord | null> {
   const key = hex.replace(/^~/, '').toLowerCase()
@@ -35,6 +39,7 @@ export async function fetchOwner(hex: string): Promise<OwnerRecord | null> {
       type: clean(j.Type),
       owner: clean(j.RegisteredOwners),
       operatorCode: clean(j.OperatorFlagCode),
+      typeCode: clean(j.ICAOTypeCode),
     }
     const empty = !rec.registration && !rec.owner && !rec.type
     cache.set(key, empty ? null : rec)
