@@ -23,6 +23,16 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Opened from the Home Screen: fill the whole screen. Some iPhones report a
+   height that's short by the status bar, which left a gap at the bottom. */
+@media (display-mode: standalone) {
+  body {
+    bottom: auto;
+    height: 100vh;
+    height: 100lvh;
+  }
+}
+
 /* A solid band behind the iPhone status bar / Dynamic Island, so nothing
    scrolls or shows through underneath it. */
 body::before {
