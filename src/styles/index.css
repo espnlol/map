@@ -29,16 +29,9 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Opened from the Home Screen: fill the whole screen. Some iPhones report a
-   height that's short by the status bar, which left a gap at the bottom. */
-@media (display-mode: standalone) {
-  body {
-    bottom: auto;
-    height: 100vh;
-    height: 100lvh;
-    height: var(--app-h, 100lvh);
-  }
-}
+/* Note: iOS 26.1+ (WebKit bug 301994) reserves a strip at the screen edges for
+   Home Screen web apps and reports odd viewport sizes; the app simply fills the
+   space it is given (position: fixed; inset: 0) so nothing ends up hidden. */
 
 #root {
   height: 100%;

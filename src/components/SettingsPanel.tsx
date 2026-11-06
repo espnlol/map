@@ -122,6 +122,9 @@ export default function SettingsPanel({ onClose, center }: { onClose: () => void
             <button onClick={() => settings.reset()} className="rounded-md px-3 py-1.5 text-xs text-slate-500 ring-1 ring-slate-700 hover:text-slate-300">
               Reset settings
             </button>
+            <p className="mt-3 text-[10px] text-slate-600">
+              SkyWatch version {__BUILD__.commit} · {new Date(__BUILD__.time).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+            </p>
           </div>
         </div>
       </div>

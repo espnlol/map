@@ -89,11 +89,26 @@ const store = createStore<Settings>('skywatch.settings', migrate())
 // fill in options added after the settings were first saved
 store.set((s) => ({ ...DEFAULT_SETTINGS, ...s }))
 
+/** When settings last changed on this device (for syncing with your profile). */
+export const settingsChangedAt = createStore<number>('skywatch.settingsAt', 0)
+
 export const settings = {
   get: store.get,
   use: store.use,
-  update: (patch: Partial<Settings>) => store.set((s) => ({ ...s, ...patch })),
-  reset: () => store.set(DEFAULT_SETTINGS),
+  subscribe: store.subscribe,
+  update: (patch: Partial<Settings>) => {
+    store.set((s) => ({ ...s, ...patch }))
+    settingsChangedAt.set(Date.now())
+  },
+  reset: () => {
+    store.set(DEFAULT_SETTINGS)
+    settingsChangedAt.set(Date.now())
+  },
+  /** Replace settings with ones saved in your profile (doesn't count as a local change). */
+  replace: (s: Settings, at: number) => {
+    store.set({ ...DEFAULT_SETTINGS, ...s })
+    settingsChangedAt.set(at)
+  },
 }
 
 export const pollMs = (radiusNm: number) => {

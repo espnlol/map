@@ -8,6 +8,7 @@ import { RELAY_URL } from './upstream'
 import { logbook, logbookRemoved, planeKey, type LogEntry } from './logbook'
 import { teams, teamsRemoved, teamHistory, type Team, type PlaneHistory } from './teams'
 import { emergencyLog, type EmergencyRecord } from './emergencyLog'
+import { settings, settingsChangedAt, type Settings } from './settings'
 
 interface AccountState {
   username: string | null
@@ -26,6 +27,8 @@ interface SyncedData {
   teamsRemoved?: Record<string, number>
   teamHistory?: Record<string, PlaneHistory>
   emergencies?: EmergencyRecord[]
+  settings?: Settings
+  settingsAt?: number
   updatedAt?: number
 }
 
@@ -131,7 +134,11 @@ export function mergeData(local: SyncedData, remote: SyncedData): SyncedData {
     if (!prev || r.lastSeenAt >= prev.lastSeenAt) em.set(r.id, r)
   }
 
+  // settings: whichever device changed them last wins
+  const useRemote = (remote.settingsAt ?? 0) > (local.settingsAt ?? 0)
   return {
+    settings: useRemote ? remote.settings : local.settings,
+    settingsAt: useRemote ? remote.settingsAt : local.settingsAt,
     logbook: logbookOut,
     logbookRemoved: removed,
     teams: [...teamMap.values()],
@@ -148,6 +155,8 @@ const localData = (): SyncedData => ({
   teamsRemoved: teamsRemoved.get(),
   teamHistory: teamHistory.get(),
   emergencies: emergencyLog.get(),
+  settings: settings.get(),
+  settingsAt: settingsChangedAt.get(),
 })
 
 let applying = false
@@ -167,6 +176,7 @@ export async function syncNow() {
     teamsRemoved.set(merged.teamsRemoved!)
     teamHistory.set(merged.teamHistory!)
     emergencyLog.set(merged.emergencies!)
+    if (merged.settings && merged.settingsAt && merged.settingsAt > settingsChangedAt.get()) settings.replace(merged.settings, merged.settingsAt)
     applying = false
     const text = JSON.stringify(merged)
     if (text !== lastPushed) {
@@ -188,7 +198,7 @@ const schedule = () => {
   timer = setTimeout(syncNow, 4000)
 }
 export function startAutoSync() {
-  const unsubs = [logbook, logbookRemoved, teams, teamsRemoved, emergencyLog].map((s) => s.subscribe(schedule))
+  const unsubs = [logbook, logbookRemoved, teams, teamsRemoved, emergencyLog, settingsChangedAt].map((s) => s.subscribe(schedule))
   const onVisible = () => !document.hidden && account.get().token && syncNow()
   document.addEventListener('visibilitychange', onVisible)
   if (account.get().token) syncNow()

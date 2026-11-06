@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { networkInterfaces } from 'node:os'
+import { execSync } from 'node:child_process'
 
 // This computer's Wi-Fi/Ethernet addresses, so the app can show a QR code
 // that opens it on a phone on the same network. Home-network ranges first.
@@ -42,10 +43,21 @@ const proxy = Object.fromEntries(
   ]),
 )
 
+function gitCommit(): string {
+  try {
+    return execSync('git rev-parse --short HEAD').toString().trim()
+  } catch {
+    return 'dev'
+  }
+}
+
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  define: { __LAN_ADDRESSES__: JSON.stringify(lanAddresses()) },
+  define: {
+    __LAN_ADDRESSES__: JSON.stringify(lanAddresses()),
+    __BUILD__: JSON.stringify({ commit: gitCommit(), time: new Date().toISOString() }),
+  },
   server: { host: true, port: 5173, proxy },
   preview: { host: true, port: 4173, proxy },
 })

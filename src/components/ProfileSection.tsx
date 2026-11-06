@@ -34,7 +34,7 @@ export default function ProfileSection() {
           <div className="min-w-0 flex-1">
             <div className="font-semibold">{a.username}</div>
             <div className="text-xs text-slate-400">
-              {a.syncing ? 'Saving…' : a.error ? <span className="text-red-300">{a.error}</span> : a.lastSync ? `Logbook, teams and emergencies saved ${fmtRelative(a.lastSync)}` : 'Not saved yet'}
+              {a.syncing ? 'Saving…' : a.error ? <span className="text-red-300">{a.error}</span> : a.lastSync ? `Logbook, teams, emergencies and settings saved ${fmtRelative(a.lastSync)}` : 'Not saved yet'}
             </div>
           </div>
           <button onClick={() => syncNow()} disabled={a.syncing} className="shrink-0 rounded-md bg-slate-700 px-2.5 py-1 text-xs disabled:opacity-50">
@@ -61,7 +61,7 @@ export default function ProfileSection() {
             </span>
           )}
         </div>
-        <p className="mt-2 text-[11px] text-slate-500">Signing out keeps everything on this device. Sign in on any other device to get it there too.</p>
+        <p className="mt-2 text-[11px] text-slate-500">Signing out keeps everything on this device. Sign in on any other device (or after reinstalling) to get it all back.</p>
         {msg && <p className="mt-1 text-xs text-red-300">{msg}</p>}
       </section>
     )
@@ -70,7 +70,7 @@ export default function ProfileSection() {
     <section className="px-4 py-3">
       <h3 className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Profile</h3>
       <p className="mb-2 text-xs text-slate-500">
-        Sign in to keep your logbook, teams and emergency history safe, and to get them on every device.
+        Sign in to keep your logbook, teams, emergency history and settings safe, and to get them on every device.
       </p>
       <div className="mb-2 flex overflow-hidden rounded-md text-xs font-semibold ring-1 ring-slate-700">
         {(['signin', 'create'] as const).map((m) => (

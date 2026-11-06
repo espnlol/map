@@ -134,8 +134,8 @@ type code are looked up in the registry (hexdb.io) in the background.
 
 ## Profiles
 
-*Settings → Profile*: create a profile (username + password) to keep your logbook, followed teams
-and emergency history on the relay's KV storage and sync them across devices. The password is
+*Settings → Profile*: create a profile (username + password) to keep your logbook, followed teams,
+emergency history and settings on the relay's KV storage and sync them across devices. The password is
 stretched on the device (PBKDF2-SHA256, 150,000 rounds) and only that result is sent; the relay
 stores a salted SHA-256 of it, and locks a username for 15 minutes after 10 wrong passwords.
 Removals are remembered so a sync never brings back a plane or team you deleted.
