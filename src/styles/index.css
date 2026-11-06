@@ -16,6 +16,12 @@ body {
   overscroll-behavior: none;
 }
 
+/* Same colour as the top bar and the phone panel, so if iOS leaves any strip
+   outside the app at the top or bottom it blends in instead of showing. */
+html {
+  background: #0f172a;
+}
+
 body {
   @apply bg-slate-950 text-slate-100;
   position: fixed;
@@ -30,6 +36,7 @@ body {
     bottom: auto;
     height: 100vh;
     height: 100lvh;
+    height: var(--app-h, 100lvh);
   }
 }
 
