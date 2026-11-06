@@ -2,9 +2,10 @@ import type { Aircraft, TimeValue } from '../types'
 import { categoryInfo } from '../lib/categories'
 import { SPECIAL_GROUPS } from '../lib/special'
 import { squawkInfo } from '../lib/squawks'
-import { fetchPhoto, lookupLinks, type FlightPath, type PlanePhoto } from '../lib/history'
+import { fetchPhoto, lookupLinks, type FlightPath } from '../lib/history'
 import { useEffect, useState } from 'react'
 import OwnerTab from './OwnerTab'
+import PhotoGallery from './PhotoGallery'
 import { addToLogbook, logbook, patchLogEntry, planeKey } from '../lib/logbook'
 import { fetchOwner } from '../lib/owner'
 import { PHASE_LABEL, airportCode, airportName, fmtAltFull, fmtAltOther, fmtMph, fmtSpeed, fmtTime, fmtVr } from '../lib/format'
@@ -81,7 +82,7 @@ export default function DetailPanel({ aircraft: a, onClose, path, pathLoading, d
 
   return (
     <div className="flex flex-col gap-3 p-4">
-      <Photo hex={a.hex} registration={a.registration} demo={demo} model={a.model} />
+      <PhotoGallery hex={a.hex} registration={a.registration} demo={demo} model={a.model} />
       <div className="flex items-start justify-between gap-2">
         <div>
           <div className="font-mono text-2xl font-bold tracking-wide">{a.callsign}</div>
@@ -264,42 +265,6 @@ function SquawkBox({ code }: { code?: string }) {
         )}
       </div>
     </div>
-  )
-}
-
-function Photo({ hex, registration, demo, model }: { hex: string; registration?: string; demo: boolean; model?: string }) {
-  const [photo, setPhoto] = useState<PlanePhoto | null | undefined>(undefined)
-  useEffect(() => {
-    if (demo) return setPhoto(null)
-    let stop = false
-    setPhoto(undefined)
-    fetchPhoto(hex, registration).then((p) => !stop && setPhoto(p))
-    return () => {
-      stop = true
-    }
-  }, [hex, registration, demo])
-
-  if (photo === undefined)
-    return <div className="aspect-[16/9] w-full animate-pulse rounded-lg bg-slate-800" aria-label="Loading photo" />
-  if (photo === null)
-    return (
-      <div className="flex h-20 w-full flex-col items-center justify-center gap-1 rounded-lg bg-slate-800/60 px-3 text-center text-xs text-slate-500">
-        <span className="text-3xl opacity-40">✈</span>
-        {demo ? 'Photos appear for real aircraft in LIVE mode' : `No photo of this exact aircraft yet${model ? ` (${model})` : ''}`}
-      </div>
-    )
-  return (
-    <figure className="overflow-hidden rounded-lg bg-slate-800">
-      <a href={photo.link} target="_blank" rel="noreferrer">
-        <img src={photo.large} alt={`Photo of ${registration ?? hex}`} className="aspect-[16/9] w-full object-cover" />
-      </a>
-      <figcaption className="px-2 py-1 text-[10px] text-slate-400">
-        Photo © {photo.photographer} ·{' '}
-        <a href={photo.link} target="_blank" rel="noreferrer" className="text-sky-400 hover:underline">
-          Planespotters.net
-        </a>
-      </figcaption>
-    </figure>
   )
 }
 

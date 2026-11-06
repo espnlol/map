@@ -172,38 +172,11 @@ export interface PlanePhoto {
   photographer: string
 }
 
-const photoCache = new Map<string, PlanePhoto | null>()
-
+/** The best single photo of this exact aircraft (used by the logbook). */
 export async function fetchPhoto(hex: string, registration?: string): Promise<PlanePhoto | null> {
-  const key = hex.toLowerCase()
-  if (photoCache.has(key)) return photoCache.get(key)!
-  const base = upstream('planespotters')
-  const urls = [`${base}/pub/photos/hex/${key.replace(/^~/, '')}`]
-  if (registration) urls.push(`${base}/pub/photos/reg/${encodeURIComponent(registration)}`)
-  for (const url of urls) {
-    try {
-      const res = await fetch(url, { headers: { Accept: 'application/json' } })
-      if (!res.ok) continue
-      const json = (await res.json()) as {
-        photos?: { thumbnail?: { src: string }; thumbnail_large?: { src: string }; link: string; photographer: string }[]
-      }
-      const p = json.photos?.[0]
-      if (p && (p.thumbnail_large || p.thumbnail)) {
-        const photo = {
-          thumb: (p.thumbnail ?? p.thumbnail_large)!.src,
-          large: (p.thumbnail_large ?? p.thumbnail)!.src,
-          link: p.link,
-          photographer: p.photographer,
-        }
-        photoCache.set(key, photo)
-        return photo
-      }
-    } catch {
-      // try the next lookup
-    }
-  }
-  photoCache.set(key, null)
-  return null
+  const { findPhotos } = await import('./photos')
+  const p = (await findPhotos(hex, registration)).find((x) => x.exact)
+  return p ? { thumb: p.thumb, large: p.src, link: p.link, photographer: p.credit } : null
 }
 
 // ---------------------------------------------------------------------------
