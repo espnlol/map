@@ -143,6 +143,7 @@ export default function App() {
   // ---- phone layout ----
   const isMobile = useIsMobile()
   const [sheet, setSheet] = useState<SheetSize>('peek')
+  const [sheetPx, setSheetPx] = useState(132)
   const [menuOpen, setMenuOpen] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
   useEffect(() => {
@@ -621,13 +622,13 @@ export default function App() {
             path={path}
             highlight={highlight}
             onClearHighlight={() => setHighlight(null)}
-            bottomInset={isMobile ? 132 : 0}
+            bottomInset={isMobile ? sheetPx : 0}
             hotspots={hotspots}
           />
         </main>
 
         {isMobile ? (
-          <BottomSheet size={sheet} onSize={setSheet}>
+          <BottomSheet size={sheet} onSize={setSheet} onHeight={setSheetPx}>
             {panel}
           </BottomSheet>
         ) : (

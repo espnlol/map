@@ -5,11 +5,13 @@ export type SheetSize = 'peek' | 'half' | 'full'
 interface Props {
   size: SheetSize
   onSize: (s: SheetSize) => void
+  /** Reports how many pixels of the map the panel covers once it settles. */
+  onHeight?: (px: number) => void
   children: ReactNode
 }
 
 /** Phone-only panel that slides up over the map. Drag or tap the handle to resize. */
-export default function BottomSheet({ size, onSize, children }: Props) {
+export default function BottomSheet({ size, onSize, onHeight, children }: Props) {
   const ref = useRef<HTMLDivElement>(null)
   const [parentH, setParentH] = useState(600)
   const [drag, setDrag] = useState<{ startY: number; startH: number; h: number } | null>(null)
@@ -24,6 +26,10 @@ export default function BottomSheet({ size, onSize, children }: Props) {
 
   const heights: Record<SheetSize, number> = { peek: 132, half: Math.round(parentH * 0.52), full: parentH - 8 }
   const height = drag ? drag.h : heights[size]
+  const settled = heights[size]
+  useEffect(() => {
+    onHeight?.(settled)
+  }, [settled, onHeight])
 
   const snap = (h: number) => {
     const order: SheetSize[] = ['peek', 'half', 'full']

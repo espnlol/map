@@ -422,8 +422,12 @@ export default function MapView({ aircraft, selected, onSelect, center, radiusNm
       <button
         className="absolute right-3 top-3 z-[500] rounded-lg bg-slate-900/90 px-3 py-2 text-xs font-medium text-sky-300 shadow ring-1 ring-slate-700 hover:bg-slate-800"
         onClick={() => {
-          const c = map.current?.getCenter()
-          if (c) onSearchHere(c.lat, c.lng)
+          const m = map.current
+          if (!m) return
+          // the middle of the part of the map you can see (not the part under the phone panel)
+          const size = m.getSize()
+          const c = m.containerPointToLatLng(L.point(size.x / 2, Math.max(40, (size.y - insetRef.current) / 2)))
+          onSearchHere(c.lat, c.lng)
         }}
       >
         Track planes here
