@@ -44,7 +44,7 @@ const TYPES: Record<string, string> = {
   WB57: 'Martin WB-57', B74S: 'Boeing 747SP', BLCF: 'Boeing 747 Dreamlifter', C5M: 'Lockheed C-5M Galaxy',
   E3TF: 'Boeing E-3 Sentry', E3CF: 'Boeing E-3 Sentry', E6: 'Boeing E-6 Mercury', U2: 'Lockheed U-2', R135: 'Boeing RC-135',
   DC3: 'Douglas DC-3', DC6: 'Douglas DC-6', P51: 'North American P-51 Mustang', SPIT: 'Supermarine Spitfire',
-  L101: 'Lockheed L-1011 TriStar', DC10: 'McDonnell Douglas DC-10', IL76: 'Ilyushin Il-76', A388: 'Airbus A380',
+  L101: 'Lockheed L-1011 TriStar', DC10: 'McDonnell Douglas DC-10', IL76: 'Ilyushin Il-76',
   A400: 'Airbus A400M Atlas',
 }
 
