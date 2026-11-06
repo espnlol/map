@@ -59,7 +59,12 @@ export async function enablePush(linkCode?: string) {
   const sub =
     (await reg.pushManager.getSubscription()) ??
     (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes((key as { publicKey: string }).publicKey) }))
-  const { token } = (await post('register', { subscription: sub.toJSON(), token: linkCode || pushStore.get().token || undefined })) as { token: string }
+  const { account } = await import('./account')
+  const { token } = (await post('register', {
+    subscription: sub.toJSON(),
+    token: linkCode || pushStore.get().token || undefined,
+    session: account.get().token || undefined,
+  })) as { token: string }
   pushStore.set({ token, enabled: true, lastSync: 0, error: null })
   await syncPushConfig()
 }

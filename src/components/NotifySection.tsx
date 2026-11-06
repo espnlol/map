@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { settings, type Settings } from '../lib/settings'
 import { disablePush, enablePush, linkWithCode, pullRelayState, pushStore, pushSupport, sendTestPush, syncPushConfig } from '../lib/push'
 import { fmtClock, fmtRelative } from '../lib/format'
+import { account } from '../lib/account'
 import { fmtDistRound } from '../lib/format'
 
 function Check({ k, label }: { k: keyof Settings; label: string }) {
@@ -17,6 +18,7 @@ function Check({ k, label }: { k: keyof Settings; label: string }) {
 export default function NotifySection({ center }: { center: { lat: number; lon: number; label: string } }) {
   const s = settings.use()
   const push = pushStore.use()
+  const profile = account.use()
   const support = pushSupport()
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
@@ -109,6 +111,11 @@ export default function NotifySection({ center }: { center: { lat: number; lon: 
           </>
         )}
       </div>
+      {!push.enabled && !profile.token && (
+        <p className="mt-2 text-[11px] text-amber-200/80">
+          Reinstalled SkyWatch, or used notifications on another phone before? Sign in to your profile above first, so the relay knows it's you.
+        </p>
+      )}
       {msg && <p className="mt-2 text-xs text-slate-300">{msg}</p>}
       {push.error && <p className="mt-2 text-xs text-red-300">Couldn't update the relay: {push.error}</p>}
 

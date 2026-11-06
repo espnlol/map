@@ -104,9 +104,21 @@ async function handlePush(request, url, env, cors) {
   const owner = await kv.get('owner')
 
   if (route === 'register') {
-    if (owner && token !== owner) return json({ error: 'This relay is already linked to another device. Use the link code from that device.' }, 403)
+    if (owner && token !== owner) {
+      // A signed-in profile can re-link after a reinstall. The first profile to do
+      // this becomes the relay's owner profile; after that only it can re-link.
+      const user = body.session ? await kv.get(`session:${body.session}`) : null
+      const ownerUser = await kv.get('ownerUser')
+      if (!user || (ownerUser && ownerUser !== user))
+        return json({ error: 'This relay is linked to another device. Sign in to your profile (Settings → Profile) and try again, or enter that device\'s link code.' }, 403)
+      if (!ownerUser) await kv.put('ownerUser', user)
+    }
     const newOwner = owner || randomToken()
     if (!owner) await kv.put('owner', newOwner)
+    if (!owner && body.session) {
+      const user = await kv.get(`session:${body.session}`)
+      if (user && !(await kv.get('ownerUser'))) await kv.put('ownerUser', user)
+    }
     if (body.subscription?.endpoint) {
       const subs = (await kv.get('subs', 'json')) || []
       const others = subs.filter((s) => s.endpoint !== body.subscription.endpoint)
