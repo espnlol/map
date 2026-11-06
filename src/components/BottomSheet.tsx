@@ -15,6 +15,16 @@ export default function BottomSheet({ size, onSize, onHeight, children }: Props)
   const ref = useRef<HTMLDivElement>(null)
   const [parentH, setParentH] = useState(600)
   const [drag, setDrag] = useState<{ startY: number; startH: number; h: number } | null>(null)
+  const [safeBottom, setSafeBottom] = useState(0)
+  useEffect(() => {
+    // measure env(safe-area-inset-bottom) so the small panel still shows the tab row above the home indicator
+    const probe = document.createElement('div')
+    probe.className = 'safe-bottom'
+    probe.style.cssText = 'position:fixed;visibility:hidden;pointer-events:none'
+    document.body.appendChild(probe)
+    setSafeBottom(parseFloat(getComputedStyle(probe).paddingBottom) || 0)
+    probe.remove()
+  }, [])
 
   useEffect(() => {
     const parent = ref.current?.parentElement
@@ -24,7 +34,7 @@ export default function BottomSheet({ size, onSize, onHeight, children }: Props)
     return () => ro.disconnect()
   }, [])
 
-  const heights: Record<SheetSize, number> = { peek: 132, half: Math.round(parentH * 0.52), full: parentH - 8 }
+  const heights: Record<SheetSize, number> = { peek: 132 + safeBottom, half: Math.round(parentH * 0.52), full: parentH - 8 }
   const height = drag ? drag.h : heights[size]
   const settled = heights[size]
   useEffect(() => {
@@ -68,7 +78,7 @@ export default function BottomSheet({ size, onSize, onHeight, children }: Props)
       >
         <span className="h-1.5 w-10 rounded-full bg-slate-600" />
       </div>
-      <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+      <div className="safe-bottom flex min-h-0 flex-1 flex-col">{children}</div>
     </div>
   )
 }

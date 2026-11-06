@@ -469,7 +469,7 @@ export default function App() {
       )}
 
       {/* Header */}
-      <header className="relative z-[800] flex items-center gap-1.5 border-b border-slate-800 bg-slate-900 px-2 py-1.5 md:flex-wrap md:gap-2 md:px-4 md:py-2">
+      <header className="safe-top relative z-[800] flex items-center gap-1.5 border-b border-slate-800 bg-slate-900 px-2 pb-1.5 md:flex-wrap md:gap-2 md:px-4 md:py-2">
         <div className="flex shrink-0 items-center gap-1.5 md:mr-2 md:gap-2">
           <span className="text-lg md:text-xl">✈</span>
           <h1 className="hidden text-lg font-bold tracking-tight sm:block">SkyWatch</h1>
@@ -632,7 +632,7 @@ export default function App() {
             {panel}
           </BottomSheet>
         ) : (
-          <aside className="relative z-10 flex w-[400px] flex-none flex-col border-r border-slate-800 bg-slate-900 md:order-1">{panel}</aside>
+          <aside className="safe-bottom relative z-10 flex w-[400px] flex-none flex-col border-r border-slate-800 bg-slate-900 md:order-1">{panel}</aside>
         )}
       </div>
     </div>

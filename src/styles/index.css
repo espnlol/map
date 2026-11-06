@@ -33,18 +33,6 @@ body {
   }
 }
 
-/* A solid band behind the iPhone status bar / Dynamic Island, so nothing
-   scrolls or shows through underneath it. */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0 0 auto;
-  height: env(safe-area-inset-top, 0px);
-  background: #0f172a;
-  z-index: 3000;
-  pointer-events: none;
-}
-
 #root {
   height: 100%;
   overflow: hidden;
@@ -66,12 +54,18 @@ body::before {
   }
 }
 
-/* Keep clear of the iPhone notch / home bar when opened from the Home Screen. */
+/* The top bar and the bottom panel reach the screen edges themselves and keep
+   only their contents clear of the status bar and the home indicator, so no
+   empty strip (or iOS's status-bar blur over one) is left at either edge. */
 #root {
-  padding-top: env(safe-area-inset-top, 0px);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
   padding-left: env(safe-area-inset-left, 0px);
   padding-right: env(safe-area-inset-right, 0px);
+}
+.safe-top {
+  padding-top: calc(env(safe-area-inset-top, 0px) + 0.375rem);
+}
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .leaflet-container {
