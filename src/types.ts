@@ -40,6 +40,9 @@ export interface Route {
   destination?: Airport
   /** false when the route database itself thinks the match is implausible. */
   plausible: boolean
+  /** Every stop when one flight number makes several (A → B → C), and which leg this is. */
+  stops?: Airport[]
+  leg?: number
 }
 
 export type Phase = 'ground' | 'takeoff' | 'climb' | 'cruise' | 'descent' | 'approach' | 'unknown'

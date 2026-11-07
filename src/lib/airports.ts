@@ -68,3 +68,18 @@ export function busyness(ap: AirportInfo, aircraft: Aircraft[]): Busyness {
   }
   return b
 }
+
+/** The airport a point is at (or near), for labelling where a flight started or ended. */
+export function nearestAirport(lat: number, lon: number, airports: AirportInfo[], maxNm = 25): { ap: AirportInfo; d: number } | null {
+  let best: AirportInfo | null = null
+  let bd = maxNm
+  for (const p of airports) {
+    if (Math.abs(p.lat - lat) > 1 || Math.abs(p.lon - lon) > 1.4) continue
+    const d = distanceNm(lat, lon, p.lat, p.lon)
+    if (d < bd) {
+      bd = d
+      best = p
+    }
+  }
+  return best ? { ap: best, d: bd } : null
+}

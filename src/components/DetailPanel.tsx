@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 import OwnerTab from './OwnerTab'
 import PhotoGallery from './PhotoGallery'
 import FlightCard from './FlightCard'
+import Journey from './Journey'
 import { addToLogbook, logbook, patchLogEntry, planeKey } from '../lib/logbook'
 import { fetchOwner } from '../lib/owner'
 import { PHASE_LABEL, airportCode, airportName, fmtAltFull, fmtAltOther, fmtMph, fmtSpeed, fmtTime, fmtVr } from '../lib/format'
@@ -159,7 +160,10 @@ export default function DetailPanel({ aircraft: a, onClose, path, pathLoading, d
       )}
 
       {r ? (
-        <FlightCard a={a} />
+        <>
+          <FlightCard a={a} />
+          <Journey a={a} demo={demo} />
+        </>
       ) : (
         <>
           <div className="rounded-lg bg-slate-800/60 p-3 text-xs text-slate-400">
@@ -169,6 +173,7 @@ export default function DetailPanel({ aircraft: a, onClose, path, pathLoading, d
             <TimeBlock label="Takeoff" t={a.takeoff} fallback={a.onGround ? 'Not departed yet' : 'Unknown'} />
             <TimeBlock label="Touchdown" t={a.touchdown} fallback={a.onGround ? 'On the ground' : 'Unknown'} />
           </div>
+          <Journey a={a} demo={demo} />
         </>
       )}
 

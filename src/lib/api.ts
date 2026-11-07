@@ -156,5 +156,7 @@ function toRoute(e: RoutesetEntry, lat: number, lon: number): Route | null {
     origin: airports[best],
     destination: airports[best + 1],
     plausible: e.plausible === undefined ? true : Boolean(e.plausible),
+    stops: airports.length > 2 ? airports : undefined,
+    leg: best,
   }
 }
