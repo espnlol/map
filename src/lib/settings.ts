@@ -34,6 +34,8 @@ export interface Settings {
   // notifications while the app is closed (needs the relay set up for it)
   notifyTeams: boolean
   notifyEmergencies: boolean
+  emergencyScope: 'near' | 'world'
+  include7600: boolean
   notifyRare: boolean
   notifyRadius: number
   home: { lat: number; lon: number; label: string } | null
@@ -66,6 +68,8 @@ export const DEFAULT_SETTINGS: Settings = {
   goAroundAlerts: true,
   notifyTeams: true,
   notifyEmergencies: true,
+  emergencyScope: 'near',
+  include7600: false,
   notifyRare: false,
   notifyRadius: 100,
   home: null,

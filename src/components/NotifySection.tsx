@@ -57,7 +57,37 @@ export default function NotifySection({ center }: { center: { lat: number; lon: 
 
       <div className="divide-y divide-slate-800">
         <Check k="notifyTeams" label="🛫 Team planes take off or land" />
-        <Check k="notifyEmergencies" label="⚠️ Emergencies near home" />
+        <Check k="notifyEmergencies" label="⚠️ Emergencies" />
+        {s.notifyEmergencies && (
+          <>
+            <div className="flex items-center justify-between gap-3 py-2 text-sm">
+              Where
+              <div className="flex overflow-hidden rounded-md text-xs font-semibold ring-1 ring-slate-700">
+                {(
+                  [
+                    ['near', 'Near home'],
+                    ['world', 'Anywhere in the world'],
+                  ] as const
+                ).map(([v, label]) => (
+                  <button
+                    key={v}
+                    onClick={() => settings.update({ emergencyScope: v })}
+                    className={`px-2.5 py-1 ${s.emergencyScope === v ? 'bg-sky-500 text-slate-950' : 'bg-slate-800 text-slate-300'}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <Check k="include7600" label="📻 Include radio failures (7600)" />
+            <p className="pb-2 text-[11px] text-slate-500">
+              {s.emergencyScope === 'world'
+                ? 'Every new 7700 (and 7500 hijack) worldwide. Expect a few an hour; you get at most 3 per check, and never the same plane twice in 6 hours.'
+                : 'Hijacks (7500) and emergencies (7700) within the distance below.'}{' '}
+              Radio failures are common and usually minor.
+            </p>
+          </>
+        )}
         <Check k="notifyRare" label="✨ Rare planes (anywhere in the world)" />
         <div className="flex items-center justify-between gap-3 py-2 text-sm">
           <div>

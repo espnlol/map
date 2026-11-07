@@ -129,3 +129,20 @@ export async function scanWorld() {
     error: failures >= 4 ? "Couldn't reach the worldwide lookups. Check your connection, or update the relay." : null,
   })
 }
+
+/** Planes squawking an emergency code anywhere in the world right now. */
+export async function worldEmergencies(include7600: boolean) {
+  const codes = ['7700', '7500', ...(include7600 ? ['7600'] : [])]
+  const out: (ReturnType<typeof base> & { code: string; label: string })[] = []
+  for (const sq of codes) {
+    try {
+      for (const a of await get(`/v2/sqk/${sq}`)) {
+        const e = detectEmergency(a.squawk, a.emergency)
+        if (e && !out.some((o) => o.hex === a.hex)) out.push({ ...base(a), code: sq, label: e.label })
+      }
+    } catch {
+      /* try the next code */
+    }
+  }
+  return out
+}

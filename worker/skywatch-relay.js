@@ -30,7 +30,7 @@ const CACHE_SECONDS = { adsblol: 2, airplaneslive: 2, adsblolglobe: 30, airplane
 const SLOW_PATHS = /^\/v2\/(type|reg|callsign|hex|mil|sqk)\b/
 
 const APP_URL = 'https://espnlol.github.io/map/'
-const RELAY_VERSION = '2026-11-07b'
+const RELAY_VERSION = '2026-11-07c'
 const UA = 'SkyWatch relay (personal flight tracker)'
 
 export default {
@@ -375,20 +375,31 @@ export async function runChecks(env) {
       }, check.errors, 'team')
     })
 
-  // 2. Emergencies near home: the three worldwide emergency-squawk lists are tiny.
-  if (config.notify?.emergencies && home)
+  // 2. Emergencies: near home, or anywhere in the world. The three worldwide
+  //    emergency-squawk lists are tiny, so both use them.
+  const world = config.notify?.emergencyScope === 'world'
+  if (config.notify?.emergencies && (home || world))
     await step('emergencies', async () => {
       const r = Math.min(250, config.radius || 100)
-      await each(['7700', '7600', '7500'], async (sq) => {
+      const codes = ['7700', '7500', ...(config.notify?.include7600 ? ['7600'] : [])]
+      await each(codes, async (sq) => {
         const data = await getJson(`/v2/sqk/${sq}`)
         for (const a of data.ac || []) {
           if (a.alt_baro === 'ground' || typeof a.lat !== 'number') continue
-          const d = distNm(home.lat, home.lon, a.lat, a.lon)
-          if (d > r) continue
+          const d = home ? distNm(home.lat, home.lon, a.lat, a.lon) : null
+          if (!world && (d == null || d > r)) continue
           const key = `${a.hex}-${sq}`
           if (state.emerg[key] && now - state.emerg[key] < 6 * 3600e3) continue
           state.emerg[key] = now
-          notes.push({ title: `⚠️ ${EMERGENCY_LABEL[sq]}`, body: `${(a.flight || a.r || a.hex).trim()}${a.t ? ` (${a.t})` : ''} is ${Math.round(d * 1.15)} mi from ${home.label || 'home'}`, url: `${APP_URL}?plane=${a.hex}`, tag: key })
+          const cs = (a.flight || a.r || a.hex).trim()
+          const route = a.flight ? await routeFor(cs, a.lat, a.lon) : {}
+          const bits = [
+            cs + (a.t ? ` (${a.t})` : ''),
+            route.from && route.to ? `${route.from} → ${route.to}` : null,
+            typeof a.alt_baro === 'number' ? `${a.alt_baro.toLocaleString()} ft` : null,
+            d != null ? `${Math.round(d * 1.15).toLocaleString()} mi from ${world ? 'you' : home.label || 'home'}` : null,
+          ].filter(Boolean)
+          notes.push({ title: `⚠️ ${EMERGENCY_LABEL[sq]}${sq === '7500' ? ' (7500)' : ''}`, body: bits.join(' · '), url: `${APP_URL}?plane=${a.hex}`, tag: key, priority: sq === '7500' ? 2 : 1 })
         }
       }, check.errors, 'emergencies')
     })
@@ -455,6 +466,7 @@ export async function runChecks(env) {
   check.alerts = notes.length
   if (notes.length && subs?.length) {
     // never flood the phone: send the first few, then a summary
+    notes.sort((x, y) => (y.priority || 0) - (x.priority || 0))
     const send = notes.length > 4 ? [...notes.slice(0, 3), { title: 'SkyWatch', body: `${notes.length - 3} more alerts. Open SkyWatch to see them.`, url: APP_URL, tag: 'more' }] : notes
     const r = await notifyAll(kv, send)
     check.sent = r.sent

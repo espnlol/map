@@ -103,7 +103,7 @@ export async function syncPushConfig() {
     teams: teams.get().flatMap((t) => t.idents.map((ident) => ({ ident, team: t.name }))),
     home: s.home,
     radius: s.notifyRadius,
-    notify: { teams: s.notifyTeams, emergencies: s.notifyEmergencies, rare: s.notifyRare, mil: milWatch.get().notify },
+    notify: { teams: s.notifyTeams, emergencies: s.notifyEmergencies, emergencyScope: s.emergencyScope, include7600: s.include7600, rare: s.notifyRare, mil: milWatch.get().notify },
     milAirports: milWatch.get().airports.map(({ code, lat, lon, elevation }) => ({ code, lat, lon, elevation })),
     rareTypes: RARE_TYPES.filter((t) => tiers.includes(t.tier)).map((t) => ({ code: t.code, name: t.name })),
   }

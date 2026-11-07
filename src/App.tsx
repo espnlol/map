@@ -31,6 +31,8 @@ import Insights, { type InsightTab } from './components/Insights'
 import { detectGoArounds, findHolding, findMilitaryPatterns } from './lib/patterns'
 import { countOpen, recordTraffic } from './lib/records'
 import { checkArrivals, fromAircraft, milWatch, scanMilitary, type MilArrival } from './lib/milwatch'
+import { worldEmergencies } from './lib/world'
+import { distanceNm } from './lib/geo'
 import { useTraffic, type Mode } from './lib/useTraffic'
 import { PRESETS } from './lib/presets'
 import { categoryKey } from './lib/categories'
@@ -315,6 +317,37 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, watch.airports.length])
 
+  // ---- emergencies anywhere in the world (pop-ups while the app is open) ----
+  const seenWorldEmerg = useRef<Map<string, number> | null>(null)
+  useEffect(() => {
+    if (mode !== 'live' || !cfg.notifyEmergencies || cfg.emergencyScope !== 'world') return
+    const run = async () => {
+      if (document.hidden) return
+      const list = await worldEmergencies(cfg.include7600)
+      const now = Date.now()
+      const first = seenWorldEmerg.current == null
+      seenWorldEmerg.current ??= new Map()
+      for (const e of list) {
+        const k = `${e.hex}-${e.code}`
+        const prev = seenWorldEmerg.current.get(k)
+        seenWorldEmerg.current.set(k, now)
+        if (first || (prev && now - prev < 6 * 3600e3) || liveHexes.has(e.hex)) continue // the local banner covers ones on your map
+        const d = distanceNm(center.lat, center.lon, e.lat, e.lon)
+        pushToast({
+          tone: 'info',
+          title: `⚠️ ${e.label} · ${e.callsign}`,
+          body: `${e.model ?? e.typeCode ?? 'Unknown type'} · ${fmtDist(d)} away`,
+          onOpen: () => jumpTo(e.hex, e.lat, e.lon, e.callsign),
+        })
+        beep('alert')
+      }
+    }
+    run()
+    const t = setInterval(run, 2 * 60_000)
+    return () => clearInterval(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, cfg.notifyEmergencies, cfg.emergencyScope, cfg.include7600])
+
   // count how often you open each plane, for "Your most tracked"
   const countedFor = useRef<string | null>(null)
   useEffect(() => {
@@ -393,7 +426,7 @@ export default function App() {
     if (!push.token) return
     const t = setTimeout(syncPushConfig, 1500)
     return () => clearTimeout(t)
-  }, [push.token, followed, watch, cfg.notifyTeams, cfg.notifyEmergencies, cfg.notifyRare, cfg.notifyRadius, cfg.home, cfg.rareLegendary, cfg.rareRare, cfg.rareUncommon])
+  }, [push.token, followed, watch, cfg.notifyTeams, cfg.notifyEmergencies, cfg.emergencyScope, cfg.include7600, cfg.notifyRare, cfg.notifyRadius, cfg.home, cfg.rareLegendary, cfg.rareRare, cfg.rareUncommon])
   useEffect(() => {
     pullRelayState()
   }, [])
