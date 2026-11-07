@@ -5,6 +5,7 @@ import { squawkInfo } from '../lib/squawks'
 import { fetchPhoto, lookupLinks, type FlightPath } from '../lib/history'
 import { useEffect, useState } from 'react'
 import OwnerTab from './OwnerTab'
+import PlaneProfile from './PlaneProfile'
 import PhotoGallery from './PhotoGallery'
 import FlightCard from './FlightCard'
 import Journey from './Journey'
@@ -61,7 +62,7 @@ export default function DetailPanel({ aircraft: a, onClose, path, pathLoading, d
   const total = o?.lat != null && d?.lat != null ? distanceNm(o.lat, o.lon!, d.lat, d.lon!) : null
   const left = d?.lat != null ? distanceNm(a.lat, a.lon, d.lat, d.lon!) : null
   const progress = total && left != null ? Math.max(0, Math.min(1, 1 - left / total)) : null
-  const [tab, setTab] = useState<'flight' | 'owner'>('flight')
+  const [tab, setTab] = useState<'flight' | 'owner' | 'profile'>('flight')
   const loggedEntry = logbook.use().find((e) => planeKey(e) === planeKey(a) || e.hex === a.hex)
   const [saved, setSaved] = useState<string | null>(null)
   useEffect(() => setSaved(null), [a.hex])
@@ -121,7 +122,7 @@ export default function DetailPanel({ aircraft: a, onClose, path, pathLoading, d
       {saved && <div className="-mt-1 text-center text-xs text-amber-200">{saved}</div>}
 
       <div className="flex rounded-lg bg-slate-800/60 p-1 text-sm font-semibold" role="tablist">
-        {(['flight', 'owner'] as const).map((t) => (
+        {(['flight', 'owner', 'profile'] as const).map((t) => (
           <button
             key={t}
             role="tab"
@@ -129,12 +130,14 @@ export default function DetailPanel({ aircraft: a, onClose, path, pathLoading, d
             onClick={() => setTab(t)}
             className={`flex-1 rounded-md py-1.5 ${tab === t ? 'bg-sky-500 text-slate-950' : 'text-slate-300 hover:text-white'}`}
           >
-            {t === 'flight' ? 'Flight' : 'Owner'}
+            {t === 'flight' ? 'Flight' : t === 'owner' ? 'Owner' : 'Profile'}
           </button>
         ))}
       </div>
 
-      {tab === 'owner' ? (
+      {tab === 'profile' ? (
+        <PlaneProfile plane={a} demo={demo} />
+      ) : tab === 'owner' ? (
         <OwnerTab a={a} demo={demo} />
       ) : (
         <>

@@ -33,6 +33,7 @@ import { useRef } from 'react'
 import Insights, { type InsightTab } from './components/Insights'
 import { detectGoArounds, findHolding, findMilitaryPatterns } from './lib/patterns'
 import { countOpen, recordTraffic } from './lib/records'
+import { recordSighting } from './lib/sightings'
 import { checkArrivals, fromAircraft, milWatch, scanMilitary, type MilArrival } from './lib/milwatch'
 import { worldEmergencies } from './lib/world'
 import { distanceNm } from './lib/geo'
@@ -362,6 +363,7 @@ export default function App() {
     else if (selectedAc && countedFor.current !== selected && mode === 'live') {
       countedFor.current = selected
       countOpen(selectedAc)
+      recordSighting(selectedAc)
     }
   }, [selected, selectedAc, mode])
 
