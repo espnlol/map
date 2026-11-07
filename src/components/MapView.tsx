@@ -103,6 +103,7 @@ export default function MapView({ aircraft, selected, onSelect, center, radiusNm
   const selPath = useRef<L.LayerGroup | null>(null)
   const renderer = useRef<L.Renderer>(L.canvas({ padding: 0.3 }))
   const fittedFor = useRef<string | null>(null)
+  const fitTimer = useRef<ReturnType<typeof setTimeout>>()
   const airportLayer = useRef<L.LayerGroup | null>(null)
   const highlightLayer = useRef<L.LayerGroup | null>(null)
   const insetRef = useRef(bottomInset)
@@ -281,17 +282,33 @@ export default function MapView({ aircraft, selected, onSelect, center, radiusNm
           .bindTooltip(path?.fromTakeoff ? 'Takeoff' : 'Start of known path')
           .addTo(selPath.current!)
       }
-      if (path && fittedFor.current !== sel.hex && pts.length > 1) {
-        fittedFor.current = sel.hex
-        m.fitBounds(L.latLngBounds(pts.map(([la, lo]) => [la, lo] as [number, number])).extend([sel.lat, sel.lon]), {
-          paddingTopLeft: [40, 40],
-          paddingBottomRight: [40, 40 + insetRef.current],
-          maxZoom: 11,
-        })
+      // Frame the whole trip once per selected plane: where it took off (or its
+      // flown path), where it is now, and where it's going.
+      if (fittedFor.current !== sel.hex) {
+        const fit = () => {
+          if (fittedFor.current === sel.hex) return
+          fittedFor.current = sel.hex
+          const b = L.latLngBounds([[sel.lat, sel.lon]])
+          for (const [la, lo] of pts) b.extend([la, lo])
+          const o = sel.route?.origin
+          const dst = sel.route?.destination
+          if (o?.lat != null && o.lon != null && !path) b.extend([o.lat, o.lon])
+          if (dst?.lat != null && dst.lon != null) b.extend([dst.lat, dst.lon])
+          m.fitBounds(b, { paddingTopLeft: [50, 60], paddingBottomRight: [50, 70 + insetRef.current], maxZoom: 10 })
+        }
+        clearTimeout(fitTimer.current)
+        if (path && pts.length > 1) fit()
+        else fitTimer.current = setTimeout(fit, 2500) // no flight history (yet): frame what we know
       }
       const d = sel.route?.destination
       if (d?.lat != null && d.lon != null)
+      {
         routeLine.current = L.polyline([[sel.lat, sel.lon], [d.lat, d.lon]], { color: '#38bdf8', weight: 1.5, dashArray: '6 6', opacity: 0.7, interactive: false }).addTo(m)
+        // mark where it's going
+        L.circleMarker([d.lat, d.lon], { radius: 5, color: '#f8fafc', weight: 2, fillColor: '#38bdf8', fillOpacity: 1, renderer: renderer.current, interactive: false })
+          .bindTooltip(d.iata || d.icao || 'Destination', { permanent: true, direction: 'right', offset: [6, 0], className: 'airport-label' })
+          .addTo(selPath.current!)
+      }
     } else {
       fittedFor.current = null
     }
@@ -441,15 +458,16 @@ export default function MapView({ aircraft, selected, onSelect, center, radiusNm
         </button>
       )}
       {selected && (
-        <div style={{ bottom: bottomInset + 24 }} className="pointer-events-none absolute left-1/2 z-[500] -translate-x-1/2 rounded-lg bg-slate-900/90 px-3 py-1.5 text-[10px] text-slate-300 ring-1 ring-slate-700">
-          <div className="mb-1 text-center font-semibold uppercase tracking-wider text-slate-400">Path altitude</div>
-          <div className="flex items-center gap-1.5">
-            <span>Ground</span>
-            {[null, 0, 5000, 10000, 20000, 30000, 40000].map((v, i) => (
-              <span key={i} className="h-2 w-5 rounded-sm" style={{ background: altColor(v) }} />
-            ))}
-            <span>40,000 ft</span>
-          </div>
+        <div
+          style={{ bottom: bottomInset + 8 }}
+          className="pointer-events-none absolute left-1/2 z-[500] flex -translate-x-1/2 items-center gap-1 whitespace-nowrap rounded-full bg-slate-900/85 px-2.5 py-1 text-[9px] text-slate-300 ring-1 ring-slate-700"
+          aria-label="Path colours by altitude"
+        >
+          <span>Low</span>
+          {[null, 0, 5000, 10000, 20000, 30000, 40000].map((v, i) => (
+            <span key={i} className="h-1.5 w-3.5 rounded-sm" style={{ background: altColor(v) }} />
+          ))}
+          <span>40k ft</span>
         </div>
       )}
       <button
