@@ -2,6 +2,8 @@ import type { ReactNode } from 'react'
 import { settings, type Settings } from '../lib/settings'
 import NotifySection from './NotifySection'
 import ProfileSection from './ProfileSection'
+import { useEffect, useState } from 'react'
+import { adsbxConnected } from '../lib/search'
 
 function Toggle({ k, label, hint }: { k: keyof Settings; label: string; hint?: string }) {
   const s = settings.use()
@@ -115,6 +117,8 @@ export default function SettingsPanel({ onClose, center }: { onClose: () => void
             <Toggle k="clock24" label="24-hour clock" />
           </Section>
 
+          <DataSources />
+
           <Section title="Updates">
             <Choice k="refresh" label="Refresh" options={[['fast', 'Fast 4s'], ['normal', '6s'], ['saver', 'Saver 15s']]} />
           </Section>
@@ -130,5 +134,27 @@ export default function SettingsPanel({ onClose, center }: { onClose: () => void
         </div>
       </div>
     </div>
+  )
+}
+
+function DataSources() {
+  const [adsbx, setAdsbx] = useState<boolean | null>(null)
+  useEffect(() => {
+    adsbxConnected().then(setAdsbx)
+  }, [])
+  return (
+    <section className="px-4 py-3 text-sm">
+      <h3 className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Flight data sources</h3>
+      <ul className="space-y-1 text-xs text-slate-300">
+        <li>✅ adsb.lol (main, free)</li>
+        <li>✅ airplanes.live (automatic backup, free)</li>
+        <li>
+          {adsbx ? '✅' : '➖'} ADS-B Exchange{' '}
+          <span className="text-slate-500">
+            {adsbx === null ? '(checking…)' : adsbx ? '(connected: used when the free sources can\'t find a plane)' : '(optional, paid: not set up)'}
+          </span>
+        </li>
+      </ul>
+    </section>
   )
 }
