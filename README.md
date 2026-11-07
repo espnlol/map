@@ -148,6 +148,35 @@ stretched on the device (PBKDF2-SHA256, 150,000 rounds) and only that result is 
 stores a salted SHA-256 of it, and locks a username for 15 minutes after 10 wrong passwords.
 Removals are remembered so a sync never brings back a plane or team you deleted.
 
+## Restricted airspace
+
+FAA Temporary Flight Restrictions (TFRs) are outlined on the map, colored by kind: VIP/presidential
+(solid red), security, hazards and wildfires, space launches, and stadiums/air shows. Tap one for the
+details and a link to the FAA notice. 🔔 lists the ones near you plus any VIP movements in the US.
+The shapes come from the FAA's TFR map service and list (tfr.faa.gov) through the relay, refreshed
+every 15 minutes. Turn it off in *Settings → Map* or the ⋯ menu. US only.
+
+## Plane profiles
+
+Open a plane and tap **Profile**, or tap *Profile* next to any Logbook entry. It shows the
+registration, owner and country, how many times you've seen and opened it, the callsigns and routes
+it flew when you saw it, your last 15 sightings, today's flights, any emergencies or military
+arrivals you caught it in, and links to FlightAware, Planespotters, JetPhotos and the adsb.lol replay.
+Sightings are saved to your profile like the logbook.
+
+## Behind the scenes
+
+- **Relay lockdown**: the relay only forwards the exact API paths the app uses, allows one profile
+  (set the Worker variable `ALLOW_SIGNUPS` to `1` to allow more), and limits "Run a check" to once a
+  minute.
+- **Fresh databases**: `.github/workflows/refresh-data.yml` rebuilds `public/airports.json`
+  (OurAirports) and `public/aircraft-types.json` (tar1090-db) on the 3rd of every month and
+  redeploys the site if anything changed. GitHub only runs scheduled workflows from the default
+  branch. Run it any time from the Actions tab.
+- **Relay auto-deploy**: `.github/workflows/relay.yml` deploys `worker/skywatch-relay.js` with
+  Wrangler (`worker/wrangler.toml`) whenever it changes. It stays off until a Cloudflare API token
+  (template "Edit Cloudflare Workers") is saved as the repository secret `CLOUDFLARE_API_TOKEN`.
+
 ## Filtering
 
 - **Aircraft category** chips (multi-select, with live counts), using the ADS-B emitter category the

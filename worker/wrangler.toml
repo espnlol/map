@@ -1,0 +1,18 @@
+# Settings for deploying the SkyWatch relay automatically from GitHub
+# (.github/workflows/relay.yml). Matches the Worker set up by hand in the
+# Cloudflare dashboard. Nothing secret lives here: the push keys and any
+# API tokens stay in Cloudflare's own secret storage.
+name = "skywatch-relay"
+main = "skywatch-relay.js"
+compatibility_date = "2024-09-23"
+account_id = "ed770f6d0fa50411af627cdacd75fc22"
+workers_dev = true
+# Keep any variables you set in the dashboard (like ALLOW_SIGNUPS).
+keep_vars = true
+
+kv_namespaces = [
+  { binding = "SKYWATCH", id = "c1717db72381470e94f820e9f04950c1" },
+]
+
+[triggers]
+crons = ["*/5 * * * *"]
