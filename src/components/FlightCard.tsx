@@ -87,9 +87,11 @@ export default function FlightCard({ a }: { a: Aircraft }) {
   const d = r.destination
   const op = usePlace(o)
   const dp = usePlace(d)
-  const total = o?.lat != null && d?.lat != null ? distanceNm(o.lat, o.lon!, d.lat, d.lon!) : null
-  const left = d?.lat != null ? distanceNm(a.lat, a.lon, d.lat, d.lon!) : null
-  const progress = total && left != null ? Math.max(0, Math.min(1, 1 - left / total)) : null
+  // flown = from the origin to here, left = from here to the destination (never negative)
+  const flown = o?.lat != null && o.lon != null ? distanceNm(o.lat, o.lon, a.lat, a.lon) : null
+  const left = d?.lat != null && d.lon != null ? distanceNm(a.lat, a.lon, d.lat, d.lon) : null
+  const total = flown != null && left != null ? flown + left : null
+  const progress = total ? flown! / total : null
   const airline = /^[A-Z]{3}\d/.test(a.callsign)
   // a late landing compared with our earlier estimate gets the red dot
   const depLabel = a.takeoff?.kind === 'observed' ? 'Took off' : a.onGround && !a.takeoff ? 'Departs' : 'Departed (est.)'
@@ -108,7 +110,7 @@ export default function FlightCard({ a }: { a: Aircraft }) {
             <div className="h-full bg-amber-300" style={{ width: `${progress * 100}%` }} />
           </div>
           <div className="mt-1 flex justify-between text-[10px] text-slate-500">
-            <span>{fmtDist(total! - left!)} flown</span>
+            <span>{fmtDist(flown!)} flown</span>
             <span>{fmtDist(left!)} to go</span>
           </div>
         </div>

@@ -152,9 +152,16 @@ function toRoute(e: RoutesetEntry, lat: number, lon: number): Route | null {
       best = i
     }
   }
+  // Flight numbers get reused (Southwest especially), so the database can hand
+  // back a route this plane isn't flying. If the plane is far off the path
+  // between the two airports, don't trust it.
+  const a = airports[best]
+  const b = airports[best + 1]
+  const legNm = distanceNm(a.lat!, a.lon!, b.lat!, b.lon!)
+  if (bestScore > Math.max(200, legNm * 0.35)) return null
   return {
-    origin: airports[best],
-    destination: airports[best + 1],
+    origin: a,
+    destination: b,
     plausible: e.plausible === undefined ? true : Boolean(e.plausible),
     stops: airports.length > 2 ? airports : undefined,
     leg: best,

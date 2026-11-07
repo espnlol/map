@@ -167,7 +167,9 @@ export default function DetailPanel({ aircraft: a, onClose, path, pathLoading, d
       ) : (
         <>
           <div className="rounded-lg bg-slate-800/60 p-3 text-xs text-slate-400">
-            Origin and destination aren't known for this callsign (common for private, military and some cargo flights).
+            Origin and destination aren't known for this flight. That's common for private, military and some cargo flights, and
+            airlines reuse flight numbers, so SkyWatch only shows a route when it matches where the plane actually is. Where it took
+            off today is under Journey.
           </div>
           <div className="flex gap-2">
             <TimeBlock label="Takeoff" t={a.takeoff} fallback={a.onGround ? 'Not departed yet' : 'Unknown'} />

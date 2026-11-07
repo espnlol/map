@@ -39,7 +39,7 @@ export default function Journey({ a, demo }: { a: Aircraft; demo: boolean }) {
   const current = (legs ?? []).find((l) => l.ongoing)
   const stops = r?.stops
   const airline = /^[A-Z]{3}\d/.test(a.callsign)
-  if (!stops && done.length === 0 && legs !== undefined) return null
+  if (!stops && done.length === 0 && !current && legs !== undefined) return null
 
   return (
     <div className="rounded-lg bg-slate-800/60 p-3">
@@ -65,6 +65,20 @@ export default function Journey({ a, demo }: { a: Aircraft; demo: boolean }) {
 
       {legs === undefined ? (
         <div className="h-4 w-2/3 animate-pulse rounded bg-slate-700" />
+      ) : done.length === 0 && current ? (
+        <div className="text-xs text-slate-300">
+          {current.fromGround ? (
+            <>
+              Took off from <b className="font-mono">{place(current.departLat, current.departLon)}</b> at {fmtClock(current.departedAt)}
+              {r ? <>, heading for <b className="font-mono">{code(r.destination)}</b></> : null}. First flight today.
+            </>
+          ) : (
+            <>
+              First seen today at {fmtClock(current.departedAt)} near <b className="font-mono">{place(current.departLat, current.departLon)}</b> (it took off
+              somewhere out of receiver range).
+            </>
+          )}
+        </div>
       ) : done.length > 0 ? (
         <>
           <div className="mb-1 text-xs text-slate-300">This plane earlier today</div>
