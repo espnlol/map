@@ -30,6 +30,7 @@ const CACHE_SECONDS = { adsblol: 2, airplaneslive: 2, adsblolglobe: 30, airplane
 const SLOW_PATHS = /^\/v2\/(type|reg|callsign|hex|mil|sqk)\b/
 
 const APP_URL = 'https://espnlol.github.io/map/'
+const RELAY_VERSION = '2026-11-07'
 const UA = 'SkyWatch relay (personal flight tracker)'
 
 export default {
@@ -48,7 +49,7 @@ export default {
     const url = new URL(request.url)
     if (url.pathname === '/' || url.pathname === '') {
       const bg = env.SKYWATCH ? 'Background checks: set up.' : 'Background checks: not set up (no SKYWATCH KV binding).'
-      return new Response(`SkyWatch relay is running.\n${bg}`, { headers: { 'Content-Type': 'text/plain', ...cors } })
+      return new Response(`SkyWatch relay is running.\n${bg}\nRelay version ${RELAY_VERSION}`, { headers: { 'Content-Type': 'text/plain', ...cors } })
     }
     if (!allowed) return new Response('Not allowed', { status: 403, headers: cors })
 
@@ -139,8 +140,13 @@ async function handlePush(request, url, env, cors) {
     return json({ ...state, devices: subs.length })
   }
   if (route === 'test') {
-    const sent = await notifyAll(kv, [{ title: 'SkyWatch', body: 'Notifications are working ✈', url: APP_URL, tag: 'test' }])
-    return json({ sent })
+    const r = await notifyAll(kv, [{ title: 'SkyWatch', body: 'Notifications are working ✈', url: APP_URL, tag: 'test' }])
+    return json(r)
+  }
+  if (route === 'run') {
+    await runChecks(env)
+    const state = (await kv.get('state', 'json')) || {}
+    return json({ lastCheck: state.lastCheck, today: state.today })
   }
   if (route === 'unregister') {
     const subs = (await kv.get('subs', 'json')) || []
@@ -266,100 +272,128 @@ async function routeFor(callsign, lat, lon) {
   }
 }
 
+// Kept small on purpose: Cloudflare's free plan allows very little processing
+// time per run, so each check uses small, targeted lookups (never the giant
+// "everything within 250 nm" or "all military worldwide" lists) and the rare-
+// plane types are spread across runs. Every run records what happened in
+// state.lastCheck so the app can show it.
+const MIL_HEX = (hex) => {
+  const n = parseInt(hex, 16)
+  return (n >= 0xadf7c8 && n <= 0xafffff) || (n >= 0x43c000 && n <= 0x43cfff)
+}
+const MIL_CALLSIGN = /^(RCH|SPAR|SAM|CNV|PAT|EVAC|NAVY|ARMY|COAST|CFC|RRR|ASCOT|GAF|CTM|IAM|NATO|MMF|PEARL|TOPCAT|VV)\d*/
+
 export async function runChecks(env) {
   const kv = env.SKYWATCH
   const [config, subs] = await Promise.all([kv.get('config', 'json'), kv.get('subs', 'json')])
-  if (!config) return
-  const before = (await kv.get('state', 'json')) || {}
-  const state = { planes: { ...(before.planes || {}) }, emerg: { ...(before.emerg || {}) }, rare: { ...(before.rare || {}) }, milSeen: { ...(before.milSeen || {}) }, milLog: [...(before.milLog || [])] }
   const now = Date.now()
+  const before = (await kv.get('state', 'json')) || {}
+  const state = {
+    ...before,
+    planes: { ...(before.planes || {}) },
+    emerg: { ...(before.emerg || {}) },
+    rare: { ...(before.rare || {}) },
+    milSeen: { ...(before.milSeen || {}) },
+    milLog: [...(before.milLog || [])],
+  }
+  const check = { at: now, steps: [], errors: [], alerts: 0, sent: 0, pushErrors: [] }
+  const step = async (name, fn) => {
+    try {
+      await fn()
+      check.steps.push(name)
+    } catch (err) {
+      check.errors.push(`${name}: ${String(err && err.message ? err.message : err).slice(0, 120)}`)
+    }
+  }
+  if (!config) {
+    check.errors.push('No settings from the app yet: turn notifications on in SkyWatch.')
+    state.lastCheck = check
+    state.lastRun = now
+    await kv.put('state', JSON.stringify(state))
+    return
+  }
   const notes = []
   const home = config.home
 
   // 1. Team planes: detect takeoffs and landings.
-  for (const { ident, team } of (config.teams || []).slice(0, 10)) {
-    try {
-      const isCs = /^[A-Z]{3}\d/.test(ident)
-      const data = await getJson(isCs ? `/v2/callsign/${ident}` : `/v2/reg/${ident}`)
-      const a = (data.ac || []).find((x) => typeof x.lat === 'number')
-      const prev = state.planes[ident] || {}
-      const st = !a ? 'offline' : a.alt_baro === 'ground' ? 'ground' : 'airborne'
-      const p = { ...prev, state: st, checkedAt: now }
-      if (a) {
-        p.lastSeenAt = now
-        p.hex = a.hex
-        p.callsign = (a.flight || '').trim() || p.callsign
-        p.lat = a.lat
-        p.lon = a.lon
+  if ((config.teams || []).length)
+    await step('teams', async () => {
+      for (const { ident, team } of config.teams.slice(0, 10)) {
+        const isCs = /^[A-Z]{3}\d/.test(ident)
+        const data = await getJson(isCs ? `/v2/callsign/${ident}` : `/v2/reg/${ident}`)
+        const a = (data.ac || []).find((x) => typeof x.lat === 'number')
+        const prev = state.planes[ident] || {}
+        const st = !a ? 'offline' : a.alt_baro === 'ground' ? 'ground' : 'airborne'
+        const p = { ...prev, state: st, checkedAt: now }
+        if (a) Object.assign(p, { lastSeenAt: now, hex: a.hex, callsign: (a.flight || '').trim() || p.callsign, lat: a.lat, lon: a.lon })
+        if (st === 'airborne' && prev.state && prev.state !== 'airborne') {
+          p.lastTakeoff = now
+          const r = p.callsign ? await routeFor(p.callsign, a.lat, a.lon) : {}
+          p.lastFrom = r.from || p.lastFrom
+          p.lastTo = r.to || p.lastTo
+          if (config.notify?.teams)
+            notes.push({ title: `🛫 ${team}: took off`, body: `${ident}${p.callsign && p.callsign !== ident ? ` (${p.callsign})` : ''}${r.from ? ` from ${r.from}` : ''}${r.to ? ` to ${r.to}` : ''}`, url: `${APP_URL}?plane=${a.hex}`, tag: `team-${ident}` })
+        }
+        if (st === 'ground' && prev.state === 'airborne') {
+          p.lastLanding = now
+          if (config.notify?.teams) notes.push({ title: `🛬 ${team}: landed`, body: `${ident}${p.lastTo ? ` at ${p.lastTo}` : ''}`, url: `${APP_URL}?plane=${a.hex}`, tag: `team-${ident}` })
+        }
+        state.planes[ident] = p
       }
-      if (st === 'airborne' && prev.state && prev.state !== 'airborne') {
-        p.lastTakeoff = now
-        const r = p.callsign ? await routeFor(p.callsign, a.lat, a.lon) : {}
-        p.lastFrom = r.from || p.lastFrom
-        p.lastTo = r.to || p.lastTo
-        if (config.notify?.teams)
-          notes.push({ title: `🛫 ${team}: took off`, body: `${ident}${p.callsign && p.callsign !== ident ? ` (${p.callsign})` : ''}${r.from ? ` from ${r.from}` : ''}${r.to ? ` to ${r.to}` : ''}`, url: `${APP_URL}?plane=${a.hex}`, tag: `team-${ident}` })
-      }
-      if (st === 'ground' && prev.state === 'airborne') {
-        p.lastLanding = now
-        if (config.notify?.teams) notes.push({ title: `🛬 ${team}: landed`, body: `${ident}${p.lastTo ? ` at ${p.lastTo}` : ''}`, url: `${APP_URL}?plane=${a.hex}`, tag: `team-${ident}` })
-      }
-      state.planes[ident] = p
-    } catch {
-      // try again next run
-    }
-  }
+    })
 
-  // 2. Emergencies near home.
-  if (config.notify?.emergencies && home) {
-    try {
+  // 2. Emergencies near home: the three worldwide emergency-squawk lists are tiny.
+  if (config.notify?.emergencies && home)
+    await step('emergencies', async () => {
       const r = Math.min(250, config.radius || 100)
-      const data = await getJson(`/v2/lat/${home.lat.toFixed(3)}/lon/${home.lon.toFixed(3)}/dist/${r}`)
-      for (const a of data.ac || []) {
-        const code = a.emergency && a.emergency !== 'none' ? a.emergency : ['7500', '7600', '7700'].includes(a.squawk) ? a.squawk : null
-        if (!code || a.alt_baro === 'ground' || typeof a.lat !== 'number') continue
-        const key = `${a.hex}-${code}`
-        if (state.emerg[key] && now - state.emerg[key] < 6 * 3600e3) continue
-        state.emerg[key] = now
-        const d = Math.round(distNm(home.lat, home.lon, a.lat, a.lon))
-        notes.push({ title: `⚠️ ${EMERGENCY_LABEL[code] || 'Emergency'}`, body: `${(a.flight || a.r || a.hex).trim()}${a.t ? ` (${a.t})` : ''} is ${d} nm from ${home.label || 'home'}`, url: `${APP_URL}?plane=${a.hex}`, tag: key })
+      for (const sq of ['7700', '7600', '7500']) {
+        const data = await getJson(`/v2/sqk/${sq}`)
+        for (const a of data.ac || []) {
+          if (a.alt_baro === 'ground' || typeof a.lat !== 'number') continue
+          const d = distNm(home.lat, home.lon, a.lat, a.lon)
+          if (d > r) continue
+          const key = `${a.hex}-${sq}`
+          if (state.emerg[key] && now - state.emerg[key] < 6 * 3600e3) continue
+          state.emerg[key] = now
+          notes.push({ title: `⚠️ ${EMERGENCY_LABEL[sq]}`, body: `${(a.flight || a.r || a.hex).trim()}${a.t ? ` (${a.t})` : ''} is ${Math.round(d * 1.15)} mi from ${home.label || 'home'}`, url: `${APP_URL}?plane=${a.hex}`, tag: key })
+        }
       }
-    } catch {
-      /* next run */
-    }
-  }
+    })
 
-  // 3. Rare planes anywhere in the world.
-  if (config.notify?.rare) {
-    for (const t of (config.rareTypes || []).slice(0, 20)) {
-      try {
+  // 3. Rare planes anywhere: a few types per run, taking turns.
+  if (config.notify?.rare && (config.rareTypes || []).length)
+    await step('rare', async () => {
+      const types = config.rareTypes
+      const per = 8
+      const start = (state.rareOffset || 0) % types.length
+      const batch = [...types, ...types].slice(start, start + Math.min(per, types.length))
+      state.rareOffset = (start + per) % types.length
+      for (const t of batch) {
         const data = await getJson(`/v2/type/${t.code}`)
         for (const a of data.ac || []) {
           if (a.alt_baro === 'ground' || typeof a.lat !== 'number') continue
           if (state.rare[a.hex] && now - state.rare[a.hex] < 12 * 3600e3) continue
           state.rare[a.hex] = now
-          const where = home ? ` · ${Math.round(distNm(home.lat, home.lon, a.lat, a.lon)).toLocaleString()} nm away` : ''
+          const where = home ? ` · ${Math.round(distNm(home.lat, home.lon, a.lat, a.lon) * 1.15).toLocaleString()} mi away` : ''
           notes.push({ title: `✨ Rare plane in the air`, body: `${t.name}${a.flight ? ` (${a.flight.trim()})` : ''}${where}`, url: `${APP_URL}?plane=${a.hex}`, tag: `rare-${a.hex}` })
         }
-      } catch {
-        /* next run */
       }
-    }
-  }
+    })
 
-  // 4. Military aircraft arriving at / landing at watched airports.
-  const watched = (config.milAirports || []).slice(0, 25)
-  if (watched.length) {
-    try {
-      const data = await getJson('/v2/mil')
-      for (const a of data.ac || []) {
-        if (typeof a.lat !== 'number' || typeof a.lon !== 'number') continue
-        const onGround = a.alt_baro === 'ground'
-        const alt = typeof a.alt_baro === 'number' ? a.alt_baro : null
-        const vr = a.baro_rate ?? a.geom_rate ?? 0
-        for (const ap of watched) {
+  // 4. Military arrivals at watched airports: a small 40 nm lookup per airport.
+  const watched = (config.milAirports || []).slice(0, 8)
+  if (watched.length)
+    await step('military', async () => {
+      for (const ap of watched) {
+        const data = await getJson(`/v2/lat/${ap.lat.toFixed(3)}/lon/${ap.lon.toFixed(3)}/dist/40`)
+        for (const a of data.ac || []) {
+          const cs = (a.flight || '').trim()
+          const mil = (a.dbFlags & 1) === 1 || MIL_HEX(a.hex) || MIL_CALLSIGN.test(cs)
+          if (!mil || typeof a.lat !== 'number') continue
+          const onGround = a.alt_baro === 'ground'
+          const alt = typeof a.alt_baro === 'number' ? a.alt_baro : null
+          const vr = a.baro_rate ?? a.geom_rate ?? 0
           const d = distNm(a.lat, a.lon, ap.lat, ap.lon)
-          if (d > 40) continue
           const agl = onGround ? 0 : (alt ?? 99999) - (ap.elevation || 0)
           let status = null
           if (d <= 4 && (onGround || agl < 400)) status = 'landed'
@@ -368,40 +402,47 @@ export async function runChecks(env) {
           const key = `${a.hex}-${ap.code}-${status}`
           if (state.milSeen[key] && now - state.milSeen[key] < 3 * 3600e3) continue
           state.milSeen[key] = now
-          const callsign = (a.flight || a.r || a.hex).trim()
+          const callsign = cs || (a.r || a.hex).trim()
           state.milLog.unshift({ id: `${key}-${now}`, hex: a.hex, callsign, model: a.t, airport: ap.code, status, at: now, distanceNm: d, altitude: alt })
           if (config.notify?.mil)
             notes.push({
               title: status === 'landed' ? `🎖️🛬 Military landed at ${ap.code}` : `🎖️ Military arriving at ${ap.code}`,
-              body: `${callsign}${a.t ? ` (${a.t})` : ''}${status === 'arriving' ? ` · ${Math.round(d * 1.15)} mi out, ${alt != null ? `${alt.toLocaleString()} ft` : 'descending'}` : ''}`,
+              body: `${callsign}${a.t ? ` (${a.t})` : ''}${status === 'arriving' ? ` · ${Math.round(d * 1.15)} mi out${alt != null ? `, ${alt.toLocaleString()} ft` : ''}` : ''}`,
               url: `${APP_URL}?plane=${a.hex}`,
               tag: key,
             })
         }
       }
       state.milLog = state.milLog.filter((e) => now - e.at < 7 * 86400e3).slice(0, 100)
-    } catch {
-      /* next run */
-    }
-  }
+    })
 
   // forget old de-duplication entries
   for (const m of [state.emerg, state.rare, state.milSeen]) for (const k of Object.keys(m)) if (now - m[k] > 24 * 3600e3) delete m[k]
-  state.lastRun = now
-  await kv.put('state', JSON.stringify(state))
 
+  check.alerts = notes.length
   if (notes.length && subs?.length) {
     // never flood the phone: send the first few, then a summary
     const send = notes.length > 4 ? [...notes.slice(0, 3), { title: 'SkyWatch', body: `${notes.length - 3} more alerts. Open SkyWatch to see them.`, url: APP_URL, tag: 'more' }] : notes
-    await notifyAll(kv, send)
-  }
+    const r = await notifyAll(kv, send)
+    check.sent = r.sent
+    check.pushErrors = r.errors
+  } else if (notes.length) check.errors.push('Alerts found but no phone is linked: turn notifications on in SkyWatch.')
+  const day = new Date(now).toDateString()
+  state.today = state.today?.day === day ? state.today : { day, alerts: 0, sent: 0, runs: 0 }
+  state.today.alerts += check.alerts
+  state.today.sent += check.sent
+  state.today.runs += 1
+  state.lastCheck = check
+  state.lastRun = now
+  await kv.put('state', JSON.stringify(state))
 }
 
 async function notifyAll(kv, notes) {
   const subs = (await kv.get('subs', 'json')) || []
-  if (!subs.length) return 0
+  if (!subs.length) return { sent: 0, errors: ['no linked phone'] }
   const vapid = await getVapid(kv)
   const dead = new Set()
+  const errors = []
   let sent = 0
   for (const sub of subs)
     for (const n of notes) {
@@ -409,12 +450,13 @@ async function notifyAll(kv, notes) {
         const res = await sendPush(sub, JSON.stringify(n), vapid)
         if (res.status === 404 || res.status === 410) dead.add(sub.endpoint)
         else if (res.ok) sent++
-      } catch {
-        /* skip */
+        else errors.push(`${new URL(sub.endpoint).host} ${res.status} ${(await res.text()).slice(0, 80)}`)
+      } catch (err) {
+        errors.push(String(err).slice(0, 80))
       }
     }
   if (dead.size) await kv.put('subs', JSON.stringify(subs.filter((s) => !dead.has(s.endpoint))))
-  return sent
+  return { sent, errors: errors.slice(0, 5) }
 }
 
 // ---------------------------------------------------------------------------
@@ -472,7 +514,7 @@ export async function encryptPayload(sub, payload) {
 
 export async function vapidAuth(endpoint, vapid) {
   const head = b64u(enc.encode(JSON.stringify({ typ: 'JWT', alg: 'ES256' })))
-  const claims = b64u(enc.encode(JSON.stringify({ aud: new URL(endpoint).origin, exp: Math.floor(Date.now() / 1000) + 12 * 3600, sub: APP_URL })))
+  const claims = b64u(enc.encode(JSON.stringify({ aud: new URL(endpoint).origin, exp: Math.floor(Date.now() / 1000) + 12 * 3600, sub: new URL(APP_URL).origin })))
   const key = await crypto.subtle.importKey('jwk', vapid.privateJwk, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign'])
   const sig = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, key, enc.encode(`${head}.${claims}`))
   return `vapid t=${head}.${claims}.${b64u(sig)}, k=${vapid.publicKey}`

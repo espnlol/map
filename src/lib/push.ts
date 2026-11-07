@@ -90,7 +90,7 @@ export function linkWithCode(code: string) {
 export async function sendTestPush() {
   const { token } = pushStore.get()
   if (!token) throw new Error('Not linked yet')
-  return (await post('test', { token })) as { sent: number }
+  return (await post('test', { token })) as { sent: number; errors?: string[] }
 }
 
 /** Send the relay what to watch: your team planes, home area and which alerts you want. */
@@ -125,13 +125,36 @@ interface RelayPlane {
 }
 
 /** Pull what the relay saw while the app was closed (exact team takeoff/landing times). */
-export async function pullRelayState(): Promise<{ lastRun?: number; devices?: number } | null> {
+export interface RelayCheck {
+  at: number
+  steps: string[]
+  errors: string[]
+  alerts: number
+  sent: number
+  pushErrors: string[]
+}
+
+export interface RelayStatus {
+  lastRun?: number
+  devices?: number
+  lastCheck?: RelayCheck
+  today?: { day: string; alerts: number; sent: number; runs: number }
+}
+
+/** Ask the relay to run its background check right now and report back. */
+export async function runCheckNow(): Promise<RelayStatus> {
+  const { token } = pushStore.get()
+  if (!token) throw new Error('Turn notifications on first.')
+  return (await post('run', { token })) as RelayStatus
+}
+
+export async function pullRelayState(): Promise<RelayStatus | null> {
   const { token } = pushStore.get()
   if (!token || !relay()) return null
   try {
     const res = await fetch(`${relay()}/push/state?token=${encodeURIComponent(token)}`)
     if (!res.ok) return null
-    const st = (await res.json()) as { planes?: Record<string, RelayPlane>; lastRun?: number; devices?: number; milLog?: MilArrival[] }
+    const st = (await res.json()) as RelayStatus & { planes?: Record<string, RelayPlane>; milLog?: MilArrival[] }
     mergeRelayArrivals(st.milLog)
     teamHistory.set((all) => {
       const next = { ...all }
@@ -147,7 +170,7 @@ export async function pullRelayState(): Promise<{ lastRun?: number; devices?: nu
       }
       return next
     })
-    return { lastRun: st.lastRun, devices: st.devices }
+    return { lastRun: st.lastRun, devices: st.devices, lastCheck: st.lastCheck, today: st.today }
   } catch {
     return null
   }

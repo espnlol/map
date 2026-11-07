@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { settings, type Settings } from '../lib/settings'
-import { disablePush, enablePush, linkWithCode, pullRelayState, pushStore, pushSupport, sendTestPush, syncPushConfig } from '../lib/push'
+import { disablePush, enablePush, linkWithCode, pullRelayState, pushStore, pushSupport, runCheckNow, sendTestPush, syncPushConfig, type RelayStatus } from '../lib/push'
 import { fmtClock, fmtRelative } from '../lib/format'
 import { account } from '../lib/account'
 import { fmtDistRound } from '../lib/format'
@@ -22,7 +22,7 @@ export default function NotifySection({ center }: { center: { lat: number; lon: 
   const support = pushSupport()
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
-  const [relay, setRelay] = useState<{ lastRun?: number; devices?: number } | null>(null)
+  const [relay, setRelay] = useState<RelayStatus | null>(null)
   const [code, setCode] = useState('')
 
   useEffect(() => {
@@ -50,10 +50,7 @@ export default function NotifySection({ center }: { center: { lat: number; lon: 
       </p>
 
       {push.enabled ? (
-        <div className="mb-2 rounded-lg bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">
-          On for this device.{' '}
-          {relay?.lastRun ? `Last background check ${fmtRelative(relay.lastRun)} (${fmtClock(relay.lastRun)}).` : 'Waiting for the first background check.'}
-        </div>
+        <RelayStatusBox relay={relay} />
       ) : !support.ok ? (
         <div className="mb-2 rounded-lg bg-amber-400/10 px-3 py-2 text-xs text-amber-200">{support.reason}</div>
       ) : null}
@@ -102,8 +99,32 @@ export default function NotifySection({ center }: { center: { lat: number; lon: 
           </button>
         ) : (
           <>
-            <button disabled={busy} onClick={() => run(async () => { await syncPushConfig(); const r = await sendTestPush(); if (!r.sent) throw new Error('The relay could not reach this device.') }, 'Test sent. It should arrive in a few seconds.')} className="flex-1 rounded-md bg-sky-500 py-2 text-sm font-semibold text-slate-950">
+            <button
+              disabled={busy}
+              onClick={() =>
+                run(async () => {
+                  await syncPushConfig()
+                  const r = await sendTestPush()
+                  if (!r.sent) throw new Error(`The relay couldn't reach this phone${r.errors?.length ? `: ${r.errors[0]}` : ''}. Try "Turn off", then turn notifications on again.`)
+                }, 'Test sent. It should arrive in a few seconds.')
+              }
+              className="flex-1 rounded-md bg-sky-500 py-2 text-sm font-semibold text-slate-950"
+            >
               Send a test
+            </button>
+            <button
+              disabled={busy}
+              onClick={() =>
+                run(async () => {
+                  await syncPushConfig()
+                  const r = await runCheckNow()
+                  setRelay((x) => ({ ...x, ...r, lastRun: r.lastCheck?.at }))
+                  if (r.lastCheck?.errors.length) throw new Error(`Check ran with problems: ${r.lastCheck.errors.join('; ')}`)
+                }, 'Check finished. Results are shown above.')
+              }
+              className="rounded-md px-3 py-2 text-sm text-sky-300 ring-1 ring-slate-700"
+            >
+              Run a check
             </button>
             <button disabled={busy} onClick={() => run(disablePush, 'Notifications are off for this device.')} className="rounded-md px-3 py-2 text-sm text-slate-400 ring-1 ring-slate-700">
               Turn off
@@ -143,5 +164,39 @@ export default function NotifySection({ center }: { center: { lat: number; lon: 
         )}
       </details>
     </section>
+  )
+}
+
+function RelayStatusBox({ relay }: { relay: RelayStatus | null }) {
+  const c = relay?.lastCheck
+  const stale = relay?.lastRun ? Date.now() - relay.lastRun > 20 * 60 * 1000 : true
+  const bad = !c || stale || c.errors.length > 0 || c.pushErrors.length > 0
+  return (
+    <div className={`mb-2 space-y-0.5 rounded-lg px-3 py-2 text-xs ${bad ? 'bg-amber-400/10 text-amber-100' : 'bg-emerald-500/10 text-emerald-300'}`}>
+      <div>On for this device{relay?.devices != null ? ` · ${relay.devices} phone${relay.devices === 1 ? '' : 's'} linked` : ''}.</div>
+      {!relay?.lastRun ? (
+        <div>No background check has run yet. Make sure the relay has its 5-minute cron trigger, then tap "Run a check".</div>
+      ) : (
+        <div>
+          Last background check {fmtRelative(relay.lastRun)} ({fmtClock(relay.lastRun)}){c ? `: looked at ${c.steps.join(', ') || 'nothing'}` : ''}.
+          {stale && ' That was a while ago: check the relay\'s cron trigger.'}
+        </div>
+      )}
+      {relay?.today && (
+        <div>
+          Today: {relay.today.runs} checks, {relay.today.alerts} alerts found, {relay.today.sent} sent to your phone.
+        </div>
+      )}
+      {c?.errors.map((e) => (
+        <div key={e} className="text-red-300">
+          ⚠ {e}
+        </div>
+      ))}
+      {c?.pushErrors.map((e) => (
+        <div key={e} className="text-red-300">
+          ⚠ Couldn't deliver: {e}
+        </div>
+      ))}
+    </div>
   )
 }
