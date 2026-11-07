@@ -83,3 +83,9 @@ export function nearestAirport(lat: number, lon: number, airports: AirportInfo[]
   }
   return best ? { ap: best, d: bd } : null
 }
+
+/** LiveATC.net's page of air traffic control audio feeds for an airport (by its 4-letter ICAO code). */
+export function liveAtcUrl(icao?: string, iata?: string): string | null {
+  const code = icao && /^[A-Z0-9]{4}$/.test(icao.toUpperCase()) ? icao.toUpperCase() : iata?.toUpperCase()
+  return code ? `https://www.liveatc.net/search/?icao=${encodeURIComponent(code)}` : null
+}

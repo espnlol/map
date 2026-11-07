@@ -3,7 +3,7 @@ import L from 'leaflet'
 import type { Aircraft, Center } from '../types'
 import { categoryInfo } from '../lib/categories'
 import type { FlightPath } from '../lib/history'
-import { busyness, loadAirports, type AirportInfo } from '../lib/airports'
+import { busyness, liveAtcUrl, loadAirports, type AirportInfo } from '../lib/airports'
 import { settings, type BaseMap } from '../lib/settings'
 import type { Hotspot } from '../lib/happening'
 import type { MilitaryPattern } from '../lib/patterns'
@@ -490,5 +490,6 @@ function airportPopup(ap: AirportInfo, b: ReturnType<typeof busyness>) {
     <div style="margin-top:6px"><b>Right now:</b> ${b.onGround} on the ground, ${b.arriving} arriving, ${b.departing} departing</div>
     ${runways ? `<div style="margin-top:6px"><b>Runways</b><br/>${runways}</div>` : ''}
     <button data-track="${ap.lat},${ap.lon}" style="margin-top:8px;width:100%;padding:6px;border-radius:6px;background:#0ea5e9;color:#020617;font-weight:600">Track planes here</button>
+    ${liveAtcUrl(ap.ident, ap.iata) ? `<a href="${liveAtcUrl(ap.ident, ap.iata)}" target="_blank" rel="noreferrer" style="display:block;margin-top:6px;text-align:center;padding:6px;border-radius:6px;border:1px solid #334155;color:#7dd3fc;font-weight:600;text-decoration:none">🎧 Listen to ATC (LiveATC)</a>` : ''}
   </div>`
 }

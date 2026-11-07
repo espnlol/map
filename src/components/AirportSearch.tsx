@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import type { Aircraft } from '../types'
-import { busyness, type AirportInfo } from '../lib/airports'
+import { busyness, liveAtcUrl, type AirportInfo } from '../lib/airports'
 import { distanceNm } from '../lib/geo'
 import { fmtDist } from '../lib/format'
 
@@ -44,8 +44,8 @@ export default function AirportSearch({ query, airports, aircraft, from, onOpen 
           const b = busyness(a, aircraft)
           const d = distanceNm(from.lat, from.lon, a.lat, a.lon)
           return (
-            <li key={a.ident}>
-              <button onClick={() => onOpen(a)} className="flex w-full items-center gap-3 rounded-lg bg-slate-800/60 px-3 py-2 text-left hover:bg-slate-800">
+            <li key={a.ident} className="flex items-stretch gap-1">
+              <button onClick={() => onOpen(a)} className="flex min-w-0 flex-1 items-center gap-3 rounded-lg bg-slate-800/60 px-3 py-2 text-left hover:bg-slate-800">
                 <span className="flex h-9 w-12 shrink-0 flex-col items-center justify-center rounded bg-sky-500/15 font-mono leading-tight text-sky-200">
                   <span className="text-sm font-bold">{code}</span>
                   {a.iata && <span className="text-[9px] text-sky-300/70">{a.ident}</span>}
@@ -64,6 +64,17 @@ export default function AirportSearch({ query, airports, aircraft, from, onOpen 
                   </span>
                 )}
               </button>
+              {liveAtcUrl(a.ident, a.iata) && (
+                <a
+                  href={liveAtcUrl(a.ident, a.iata)!}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={`Listen to ${code} air traffic control on LiveATC`}
+                  className="flex w-11 shrink-0 flex-col items-center justify-center rounded-lg bg-slate-800/60 text-lg hover:bg-slate-800"
+                >
+                  🎧<span className="text-[9px] text-sky-300">ATC</span>
+                </a>
+              )}
             </li>
           )
         })}

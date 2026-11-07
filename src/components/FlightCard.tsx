@@ -5,6 +5,7 @@ import { fmtOffset, fmtTemp, placeInfo, weatherLabel, type PlaceInfo } from '../
 import { settings } from '../lib/settings'
 import { fmtClock } from '../lib/format'
 import { fmtDist } from '../lib/format'
+import { liveAtcUrl } from '../lib/airports'
 
 function usePlace(ap?: Airport) {
   const [p, setP] = useState<PlaceInfo | null>(null)
@@ -45,6 +46,11 @@ function End({ ap, place, align }: { ap?: Airport; place: PlaceInfo | null; alig
         <div className="text-[11px] text-slate-400">
           {w.icon} {fmtTemp(place.tempC)} {w.text}
         </div>
+      )}
+      {liveAtcUrl(ap?.icao, ap?.iata) && (
+        <a href={liveAtcUrl(ap?.icao, ap?.iata)!} target="_blank" rel="noreferrer" className="mt-0.5 inline-block text-[11px] font-semibold text-sky-300">
+          🎧 Listen to ATC
+        </a>
       )}
     </div>
   )

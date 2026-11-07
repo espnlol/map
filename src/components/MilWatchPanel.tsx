@@ -3,6 +3,7 @@ import type { Aircraft } from '../types'
 import type { AirportInfo } from '../lib/airports'
 import { milArrivals, milWatch, nearWatched, scanMilitary, type MilArrival } from '../lib/milwatch'
 import { settingsChangedAt } from '../lib/settings'
+import { liveAtcUrl } from '../lib/airports'
 import { fmtAlt, fmtClock, fmtDist, fmtRelative } from '../lib/format'
 
 interface Props {
@@ -55,6 +56,15 @@ export default function MilWatchPanel({ airports, aircraft, onOpen, onOpenArriva
           {w.airports.map((a) => (
             <span key={a.code} className="flex items-center gap-1.5 rounded-full bg-lime-400/15 py-1 pl-2.5 pr-1 text-xs text-lime-200 ring-1 ring-lime-400/30">
               <b>{a.code}</b> {a.name}
+              {(() => {
+                const ap = airports.find((x) => x.iata === a.code || x.ident === a.code)
+                const url = liveAtcUrl(ap?.ident, a.code)
+                return url ? (
+                  <a href={url} target="_blank" rel="noreferrer" title={`Listen to ${a.code} ATC on LiveATC`} className="px-0.5">
+                    🎧
+                  </a>
+                ) : null
+              })()}
               <button onClick={() => remove(a.code)} className="rounded-full px-1.5 text-lime-200/70 hover:text-red-300" aria-label={`Stop watching ${a.code}`}>
                 ✕
               </button>
