@@ -288,6 +288,12 @@ export default function MapView({ aircraft, selected, onSelect, center, radiusNm
         const fit = () => {
           if (fittedFor.current === sel.hex) return
           fittedFor.current = sel.hex
+          if (!settings.get().tripZoom) {
+            // trip zoom off: keep the view, just bring the plane on-screen if it isn't
+            const visible = m.getBounds()
+            if (!visible.contains([sel.lat, sel.lon])) m.panTo([sel.lat, sel.lon])
+            return
+          }
           const b = L.latLngBounds([[sel.lat, sel.lon]])
           for (const [la, lo] of pts) b.extend([la, lo])
           const o = sel.route?.origin
@@ -298,6 +304,7 @@ export default function MapView({ aircraft, selected, onSelect, center, radiusNm
         }
         clearTimeout(fitTimer.current)
         if (path && pts.length > 1) fit()
+        else if (!settings.get().tripZoom) fit()
         else fitTimer.current = setTimeout(fit, 2500) // no flight history (yet): frame what we know
       }
       const d = sel.route?.destination
@@ -449,6 +456,7 @@ export default function MapView({ aircraft, selected, onSelect, center, radiusNm
   return (
     <div className="relative h-full w-full">
       <div ref={el} className="h-full w-full" />
+      <TripZoomButton />
       {highlight && (
         <button
           onClick={onClearHighlight}
@@ -510,4 +518,32 @@ function airportPopup(ap: AirportInfo, b: ReturnType<typeof busyness>) {
     <button data-track="${ap.lat},${ap.lon}" style="margin-top:8px;width:100%;padding:6px;border-radius:6px;background:#0ea5e9;color:#020617;font-weight:600">Track planes here</button>
     ${liveAtcUrl(ap.ident, ap.iata) ? `<a href="${liveAtcUrl(ap.ident, ap.iata)}" target="_blank" rel="noreferrer" style="display:block;margin-top:6px;text-align:center;padding:6px;border-radius:6px;border:1px solid #334155;color:#7dd3fc;font-weight:600;text-decoration:none">🎧 Listen to ATC (LiveATC)</a>` : ''}
   </div>`
+}
+
+/** A small, out-of-the-way switch under the map's zoom and layer buttons. */
+function TripZoomButton() {
+  const on = settings.use().tripZoom
+  const [flash, setFlash] = useState(false)
+  useEffect(() => {
+    if (!flash) return
+    const t = setTimeout(() => setFlash(false), 1400)
+    return () => clearTimeout(t)
+  }, [flash])
+  return (
+    <div className="absolute left-[10px] top-[142px] z-[500] flex items-center gap-1.5">
+      <button
+        onClick={() => {
+          settings.update({ tripZoom: !on })
+          setFlash(true)
+        }}
+        aria-pressed={on}
+        aria-label={on ? 'Trip zoom on: opening a plane zooms out to its whole trip' : 'Trip zoom off: opening a plane keeps the map where it is'}
+        title={on ? 'Trip zoom: on' : 'Trip zoom: off'}
+        className={`flex h-[30px] w-[30px] items-center justify-center rounded-[4px] border-2 border-black/20 bg-clip-padding text-sm shadow-sm ${on ? 'bg-white' : 'bg-white/60 grayscale'}`}
+      >
+        🔭
+      </button>
+      {flash && <span className="rounded bg-slate-900/90 px-1.5 py-0.5 text-[10px] text-slate-200 ring-1 ring-slate-700">Trip zoom {on ? 'on' : 'off'}</span>}
+    </div>
+  )
 }

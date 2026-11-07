@@ -103,6 +103,7 @@ export default function SettingsPanel({ onClose, center }: { onClose: () => void
             <Toggle k="airports" label="Airports and runways" />
             <Toggle k="labels" label="Callsign labels on planes" hint="Shown when zoomed in" />
             <Toggle k="rangeRing" label="Circle around your search area" />
+            <Toggle k="tripZoom" label="Zoom out to the whole trip" hint="When you open a plane. Off: the map stays put (also the 🔭 button on the map)" />
             <Toggle k="followSelected" label="Follow the selected plane" hint="Keeps it in the middle of the map" />
             <Toggle k="groundVehicles" label="Show airport ground vehicles" />
           </Section>

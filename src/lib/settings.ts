@@ -10,6 +10,7 @@ export interface Settings {
   labels: boolean
   rangeRing: boolean
   followSelected: boolean
+  tripZoom: boolean
   groundVehicles: boolean
   // units & time
   altUnit: 'ft' | 'm'
@@ -48,6 +49,7 @@ export const DEFAULT_SETTINGS: Settings = {
   labels: false,
   rangeRing: true,
   followSelected: false,
+  tripZoom: true,
   groundVehicles: true,
   altUnit: 'ft',
   speedUnit: 'kt',
