@@ -19,18 +19,33 @@ const UPSTREAMS = {
   hexdb: 'https://hexdb.io',
   airportdata: 'https://www.airport-data.com',
   faa: 'https://nasstatus.faa.gov',
+  tfr: 'https://tfr.faa.gov',
 }
 
 // Websites allowed to use this relay.
 const ALLOWED_ORIGINS = [/^https:\/\/espnlol\.github\.io$/, /^http:\/\/localhost(:\d+)?$/]
 
 // How long (seconds) to reuse an answer.
-const CACHE_SECONDS = { adsblol: 2, airplaneslive: 2, adsblolglobe: 30, airplanesliveglobe: 30, planespotters: 86400, hexdb: 86400, airportdata: 86400, faa: 120 }
+const CACHE_SECONDS = { adsblol: 2, airplaneslive: 2, adsblolglobe: 30, airplanesliveglobe: 30, planespotters: 86400, hexdb: 86400, airportdata: 86400, faa: 120, tfr: 900 }
 // Worldwide lookups (rare types, a tail number) change slowly; share them for a minute.
+// Lockdown: each service may only be asked for the things SkyWatch uses, so the
+// relay can't be used as a general-purpose proxy.
+const ALLOWED_PATHS = {
+  adsblol: /^\/(v2\/[a-z]+(\/[A-Za-z0-9.~_-]+)*\/?|api\/0\/routeset)$/,
+  airplaneslive: /^\/v2\/[a-z]+(\/[A-Za-z0-9.~_-]+)*\/?$/,
+  adsblolglobe: /^\/data\/traces\/[0-9a-f]{2}\/trace_(full|recent)_~?[0-9a-f]{6}\.json$/,
+  airplanesliveglobe: /^\/data\/traces\/[0-9a-f]{2}\/trace_(full|recent)_~?[0-9a-f]{6}\.json$/,
+  planespotters: /^\/pub\/photos\/(hex|reg)\/[A-Za-z0-9-]+$/,
+  hexdb: /^\/api\/v1\/aircraft\/[0-9a-fA-F]{6}$/,
+  airportdata: /^\/api\/ac_thumb\.json$/,
+  faa: /^\/api\/airport-status-information$/,
+  tfr: /^\/(geoserver\/TFR\/ows|tfrapi\/[A-Za-z]+)$/,
+}
+
 const SLOW_PATHS = /^\/v2\/(type|reg|callsign|hex|mil|sqk)\b/
 
 const APP_URL = 'https://espnlol.github.io/map/'
-const RELAY_VERSION = '2026-11-07c'
+const RELAY_VERSION = '2026-11-08'
 const UA = 'SkyWatch relay (personal flight tracker)'
 
 export default {
@@ -60,6 +75,7 @@ export default {
     const [, name, ...rest] = url.pathname.split('/')
     const base = UPSTREAMS[name]
     if (!base) return new Response('Unknown service', { status: 404, headers: cors })
+    if (!ALLOWED_PATHS[name].test('/' + rest.join('/'))) return new Response('Not allowed', { status: 403, headers: cors })
     const path = '/' + rest.join('/')
     const target = `${base}${path}${url.search}`
     const ttl = SLOW_PATHS.test(path) ? 60 : CACHE_SECONDS[name] ?? 5
@@ -147,6 +163,12 @@ async function handlePush(request, url, env, cors) {
     return json(r)
   }
   if (route === 'run') {
+    const last = Number((await kv.get('lastManualRun')) || 0)
+    if (Date.now() - last < 60_000) {
+      const state = (await kv.get('state', 'json')) || {}
+      return json({ lastCheck: state.lastCheck, today: state.today, note: 'A check ran less than a minute ago; showing that one.' })
+    }
+    await kv.put('lastManualRun', String(Date.now()), { expirationTtl: 300 })
     await runChecks(env)
     const state = (await kv.get('state', 'json')) || {}
     return json({ lastCheck: state.lastCheck, today: state.today })
@@ -199,6 +221,12 @@ async function handleAccount(request, url, env, cors) {
     const user = await kv.get(key, 'json')
     if (route === 'signup') {
       if (user) return json({ error: 'That username is taken. Pick another, or sign in.' }, 409)
+      // Lockdown: this relay belongs to one person. Once a profile exists, new
+      // ones are refused (set the Worker variable ALLOW_SIGNUPS=1 to allow more).
+      if (env.ALLOW_SIGNUPS !== '1') {
+        const existing = await kv.list({ prefix: 'user:', limit: 1 })
+        if (existing.keys.length) return json({ error: 'This SkyWatch relay already has its owner profile. Sign in to it instead.' }, 403)
+      }
       const salt = randomToken()
       await kv.put(key, JSON.stringify({ name, salt, verifier: await sha256hex(salt + proof), created: Date.now() }))
     } else {
