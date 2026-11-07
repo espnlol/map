@@ -184,3 +184,10 @@ body {
   padding: 1px 6px;
   border-radius: 9999px;
 }
+
+/* Phone: the busiest-airports dropdown sits just under the top bar, inside the screen. */
+@media (max-width: 767px) {
+  .safe-dropdown {
+    top: calc(env(safe-area-inset-top, 0px) + 3.4rem);
+  }
+}

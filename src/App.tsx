@@ -19,6 +19,7 @@ import AlertsMenu from './components/AlertsMenu'
 import Toasts, { type Toast } from './components/Toasts'
 import WorldSearch from './components/WorldSearch'
 import AirportSearch from './components/AirportSearch'
+import BusiestMenu from './components/BusiestMenu'
 import { settings } from './lib/settings'
 import { rareStore, scanRare, unseenRare } from './lib/rare'
 import { describePlace, findHotspots, type Hotspot } from './lib/happening'
@@ -156,6 +157,7 @@ export default function App() {
   const [sheet, setSheet] = useState<SheetSize>('peek')
   const [sheetPx, setSheetPx] = useState(132)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [busiestOpen, setBusiestOpen] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
   useEffect(() => {
     if (selected && isMobile) setSheet((s) => (s === 'peek' ? 'half' : s))
@@ -594,6 +596,38 @@ export default function App() {
   )
 
   const iconBtn = 'rounded-md bg-slate-800 px-2.5 py-1.5 text-sm ring-1 ring-slate-700 hover:bg-slate-700'
+  const goToAirport = (a: AirportInfo) => {
+    const code = a.iata || a.ident
+    setQuery('')
+    setHighlight(null)
+    setSelected(null)
+    setCenter({ lat: a.lat, lon: a.lon, label: `${a.city || a.name} (${code})` })
+    setRadius((r) => Math.min(r, 50))
+    setFocusAirport(a.ident)
+    setTimeout(() => setFocusAirport(null), 6000)
+    if (isMobile) setSheet('peek')
+  }
+  const busiest = (
+    <div className="relative shrink-0">
+      <button onClick={() => setBusiestOpen((o) => !o)} className={`${iconBtn} px-2 md:px-2.5`} aria-label="Busiest airports" aria-expanded={busiestOpen}>
+        🔥<span className="hidden md:inline"> Busiest ▾</span>
+      </button>
+      {busiestOpen && (
+        <BusiestMenu
+          airports={airportList}
+          aircraft={traffic.aircraft}
+          center={center}
+          radiusNm={radius}
+          live={mode === 'live'}
+          onClose={() => setBusiestOpen(false)}
+          onPick={(a) => {
+            setBusiestOpen(false)
+            goToAirport(a)
+          }}
+        />
+      )}
+    </div>
+  )
   const bell = (
     <button onClick={() => setShowAlerts(true)} className={`${iconBtn} relative shrink-0 px-2 md:px-2.5`} aria-label={`Alerts (${alertCount})`}>
       🔔<span className="hidden md:inline"> Alerts</span>
@@ -683,7 +717,7 @@ export default function App() {
         </select>
         <select
           id="radius"
-          className="shrink-0 rounded-md bg-slate-800 px-1.5 py-1.5 text-xs ring-1 ring-slate-700 md:px-2 md:text-sm"
+          className="w-[74px] shrink-0 rounded-md bg-slate-800 px-1.5 py-1.5 text-xs ring-1 ring-slate-700 md:w-auto md:px-2 md:text-sm"
           value={radius}
           onChange={(e) => setRadius(Number(e.target.value))}
         >
@@ -693,7 +727,8 @@ export default function App() {
             </option>
           ))}
         </select>
-        <button onClick={useMyLocation} className={`${iconBtn} shrink-0 px-2 md:px-2.5`} aria-label="Near me">
+        {busiest}
+        <button onClick={useMyLocation} className={`${iconBtn} hidden shrink-0 px-2 md:block md:px-2.5`} aria-label="Near me">
           📍<span className="hidden md:inline"> Near me</span>
         </button>
         {isMobile && bell}
@@ -706,6 +741,9 @@ export default function App() {
               <>
                 <div className="fixed inset-0 z-[900]" onClick={() => setMenuOpen(false)} />
                 <div className="absolute right-0 top-full z-[901] mt-1 w-52 overflow-hidden rounded-lg bg-slate-800 text-sm shadow-xl ring-1 ring-slate-700">
+                  <button className="block w-full px-4 py-2.5 text-left hover:bg-slate-700" onClick={() => (setMenuOpen(false), useMyLocation())}>
+                    📍 Planes near me
+                  </button>
                   <button className="block w-full px-4 py-2.5 text-left hover:bg-slate-700" onClick={() => (setMenuOpen(false), setInsights('records'))}>
                     📊 Insights
                   </button>
