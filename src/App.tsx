@@ -18,6 +18,7 @@ import SettingsPanel from './components/SettingsPanel'
 import AlertsMenu from './components/AlertsMenu'
 import Toasts, { type Toast } from './components/Toasts'
 import WorldSearch from './components/WorldSearch'
+import AirportSearch from './components/AirportSearch'
 import { settings } from './lib/settings'
 import { rareStore, scanRare, unseenRare } from './lib/rare'
 import { describePlace, findHotspots, type Hotspot } from './lib/happening'
@@ -62,6 +63,7 @@ export default function App() {
   const [selected, setSelected] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>('flights')
   const [highlight, setHighlight] = useState<Highlight | null>(null)
+  const [focusAirport, setFocusAirport] = useState<string | null>(null)
   const [showSquawks, setShowSquawks] = useState(false)
   const [showPhone, setShowPhone] = useState(false)
   const cfg = settings.use()
@@ -524,6 +526,25 @@ export default function App() {
                 </div>
               </div>
             )}
+            {query.trim().length >= 3 && (
+              <AirportSearch
+                query={query}
+                airports={airportList}
+                aircraft={traffic.aircraft}
+                from={center}
+                onOpen={(a) => {
+                  const code = a.iata || a.ident
+                  setQuery('')
+                  setHighlight(null)
+                  setSelected(null)
+                  setCenter({ lat: a.lat, lon: a.lon, label: `${a.city || a.name} (${code})` })
+                  setRadius((r) => Math.min(r, 50))
+                  setFocusAirport(a.ident)
+                  setTimeout(() => setFocusAirport(null), 6000) // e.g. airports hidden on the map
+                  if (isMobile) setSheet('peek')
+                }}
+              />
+            )}
             {traffic.status === 'loading' ? (
               <p className="px-4 py-8 text-center text-sm text-slate-500">Loading aircraft…</p>
             ) : (
@@ -802,6 +823,8 @@ export default function App() {
             bottomInset={isMobile ? sheetPx : 0}
             hotspots={hotspots}
             military={military}
+            focusAirport={focusAirport}
+            onAirportFocused={() => setFocusAirport(null)}
           />
         </main>
 

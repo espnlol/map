@@ -58,6 +58,9 @@ interface Props {
   bottomInset: number
   hotspots: Hotspot[]
   military: MilitaryPattern[]
+  /** An airport (ident) to open the info card for, once its marker is on the map. */
+  focusAirport: string | null
+  onAirportFocused: () => void
 }
 
 /** A saved path or spot to show on the map (an emergency or a logbook entry). */
@@ -89,7 +92,7 @@ function iconFor(a: Aircraft, selected: boolean, label: boolean) {
   })
 }
 
-export default function MapView({ aircraft, selected, onSelect, center, radiusNm, onSearchHere, showTrails, showAirports, path, highlight, onClearHighlight, bottomInset, hotspots, military }: Props) {
+export default function MapView({ aircraft, selected, onSelect, center, radiusNm, onSearchHere, showTrails, showAirports, path, highlight, onClearHighlight, bottomInset, hotspots, military, focusAirport, onAirportFocused }: Props) {
   const cfg = settings.use()
   const [zoom, setZoom] = useState(8)
   const showLabels = cfg.labels && zoom >= 9
@@ -311,6 +314,17 @@ export default function MapView({ aircraft, selected, onSelect, center, radiusNm
     if (cfg.rangeRing) ring.current.addTo(m)
     else ring.current.remove()
   }, [cfg.rangeRing])
+
+  // Open the info card of an airport picked in search.
+  useEffect(() => {
+    if (!focusAirport) return
+    const mk = airportMarkers.current.get(focusAirport)
+    if (mk) {
+      mk.openPopup()
+      onAirportFocused()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusAirport, view, airports])
 
   // Military loops, outlined.
   const milLayer = useRef<L.LayerGroup | null>(null)
