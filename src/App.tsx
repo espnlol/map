@@ -16,6 +16,7 @@ import { refreshTeams, teams } from './lib/teams'
 import type { Highlight } from './components/MapView'
 import SettingsPanel from './components/SettingsPanel'
 import AlertsMenu from './components/AlertsMenu'
+import { useTfrs } from './lib/tfr'
 import Toasts, { type Toast } from './components/Toasts'
 import WorldSearch from './components/WorldSearch'
 import AirportSearch from './components/AirportSearch'
@@ -68,6 +69,8 @@ export default function App() {
   const [showSquawks, setShowSquawks] = useState(false)
   const [showPhone, setShowPhone] = useState(false)
   const cfg = settings.use()
+  const tfrs = useTfrs(cfg.restrictedAreas)
+  const [focusTfr, setFocusTfr] = useState<string | null>(null)
   const showTrails = cfg.trails
   const showAirports = cfg.airports
   const [showSettings, setShowSettings] = useState(false)
@@ -667,6 +670,16 @@ export default function App() {
             setShowAlerts(false)
             setInsights('milwatch')
           }}
+          tfrs={tfrs}
+          tfrOn={cfg.restrictedAreas}
+          center={center}
+          radiusNm={radius}
+          onOpenTfr={(id) => {
+            setShowAlerts(false)
+            setSelected(null)
+            setFocusTfr(id)
+            if (isMobile) setSheet('peek')
+          }}
         />
       )}
       {insights && (
@@ -761,6 +774,9 @@ export default function App() {
                   </button>
                   <button className="block w-full px-4 py-2.5 text-left hover:bg-slate-700" onClick={() => settings.update({ trails: !showTrails })}>
                     {showTrails ? '✓ ' : ''}Trails on map
+                  </button>
+                  <button className="block w-full px-4 py-2.5 text-left hover:bg-slate-700" onClick={() => settings.update({ restrictedAreas: !cfg.restrictedAreas })}>
+                    {cfg.restrictedAreas ? '✓ ' : ''}Restricted airspace
                   </button>
                   <div className="flex border-t border-slate-700">
                     {(['live', 'demo'] as Mode[]).map((m) => (
@@ -863,6 +879,9 @@ export default function App() {
             military={military}
             focusAirport={focusAirport}
             onAirportFocused={() => setFocusAirport(null)}
+            tfrs={tfrs ?? []}
+            focusTfr={focusTfr}
+            onTfrFocused={() => setFocusTfr(null)}
           />
         </main>
 

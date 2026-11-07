@@ -7,6 +7,7 @@ import { busyness, liveAtcUrl, loadAirports, type AirportInfo } from '../lib/air
 import { settings, type BaseMap } from '../lib/settings'
 import type { Hotspot } from '../lib/happening'
 import type { MilitaryPattern } from '../lib/patterns'
+import { TFR_KINDS, type Tfr } from '../lib/tfr'
 
 /** Altitude → colour, low = orange, high = violet (same idea as most flight trackers). */
 export function altColor(alt: number | null): string {
@@ -61,6 +62,11 @@ interface Props {
   /** An airport (ident) to open the info card for, once its marker is on the map. */
   focusAirport: string | null
   onAirportFocused: () => void
+  /** FAA restricted airspace to outline. */
+  tfrs: Tfr[]
+  /** A TFR (NOTAM number) to zoom to and open. */
+  focusTfr: string | null
+  onTfrFocused: () => void
 }
 
 /** A saved path or spot to show on the map (an emergency or a logbook entry). */
@@ -92,7 +98,7 @@ function iconFor(a: Aircraft, selected: boolean, label: boolean) {
   })
 }
 
-export default function MapView({ aircraft, selected, onSelect, center, radiusNm, onSearchHere, showTrails, showAirports, path, highlight, onClearHighlight, bottomInset, hotspots, military, focusAirport, onAirportFocused }: Props) {
+export default function MapView({ aircraft, selected, onSelect, center, radiusNm, onSearchHere, showTrails, showAirports, path, highlight, onClearHighlight, bottomInset, hotspots, military, focusAirport, onAirportFocused, tfrs, focusTfr, onTfrFocused }: Props) {
   const cfg = settings.use()
   const [zoom, setZoom] = useState(8)
   const showLabels = cfg.labels && zoom >= 9
@@ -355,7 +361,7 @@ export default function MapView({ aircraft, selected, onSelect, center, radiusNm
   useEffect(() => {
     const m = map.current
     if (!m) return
-    if (!milLayer.current) milLayer.current = L.layerGroup().addTo(m)
+    if (!milLayer.current || !m.hasLayer(milLayer.current)) milLayer.current = L.layerGroup().addTo(m)
     milLayer.current.clearLayers()
     for (const p of military) {
       if (p.hull.length < 3) continue
@@ -366,6 +372,44 @@ export default function MapView({ aircraft, selected, onSelect, center, radiusNm
       }).addTo(milLayer.current)
     }
   }, [military])
+
+  // Restricted airspace (FAA TFRs).
+  const tfrLayer = useRef<L.LayerGroup | null>(null)
+  const tfrShapes = useRef(new Map<string, L.Polygon>())
+  useEffect(() => {
+    const m = map.current
+    if (!m) return
+    if (!tfrLayer.current || !m.hasLayer(tfrLayer.current)) tfrLayer.current = L.layerGroup().addTo(m)
+    tfrLayer.current.clearLayers()
+    tfrShapes.current.clear()
+    for (const t of tfrs) {
+      if (t.polygons.length === 0) continue
+      const k = TFR_KINDS[t.kind]
+      const shape = L.polygon(t.polygons, {
+        color: k.color,
+        weight: 1.5,
+        dashArray: t.kind === 'vip' ? undefined : '4 4',
+        fillColor: k.color,
+        fillOpacity: t.kind === 'vip' ? 0.14 : 0.08,
+        renderer: renderer.current,
+      })
+        .bindTooltip(`${k.emoji} ${esc(k.label)} TFR`, { sticky: true })
+        .bindPopup(tfrPopup(t))
+        .addTo(tfrLayer.current)
+      tfrShapes.current.set(t.id, shape)
+    }
+  }, [tfrs])
+
+  useEffect(() => {
+    const m = map.current
+    if (!m || !focusTfr) return
+    const shape = tfrShapes.current.get(focusTfr)
+    if (!shape) return
+    m.fitBounds(shape.getBounds(), { paddingTopLeft: [40, 40], paddingBottomRight: [40, 40 + insetRef.current], maxZoom: 11 })
+    shape.openPopup(shape.getBounds().getCenter())
+    onTfrFocused()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusTfr, tfrs])
 
   // Places where aircraft are circling.
   useEffect(() => {
@@ -517,6 +561,18 @@ function airportPopup(ap: AirportInfo, b: ReturnType<typeof busyness>) {
     ${runways ? `<div style="margin-top:6px"><b>Runways</b><br/>${runways}</div>` : ''}
     <button data-track="${ap.lat},${ap.lon}" style="margin-top:8px;width:100%;padding:6px;border-radius:6px;background:#0ea5e9;color:#020617;font-weight:600">Track planes here</button>
     ${liveAtcUrl(ap.ident, ap.iata) ? `<a href="${liveAtcUrl(ap.ident, ap.iata)}" target="_blank" rel="noreferrer" style="display:block;margin-top:6px;text-align:center;padding:6px;border-radius:6px;border:1px solid #334155;color:#7dd3fc;font-weight:600;text-decoration:none">🎧 Listen to ATC (LiveATC)</a>` : ''}
+  </div>`
+}
+
+function tfrPopup(t: Tfr) {
+  const k = TFR_KINDS[t.kind]
+  const where = [t.facility, t.state].filter(Boolean).join(' · ')
+  return `<div style="font-size:12px;line-height:1.45;max-width:260px">
+    <div style="font-weight:700;font-size:14px;color:${k.color}">${k.emoji} ${esc(k.label)}</div>
+    <div style="color:#64748b">NOTAM ${esc(t.id)}${where ? ` · ${esc(where)}` : ''}${t.type ? ` · ${esc(t.type)}` : ''}</div>
+    ${t.title ? `<div style="margin-top:6px">${esc(t.title)}</div>` : ''}
+    <div style="margin-top:6px;color:#64748b">Pilots need permission to fly in here. Outline is approximate; the FAA notice has the exact limits and times.</div>
+    <a href="${t.url}" target="_blank" rel="noreferrer" style="display:block;margin-top:8px;text-align:center;padding:6px;border-radius:6px;border:1px solid #334155;color:#7dd3fc;font-weight:600;text-decoration:none">Read the FAA notice ↗</a>
   </div>`
 }
 

@@ -101,6 +101,7 @@ export default function SettingsPanel({ onClose, center }: { onClose: () => void
             <Choice k="baseMap" label="Map style" options={[['dark', 'Dark'], ['streets', 'Streets'], ['satellite', 'Satellite']]} />
             <Toggle k="trails" label="Trails behind planes" />
             <Toggle k="airports" label="Airports and runways" />
+            <Toggle k="restrictedAreas" label="Restricted airspace (TFRs)" hint="FAA no-fly zones: presidential visits, wildfires, rocket launches, stadiums. US only" />
             <Toggle k="labels" label="Callsign labels on planes" hint="Shown when zoomed in" />
             <Toggle k="rangeRing" label="Circle around your search area" />
             <Toggle k="tripZoom" label="Zoom out to the whole trip" hint="When you open a plane. Off: the map stays put (also the 🔭 button on the map)" />

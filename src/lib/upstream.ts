@@ -21,6 +21,7 @@ export const UPSTREAMS = {
   hexdb: 'https://hexdb.io',
   airportdata: 'https://www.airport-data.com',
   faa: 'https://nasstatus.faa.gov',
+  tfr: 'https://tfr.faa.gov',
 } as const
 
 export type UpstreamName = keyof typeof UPSTREAMS

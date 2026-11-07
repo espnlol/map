@@ -12,6 +12,7 @@ export interface Settings {
   followSelected: boolean
   tripZoom: boolean
   groundVehicles: boolean
+  restrictedAreas: boolean
   // units & time
   altUnit: 'ft' | 'm'
   speedUnit: 'kt' | 'mph' | 'kmh'
@@ -51,6 +52,7 @@ export const DEFAULT_SETTINGS: Settings = {
   followSelected: false,
   tripZoom: true,
   groundVehicles: true,
+  restrictedAreas: true,
   altUnit: 'ft',
   speedUnit: 'kt',
   distUnit: 'auto',
