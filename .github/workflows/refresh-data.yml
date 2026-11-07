@@ -1,0 +1,75 @@
+# Rebuilds the bundled airport and aircraft-type databases from their sources
+# once a month (and on demand), commits them if anything changed, then
+# republishes the website.
+#
+# Note: GitHub only runs scheduled workflows from the repository's DEFAULT
+# branch. Until this branch is the default, start it from the Actions tab
+# ("Refresh airport & aircraft data" → Run workflow).
+name: Refresh airport & aircraft data
+
+on:
+  schedule:
+    - cron: '17 6 3 * *' # 06:17 UTC on the 3rd of every month
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: refresh-data
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/eager-mayer-5evp1u
+
+      - name: Download the source data
+        run: |
+          set -euo pipefail
+          D="$RUNNER_TEMP/data"; mkdir -p "$D"
+          curl -fsSL -o "$D/airports.csv" https://raw.githubusercontent.com/davidmegginson/ourairports-data/main/airports.csv
+          curl -fsSL -o "$D/runways.csv" https://raw.githubusercontent.com/davidmegginson/ourairports-data/main/runways.csv
+          curl -fsSL https://raw.githubusercontent.com/wiedehopf/tar1090-db/master/db/icao_aircraft_types.js | gunzip > "$D/types.json"
+          curl -fsSL -o "$D/aircraft.csv.gz" https://raw.githubusercontent.com/wiedehopf/tar1090-db/csv/aircraft.csv.gz
+          ls -la "$D"
+
+      - name: Rebuild the databases
+        run: |
+          set -euo pipefail
+          D="$RUNNER_TEMP/data"
+          python3 -I scripts/build-airports.py "$D"
+          python3 -I scripts/build-types.py "$D/types.json" "$D/aircraft.csv.gz"
+
+      - name: Sanity-check before saving
+        run: |
+          python3 -I - <<'PY'
+          import json, sys
+          airports = json.load(open('public/airports.json'))
+          types = json.load(open('public/aircraft-types.json'))
+          print(len(airports), 'airports,', len(types), 'aircraft types')
+          # never replace good data with a broken download
+          if len(airports) < 4000 or len(types) < 2000:
+              sys.exit('Refusing to save: the new data looks incomplete')
+          PY
+
+      - name: Commit if anything changed, then republish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- public/airports.json public/aircraft-types.json; then
+            echo "Data unchanged."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898699+github-actions[bot]@users.noreply.github.com"
+          git add public/airports.json public/aircraft-types.json
+          git commit -m "Refresh airport and aircraft-type data ($(date -u +%Y-%m-%d))"
+          git push origin HEAD:claude/eager-mayer-5evp1u
+          # pushes made by this workflow don't trigger other workflows, so start the publish one directly
+          gh workflow run pages.yml --ref claude/eager-mayer-5evp1u
