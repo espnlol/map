@@ -111,6 +111,8 @@ export async function scanRare(local: Aircraft[], center: { lat: number; lon: nu
   if (worldwide) {
     const types = RARE_TYPES.filter((t) => tiers.includes(t.tier))
     for (const t of types) {
+      // space the lookups out so the free flight-data services don't refuse us (429)
+      await new Promise((r) => setTimeout(r, 300))
       try {
         const res = await fetch(`${upstream('adsblol')}/v2/type/${t.code}`, { headers: { Accept: 'application/json' } })
         if (!res.ok) continue

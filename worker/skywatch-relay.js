@@ -30,7 +30,7 @@ const CACHE_SECONDS = { adsblol: 2, airplaneslive: 2, adsblolglobe: 30, airplane
 const SLOW_PATHS = /^\/v2\/(type|reg|callsign|hex|mil|sqk)\b/
 
 const APP_URL = 'https://espnlol.github.io/map/'
-const RELAY_VERSION = '2026-11-07'
+const RELAY_VERSION = '2026-11-07b'
 const UA = 'SkyWatch relay (personal flight tracker)'
 
 export default {
@@ -74,6 +74,9 @@ export default {
     let upstream
     try {
       upstream = await fetch(target, init)
+      // adsb.lol busy? try airplanes.live for the same lookup
+      if (name === 'adsblol' && (upstream.status === 429 || upstream.status >= 500) && request.method === 'GET' && path.startsWith('/v2/'))
+        upstream = await fetch(`${UPSTREAMS.airplaneslive}${airplanesLivePath(path)}${url.search}`, { ...init, headers: { ...init.headers, Referer: `${UPSTREAMS.airplaneslive}/` } })
     } catch (err) {
       return new Response(`Upstream error: ${err}`, { status: 502, headers: cors })
     }
@@ -245,10 +248,40 @@ async function handleAccount(request, url, env, cors) {
 
 const EMERGENCY_LABEL = { '7500': 'Hijack', '7600': 'Radio failure', '7700': 'General emergency', general: 'General emergency', lifeguard: 'Medical', minfuel: 'Minimum fuel', nordo: 'Radio failure', unlawful: 'Hijack', downed: 'Downed aircraft' }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+/** The same lookup on airplanes.live, which names one path differently. */
+function airplanesLivePath(path) {
+  const m = /^\/v2\/lat\/([-\d.]+)\/lon\/([-\d.]+)\/dist\/(\d+)/.exec(path)
+  return m ? `/v2/point/${m[1]}/${m[2]}/${m[3]}` : path
+}
+
+/**
+ * Ask adsb.lol; if it says "too many requests" (429) or is down, ask
+ * airplanes.live instead. Answers are cached for a minute at Cloudflare, so
+ * the app and the background check share them instead of asking twice.
+ */
 async function getJson(path) {
-  const res = await fetch(`https://api.adsb.lol${path}`, { headers: { Accept: 'application/json', 'User-Agent': UA } })
+  const opts = { headers: { Accept: 'application/json', 'User-Agent': UA }, cf: { cacheTtl: 60, cacheEverything: true } }
+  let res = await fetch(`https://api.adsb.lol${path}`, opts)
+  if (res.status === 429 || res.status >= 500) {
+    await sleep(1100) // airplanes.live allows about one request a second
+    res = await fetch(`https://api.airplanes.live${airplanesLivePath(path)}`, opts)
+  }
   if (!res.ok) throw new Error(`${path} → ${res.status}`)
   return res.json()
+}
+
+/** Run each item; one failed lookup doesn't stop the rest. */
+async function each(items, fn, errors, label) {
+  for (const it of items) {
+    try {
+      await fn(it)
+    } catch (err) {
+      errors.push(`${label}: ${String(err && err.message ? err.message : err).slice(0, 100)}`)
+    }
+    await sleep(250)
+  }
 }
 
 function distNm(lat1, lon1, lat2, lon2) {
@@ -318,7 +351,7 @@ export async function runChecks(env) {
   // 1. Team planes: detect takeoffs and landings.
   if ((config.teams || []).length)
     await step('teams', async () => {
-      for (const { ident, team } of config.teams.slice(0, 10)) {
+      await each(config.teams.slice(0, 10), async ({ ident, team }) => {
         const isCs = /^[A-Z]{3}\d/.test(ident)
         const data = await getJson(isCs ? `/v2/callsign/${ident}` : `/v2/reg/${ident}`)
         const a = (data.ac || []).find((x) => typeof x.lat === 'number')
@@ -339,14 +372,14 @@ export async function runChecks(env) {
           if (config.notify?.teams) notes.push({ title: `🛬 ${team}: landed`, body: `${ident}${p.lastTo ? ` at ${p.lastTo}` : ''}`, url: `${APP_URL}?plane=${a.hex}`, tag: `team-${ident}` })
         }
         state.planes[ident] = p
-      }
+      }, check.errors, 'team')
     })
 
   // 2. Emergencies near home: the three worldwide emergency-squawk lists are tiny.
   if (config.notify?.emergencies && home)
     await step('emergencies', async () => {
       const r = Math.min(250, config.radius || 100)
-      for (const sq of ['7700', '7600', '7500']) {
+      await each(['7700', '7600', '7500'], async (sq) => {
         const data = await getJson(`/v2/sqk/${sq}`)
         for (const a of data.ac || []) {
           if (a.alt_baro === 'ground' || typeof a.lat !== 'number') continue
@@ -357,18 +390,18 @@ export async function runChecks(env) {
           state.emerg[key] = now
           notes.push({ title: `⚠️ ${EMERGENCY_LABEL[sq]}`, body: `${(a.flight || a.r || a.hex).trim()}${a.t ? ` (${a.t})` : ''} is ${Math.round(d * 1.15)} mi from ${home.label || 'home'}`, url: `${APP_URL}?plane=${a.hex}`, tag: key })
         }
-      }
+      }, check.errors, 'emergencies')
     })
 
   // 3. Rare planes anywhere: a few types per run, taking turns.
   if (config.notify?.rare && (config.rareTypes || []).length)
     await step('rare', async () => {
       const types = config.rareTypes
-      const per = 8
+      const per = 4
       const start = (state.rareOffset || 0) % types.length
       const batch = [...types, ...types].slice(start, start + Math.min(per, types.length))
       state.rareOffset = (start + per) % types.length
-      for (const t of batch) {
+      await each(batch, async (t) => {
         const data = await getJson(`/v2/type/${t.code}`)
         for (const a of data.ac || []) {
           if (a.alt_baro === 'ground' || typeof a.lat !== 'number') continue
@@ -377,14 +410,14 @@ export async function runChecks(env) {
           const where = home ? ` · ${Math.round(distNm(home.lat, home.lon, a.lat, a.lon) * 1.15).toLocaleString()} mi away` : ''
           notes.push({ title: `✨ Rare plane in the air`, body: `${t.name}${a.flight ? ` (${a.flight.trim()})` : ''}${where}`, url: `${APP_URL}?plane=${a.hex}`, tag: `rare-${a.hex}` })
         }
-      }
+      }, check.errors, 'rare')
     })
 
   // 4. Military arrivals at watched airports: a small 40 nm lookup per airport.
   const watched = (config.milAirports || []).slice(0, 8)
   if (watched.length)
     await step('military', async () => {
-      for (const ap of watched) {
+      await each(watched, async (ap) => {
         const data = await getJson(`/v2/lat/${ap.lat.toFixed(3)}/lon/${ap.lon.toFixed(3)}/dist/40`)
         for (const a of data.ac || []) {
           const cs = (a.flight || '').trim()
@@ -412,7 +445,7 @@ export async function runChecks(env) {
               tag: key,
             })
         }
-      }
+      }, check.errors, 'military')
       state.milLog = state.milLog.filter((e) => now - e.at < 7 * 86400e3).slice(0, 100)
     })
 
