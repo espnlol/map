@@ -30,7 +30,7 @@ const CACHE_SECONDS = { adsblol: 2, airplaneslive: 2, adsblolglobe: 30, airplane
 const SLOW_PATHS = /^\/v2\/(type|reg|callsign|hex|mil|sqk)\b/
 
 const APP_URL = 'https://espnlol.github.io/map/'
-const RELAY_VERSION = '2026-11-08'
+const RELAY_VERSION = '2026-11-07c'
 const UA = 'SkyWatch relay (personal flight tracker)'
 
 export default {
@@ -48,16 +48,13 @@ export default {
 
     const url = new URL(request.url)
     if (url.pathname === '/' || url.pathname === '') {
-      const bg =
-        (env.SKYWATCH ? 'Background checks: set up.' : 'Background checks: not set up (no SKYWATCH KV binding).') +
-        (env.ADSBX_KEY ? '\nADS-B Exchange: connected.' : '\nADS-B Exchange: not set up (optional).')
+      const bg = env.SKYWATCH ? 'Background checks: set up.' : 'Background checks: not set up (no SKYWATCH KV binding).'
       return new Response(`SkyWatch relay is running.\n${bg}\nRelay version ${RELAY_VERSION}`, { headers: { 'Content-Type': 'text/plain', ...cors } })
     }
     if (!allowed) return new Response('Not allowed', { status: 403, headers: cors })
 
     if (url.pathname.startsWith('/push/')) return handlePush(request, url, env, cors)
     if (url.pathname.startsWith('/account/')) return handleAccount(request, url, env, cors)
-    if (url.pathname.startsWith('/adsbx/')) return handleAdsbx(url, env, cors)
 
     if (request.method !== 'GET' && request.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: cors })
     const [, name, ...rest] = url.pathname.split('/')
@@ -92,31 +89,6 @@ export default {
   async scheduled(event, env, ctx) {
     if (env.SKYWATCH) ctx.waitUntil(runChecks(env))
   },
-}
-
-// ---------------------------------------------------------------------------
-// ADS-B Exchange (optional, paid): only used when the free sources can't find
-// a plane. Needs a RapidAPI key saved as the Worker secret ADSBX_KEY.
-// ---------------------------------------------------------------------------
-
-const ADSBX_HOST = 'adsbexchange-com1.p.rapidapi.com'
-
-async function handleAdsbx(url, env, cors) {
-  const json = (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { ...cors, 'Content-Type': 'application/json' } })
-  if (url.pathname === '/adsbx/status') return json({ connected: Boolean(env.ADSBX_KEY) })
-  if (!env.ADSBX_KEY) return json({ error: 'ADS-B Exchange is not set up on this relay.' }, 501)
-  // Only one-plane lookups (keeps the 10,000 requests a month for when they matter).
-  const m = /^\/adsbx\/v2\/(callsign|reg|registration|hex|icao)\/([A-Za-z0-9~-]{2,10})\/?$/.exec(url.pathname)
-  if (!m) return json({ error: 'Only callsign, registration and hex lookups go to ADS-B Exchange.' }, 400)
-  const kind = { reg: 'registration', registration: 'registration', hex: 'icao', icao: 'icao', callsign: 'callsign' }[m[1]]
-  const res = await fetch(`https://${ADSBX_HOST}/v2/${kind}/${encodeURIComponent(m[2])}/`, {
-    headers: { 'X-RapidAPI-Key': env.ADSBX_KEY, 'X-RapidAPI-Host': ADSBX_HOST, Accept: 'application/json' },
-    cf: { cacheTtl: 60, cacheEverything: true },
-  })
-  const headers = new Headers(cors)
-  headers.set('Content-Type', 'application/json')
-  headers.set('Cache-Control', 'public, max-age=60')
-  return new Response(res.body, { status: res.status, headers })
 }
 
 // ---------------------------------------------------------------------------

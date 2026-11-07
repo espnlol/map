@@ -1,5 +1,5 @@
 import type { RawAircraft } from '../types'
-import { RELAY_URL, upstream } from './upstream'
+import { upstream } from './upstream'
 import { modelName, isKnownType } from './aircraftTypes'
 import { RARE_TYPES } from './rare'
 import { distanceNm } from './geo'
@@ -73,46 +73,7 @@ export async function searchWorld(term: string, from: { lat: number; lon: number
       }
     }),
   )
-  // Nothing from the free sources? Ask ADS-B Exchange, if it's connected to the relay.
-  if (out.size === 0 && RELAY_URL) {
-    for (const p of plans.filter((x) => /^\/v2\/(callsign|reg|hex)\//.test(x.path))) {
-      try {
-        const res = await fetch(`${RELAY_URL.replace(/\/+$/, '')}/adsbx${p.path}`, { headers: { Accept: 'application/json' } })
-        if (!res.ok) continue
-        const json = (await res.json()) as { ac?: RawAircraft[] }
-        for (const a of json.ac ?? []) {
-          if (typeof a.lat !== 'number' || typeof a.lon !== 'number' || out.has(a.hex)) continue
-          out.set(a.hex, {
-            hex: a.hex,
-            callsign: (a.flight ?? '').trim() || a.r || a.hex.toUpperCase(),
-            registration: a.r,
-            model: modelName(a.t, a.desc),
-            lat: a.lat,
-            lon: a.lon,
-            altitude: a.alt_baro === 'ground' ? null : typeof a.alt_baro === 'number' ? a.alt_baro : null,
-            speed: a.gs,
-            distance: distanceNm(from.lat, from.lon, a.lat, a.lon),
-            matched: `${p.label} (ADS-B Exchange)`,
-          })
-        }
-        if (out.size) break
-      } catch {
-        /* not connected */
-      }
-    }
-  }
   return [...out.values()].sort((a, b) => a.distance - b.distance).slice(0, 100)
-}
-
-/** Whether the relay has ADS-B Exchange connected. */
-export async function adsbxConnected(): Promise<boolean> {
-  if (!RELAY_URL) return false
-  try {
-    const r = await fetch(`${RELAY_URL.replace(/\/+$/, '')}/adsbx/status`)
-    return r.ok && Boolean(((await r.json()) as { connected?: boolean }).connected)
-  } catch {
-    return false
-  }
 }
 
 /** Find one aircraft by its transponder code (used by notification and share links). */
