@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { findPhotos, morePhotoLinks, type Photo } from '../lib/photos'
+import { findPhotos, hiddenPhotos, hidePhoto, morePhotoLinks, type Photo } from '../lib/photos'
 
 interface Props {
   hex: string
@@ -9,7 +9,9 @@ interface Props {
 }
 
 export default function PhotoGallery({ hex, registration, model, demo }: Props) {
-  const [photos, setPhotos] = useState<Photo[] | undefined>(undefined)
+  const [found, setPhotos] = useState<Photo[] | undefined>(undefined)
+  const hidden = hiddenPhotos.use()
+  const photos = found?.filter((p) => !hidden.includes(p.link))
   const [index, setIndex] = useState(0)
   const strip = useRef<HTMLDivElement>(null)
 
@@ -112,6 +114,10 @@ export default function PhotoGallery({ hex, registration, model, demo }: Props) 
             {cur.source}
           </a>
           {photos.length > 1 && <span className="text-slate-500"> · swipe for more</span>}
+          {' · '}
+          <button onClick={() => (hidePhoto(cur.link), setIndex(0), strip.current?.scrollTo({ left: 0 }))} className="text-slate-400 underline hover:text-red-300">
+            Wrong photo?
+          </button>
         </figcaption>
       </figure>
       {more}

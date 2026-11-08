@@ -7,6 +7,15 @@
  * Each photo keeps its credit and a link to where it came from.
  */
 import { upstream } from './upstream'
+import { createStore } from './store'
+
+/** Photos you marked as wrong (by link), never shown again on this device. */
+export const hiddenPhotos = createStore<string[]>('skywatch.hiddenPhotos', [])
+export const hidePhoto = (link: string) => hiddenPhotos.set((h) => (h.includes(link) ? h : [...h, link].slice(-500)))
+
+/** Words that show a picture or article is about aviation. */
+const AVIATION =
+  /aircraft|airplane|aeroplane|airliner|airline|airport|airfield|aviation|helicopter|rotorcraft|jet\b|jetliner|airship|glider|biplane|seaplane|turboprop|fighter|bomber|tanker|air force|navy|boeing|airbus|cessna|piper|embraer|bombardier|gulfstream|beechcraft|cirrus|dassault|lockheed|sikorsky|bell \d|eurocopter|leonardo|agusta|robinson|pilatus|de havilland|mcdonnell|douglas|antonov|tupolev|ilyushin|sukhoi|mitsubishi|atr\b|saab|fokker|learjet|diamond|mooney|daher|textron|spotting|registration|\bflight\b|cockpit|runway|tail number/i
 
 export interface Photo {
   src: string // best size to show
@@ -78,8 +87,15 @@ interface WikiPage {
 
 const stripHtml = (s?: string) => (s ?? '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim()
 
+/** Matches the registration as its own word in a title (N123AB, N-123AB, N_123AB), not inside other text like "DSCN1234". */
+function regPattern(reg: string): RegExp {
+  const chars = normReg(reg).split('').map((c) => c.replace(/[^A-Z0-9]/g, ''))
+  return new RegExp(`(^|[^A-Z0-9])${chars.join('[-_ ]?')}($|[^A-Z0-9])`)
+}
+
 async function commons(reg?: string): Promise<Photo[]> {
-  if (!reg || reg.length < 3) return []
+  // Very short registrations match too many unrelated files.
+  if (!reg || normReg(reg).length < 4) return []
   const params = new URLSearchParams({
     action: 'query',
     format: 'json',
@@ -93,9 +109,17 @@ async function commons(reg?: string): Promise<Photo[]> {
     iiurlwidth: '960',
   })
   const j = await getJson<{ query?: { pages?: Record<string, WikiPage> } }>(`https://commons.wikimedia.org/w/api.php?${params}`)
-  const want = normReg(reg)
+  const re = regPattern(reg)
   return Object.values(j?.query?.pages ?? {})
-    .filter((p) => normReg(p.title).includes(want) && /\.(jpe?g|png|webp)$/i.test(p.title))
+    .filter((p) => {
+      if (!/\.(jpe?g|png|webp)$/i.test(p.title)) return false
+      const name = p.title.replace(/^File:/i, '').replace(/\.[a-z]+$/i, '').toUpperCase()
+      if (!re.test(name)) return false
+      // The file must also look like an aviation photo (title, description or categories).
+      const meta = p.imageinfo?.[0]?.extmetadata
+      const about = `${p.title} ${stripHtml(meta?.ImageDescription?.value)} ${stripHtml(meta?.Categories?.value)} ${stripHtml(meta?.ObjectName?.value)}`
+      return AVIATION.test(about)
+    })
     .slice(0, 6)
     .map((p) => {
       const ii = p.imageinfo![0]
@@ -113,16 +137,19 @@ async function modelPhoto(model?: string): Promise<Photo[]> {
     origin: '*',
     generator: 'search',
     gsrsearch: `${model} aircraft`,
-    gsrlimit: '1',
-    prop: 'pageimages|info',
+    gsrlimit: '5',
+    prop: 'pageimages|info|description',
     piprop: 'thumbnail',
     pithumbsize: '960',
     inprop: 'url',
   })
-  const j = await getJson<{ query?: { pages?: Record<string, { title: string; fullurl: string; thumbnail?: { source: string } }> } }>(
-    `https://en.wikipedia.org/w/api.php?${params}`,
-  )
-  const page = Object.values(j?.query?.pages ?? {})[0]
+  type Page = { title: string; fullurl: string; index?: number; description?: string; thumbnail?: { source: string } }
+  const j = await getJson<{ query?: { pages?: Record<string, Page> } }>(`https://en.wikipedia.org/w/api.php?${params}`)
+  // Take the best-ranked result that is actually about an aircraft, not a person or place.
+  const maker = model.split(' ')[0].toLowerCase()
+  const page = Object.values(j?.query?.pages ?? {})
+    .sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
+    .find((p) => p.thumbnail && (AVIATION.test(p.description ?? '') || (!p.description && p.title.toLowerCase().includes(maker) && AVIATION.test(p.title))))
   if (!page?.thumbnail) return []
   return [{ src: page.thumbnail.source, thumb: page.thumbnail.source, link: page.fullurl, credit: `Wikipedia: ${page.title}`, source: 'Wikipedia', exact: false }]
 }
