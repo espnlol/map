@@ -1,11 +1,13 @@
 import type { RawAircraft } from '../types'
+import { cachedOwner } from './owner'
+import { inferCategory } from './aircraftTypes'
 
 /**
  * "Special" groups that ADS-B doesn't broadcast directly. They're worked out
  * from the aircraft's address, callsign, registration and operator, so they're
  * best-effort and every match carries the reason it matched.
  */
-export type SpecialTag = 'milgov' | 'sports'
+export type SpecialTag = 'milgov' | 'sports' | 'news'
 
 export interface SpecialMatch {
   tag: SpecialTag
@@ -24,6 +26,12 @@ export const SPECIAL_GROUPS: { tag: SpecialTag; label: string; color: string; de
     label: 'Sports',
     color: '#f97316',
     description: 'Likely sports-team flights: team-owned jets and airlines that mostly fly team charters',
+  },
+  {
+    tag: 'news',
+    label: 'News',
+    color: '#e879f9',
+    description: 'TV news helicopters and planes: owned by a TV station or broadcaster, or by a company that flies news helicopters for them',
   },
 ]
 
@@ -91,6 +99,33 @@ const SPORTS_OPERATOR_WORDS = [
   'FOOTBALL', 'BASEBALL', 'BASKETBALL', 'HOCKEY', 'SOCCER', 'RACING', 'NASCAR', 'NFL', 'NBA', 'NHL', 'MLB',
 ]
 
+// Owners that mean TV news. Station helicopters are usually registered to the
+// station's parent company or to a company that flies them for the station.
+const NEWS_OWNER_WORDS: [RegExp, string][] = [
+  [/\bTELEVISION\b/, 'a TV station or network'],
+  [/\bBROADCAST(ING|ERS?)?\b/, 'a broadcaster'],
+  [/\b[KW][A-Z]{2,3}[- ]?TV\b/, 'a TV station'],
+  [/\bTV\b/, 'a TV company'],
+  [/\bNEWS\b/, 'a news organization'],
+  [/\bTEGNA\b/, 'TEGNA, owner of many local TV stations'],
+  [/\bNEXSTAR\b/, 'Nexstar, owner of many local TV stations'],
+  [/\bSINCLAIR\b/, 'Sinclair, owner of many local TV stations'],
+  [/\bGRAY (MEDIA|TELEVISION)\b/, 'Gray Media, owner of many local TV stations'],
+  [/\bSCRIPPS\b/, 'Scripps, owner of many local TV stations'],
+  [/\bHEARST\b/, 'Hearst Television'],
+  [/\bNBC ?UNIVERSAL\b|\bNBC\b/, 'NBC'],
+  [/\bCBS\b/, 'CBS'],
+  [/\bFOX (TELEVISION|TV|STATIONS|CORP)/, 'Fox Television Stations'],
+  [/\bAMERICAN BROADCASTING\b|\bABC INC\b|\bABC HOLDING/, 'ABC'],
+  [/\bTELEMUNDO\b/, 'Telemundo'],
+  [/\bUNIVISION\b|\bTELEVISAUNIVISION\b/, 'Univision'],
+  [/\bCOX MEDIA\b/, 'Cox Media Group, owner of local TV stations'],
+  [/\bGRAHAM MEDIA\b/, 'Graham Media Group, owner of local TV stations'],
+  [/\bALLEN MEDIA\b/, 'Allen Media, owner of local TV stations'],
+  [/\bHELINET\b/, 'Helinet, which flies TV news helicopters'],
+  [/\bANGEL CITY AIR\b/, 'Angel City Air, which flies TV news helicopters'],
+]
+
 function hexIn(hex: string, lo: number, hi: number): boolean {
   const n = parseInt(hex.replace(/^~/, ''), 16)
   return !Number.isNaN(n) && n >= lo && n <= hi && !hex.startsWith('~')
@@ -106,7 +141,8 @@ function prefixMatch(callsign: string, table: Record<string, string>): string | 
 
 export function detectSpecial(r: RawAircraft, callsign: string): SpecialMatch[] {
   const out: SpecialMatch[] = []
-  const op = (r.ownOp ?? '').toUpperCase()
+  // The feed's operator, or the registered owner if we've looked this plane up.
+  const op = (r.ownOp || cachedOwner(r.hex)?.owner || '').toUpperCase()
   const reg = (r.r ?? '').toUpperCase().replace(/-/g, '')
 
   // --- Military / government -------------------------------------------
@@ -130,6 +166,18 @@ export function detectSpecial(r: RawAircraft, callsign: string): SpecialMatch[] 
     if (w) sport = `Operator: ${titleCase(op)}`
   }
   if (sport) out.push({ tag: 'sports', reason: sport })
+
+  // --- TV news -------------------------------------------------------------
+  const heli = r.category === 'A7' || inferCategory(r.t) === 'A7'
+  let news: string | null = null
+  if (op && !mil) {
+    const hit = NEWS_OWNER_WORDS.find(([re]) => re.test(op))
+    if (hit) news = `Owned by ${titleCase(op)} (${hit[1]})`
+  }
+  // Many station helicopters carry "TV" in their tail number (N4TV, N11TV…).
+  if (!news && heli && /^N\d{1,3}[A-Z]?TV$/.test(reg)) news = `Tail number ${reg} ends in "TV", a common pick for TV station helicopters`
+  if (!news && heli && /^(NEWS|CHOPPER)\d{1,2}$/.test(callsign)) news = `Callsign ${callsign}`
+  if (news) out.push({ tag: 'news', reason: heli ? news : `${news}. A station plane, not a helicopter` })
 
   return out
 }

@@ -92,7 +92,7 @@ function iconFor(a: Aircraft, selected: boolean, label: boolean) {
     className: 'plane-icon',
     html: `<div style="position:relative;width:${size}px;height:${size}px">${ring}${sel}${planeSvg(color, a.track ?? 0, size, a.category === 'A7')}${
       label ? `<span class="plane-label">${a.callsign}</span>` : ''
-    }</div>`,
+    }${a.special.some((s) => s.tag === 'news') ? '<span class="news-tag">NEWS</span>' : ''}</div>`,
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
   })
@@ -226,7 +226,7 @@ export default function MapView({ aircraft, selected, onSelect, center, radiusNm
     for (const a of visible) {
       live.add(a.hex)
       const isSel = a.hex === selected
-      const key = `${a.category}|${Math.round(a.track ?? 0)}|${a.onGround}|${a.emergency?.code ?? ''}|${isSel}|${showLabels ? a.callsign : ''}`
+      const key = `${a.category}|${Math.round(a.track ?? 0)}|${a.onGround}|${a.emergency?.code ?? ''}|${isSel}|${showLabels ? a.callsign : ''}|${a.special.map((s) => s.tag).join()}`
       const existing = markers.current.get(a.hex)
       if (existing) {
         existing.m.setLatLng([a.lat, a.lon])

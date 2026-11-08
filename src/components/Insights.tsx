@@ -55,6 +55,7 @@ function interest(a: Aircraft): { score: number; why: string } | null {
   if (r) (score += r.tier === 'legendary' ? 80 : r.tier === 'rare' ? 60 : 25), why.push(`${r.tier} ${r.name}`)
   if (a.special.some((s) => s.tag === 'milgov')) (score += 40), why.push('military / gov')
   if (a.special.some((s) => s.tag === 'sports')) (score += 35), why.push('sports')
+  if (a.special.some((s) => s.tag === 'news')) (score += 20), why.push('TV news')
   if (a.category === 'A5') (score += 8), why.push('heavy')
   if (['7500', '7600', '7700', '1255', '1277'].includes(a.squawk ?? '')) (score += 15), why.push(`squawk ${a.squawk}`)
   return score ? { score, why: why.join(' · ') } : null

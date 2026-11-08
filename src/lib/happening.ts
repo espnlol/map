@@ -10,7 +10,7 @@ export interface Hotspot {
   lon: number
   radiusNm: number
   since: number
-  aircraft: { hex: string; callsign: string; model?: string; milgov: boolean; heli: boolean; altitude: number | null; turns: number }[]
+  aircraft: { hex: string; callsign: string; model?: string; milgov: boolean; news: boolean; heli: boolean; altitude: number | null; turns: number }[]
   nearAirport?: string
 }
 
@@ -71,6 +71,7 @@ export function findHotspots(aircraft: Aircraft[], airports: AirportInfo[], igno
       callsign: a.callsign,
       model: a.model,
       milgov: a.special.some((s) => s.tag === 'milgov'),
+      news: a.special.some((s) => s.tag === 'news'),
       heli: a.category === 'A7',
       altitude: a.altitude,
       turns: Math.round(c.turns * 10) / 10,

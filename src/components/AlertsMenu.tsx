@@ -113,7 +113,7 @@ export default function AlertsMenu({ onClose, hotspots, placeOf, onOpenRare, onO
                         {placeOf(h.lat, h.lon) && <span className="font-normal text-slate-400"> · {placeOf(h.lat, h.lon)}</span>}
                       </div>
                       <div className="text-xs text-slate-400">
-                        {h.aircraft.map((a) => `${a.callsign}${a.model ? ` (${a.model})` : ''}${a.milgov ? ' · military/gov' : ''}`).join(', ')}
+                        {h.aircraft.map((a) => `${a.callsign}${a.model ? ` (${a.model})` : ''}${a.milgov ? ' · military/gov' : ''}${a.news ? ' · TV news' : ''}`).join(', ')}
                       </div>
                       <div className="text-[11px] text-slate-500">
                         Since {fmtClock(h.since)} ({fmtRelative(h.since)}) · {h.aircraft.reduce((n, a) => Math.max(n, a.turns), 0)} turns

@@ -34,6 +34,7 @@ import Insights, { type InsightTab } from './components/Insights'
 import { detectGoArounds, findHolding, findMilitaryPatterns } from './lib/patterns'
 import { countOpen, recordTraffic } from './lib/records'
 import { recordSighting } from './lib/sightings'
+import { cachedOwner, fetchOwner } from './lib/owner'
 import { checkArrivals, fromAircraft, milWatch, scanMilitary, type MilArrival } from './lib/milwatch'
 import { worldEmergencies } from './lib/world'
 import { distanceNm } from './lib/geo'
@@ -355,6 +356,20 @@ export default function App() {
     return () => clearInterval(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, cfg.notifyEmergencies, cfg.emergencyScope, cfg.include7600])
+
+  // Look up who owns helicopters the feed doesn't name, so TV news (and police)
+  // helicopters get labelled. A few per update; answers are cached for the session.
+  const ownerAsked = useRef(new Set<string>())
+  useEffect(() => {
+    if (mode !== 'live') return
+    const todo = traffic.aircraft
+      .filter((a) => a.category === 'A7' && !a.operator && !a.hex.startsWith('~') && !ownerAsked.current.has(a.hex) && cachedOwner(a.hex) === undefined)
+      .slice(0, 4)
+    for (const a of todo) {
+      ownerAsked.current.add(a.hex)
+      fetchOwner(a.hex)
+    }
+  }, [traffic.aircraft, mode])
 
   // count how often you open each plane, for "Your most tracked"
   const countedFor = useRef<string | null>(null)

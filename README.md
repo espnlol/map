@@ -189,6 +189,11 @@ Sightings are saved to your profile like the logbook.
   - **Sports**: likely sports-team flights. Matched by team-owned jets, charter airlines that
     mostly fly teams (GlobalX, iAero) or the operator name. Many team flights go out on regular
     airline charters with ordinary callsigns, so this group misses some.
+  - **News**: TV news helicopters (and station planes), tagged NEWS on the map. Matched by the
+    registered owner (TV stations, broadcasters and their parent companies like TEGNA, Nexstar,
+    Sinclair, Gray, Scripps, Hearst, Fox, NBC, CBS, ABC, plus Helinet and Angel City Air, which fly
+    news helicopters), a "TV" tail number (N7TV) or a NEWS/CHOPPER callsign. Helicopters the feed
+    doesn't name an owner for are looked up in the public registry automatically.
   Every match shows the reason it matched on the aircraft's detail panel.
 - Search by callsign, registration, type, model or airport code
 - "Emergencies only" and "Hide on ground" toggles
