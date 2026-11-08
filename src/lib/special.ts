@@ -7,7 +7,7 @@ import { inferCategory } from './aircraftTypes'
  * from the aircraft's address, callsign, registration and operator, so they're
  * best-effort and every match carries the reason it matched.
  */
-export type SpecialTag = 'milgov' | 'sports' | 'news'
+export type SpecialTag = 'milgov' | 'police' | 'medical' | 'news' | 'sports'
 
 export interface SpecialMatch {
   tag: SpecialTag
@@ -19,7 +19,19 @@ export const SPECIAL_GROUPS: { tag: SpecialTag; label: string; color: string; de
     tag: 'milgov',
     label: 'Military / Gov',
     color: '#84cc16',
-    description: 'Military and government aircraft: air forces, navies, coast guards, police, customs, NASA and similar',
+    description: 'Military and government aircraft: air forces, navies, coast guards, customs, NASA and similar',
+  },
+  {
+    tag: 'police',
+    label: 'Police',
+    color: '#60a5fa',
+    description: 'Police, sheriff and state patrol helicopters and planes',
+  },
+  {
+    tag: 'medical',
+    label: 'Medical',
+    color: '#2dd4bf',
+    description: 'Air ambulances: medical helicopters and planes run by hospitals and air-medical companies',
   },
   {
     tag: 'sports',
@@ -76,7 +88,7 @@ const MILGOV_CALLSIGNS: Record<string, string> = {
 
 const MILGOV_OPERATOR_WORDS = [
   'AIR FORCE', 'NAVY', 'ARMY', 'MARINE CORPS', 'COAST GUARD', 'NATIONAL GUARD', 'AIR NATIONAL GUARD',
-  'DEPARTMENT OF', 'DEPT OF', 'POLICE', 'SHERIFF', 'HIGHWAY PATROL', 'STATE PATROL', 'STATE OF ', 'COUNTY OF',
+  'DEPARTMENT OF', 'DEPT OF', 'STATE OF ', 'COUNTY OF',
   'CITY OF', 'UNITED STATES', 'U S ', 'US GOVERNMENT', 'FEDERAL', 'CUSTOMS', 'BORDER PROTECTION', 'HOMELAND',
   'FBI', 'NASA', 'NOAA', 'FAA', 'FOREST SERVICE', 'FISH AND WILDLIFE', 'MINISTRY OF DEFENCE', 'GOVERNMENT',
 ]
@@ -97,6 +109,33 @@ const SPORTS_REGISTRATIONS: Record<string, string> = {
 const SPORTS_OPERATOR_WORDS = [
   'SPORTS', 'ATHLETIC', 'PATRIOTS', 'COWBOYS', 'PACKERS', 'YANKEES', 'LAKERS', 'CELTICS', 'WARRIORS',
   'FOOTBALL', 'BASEBALL', 'BASKETBALL', 'HOCKEY', 'SOCCER', 'RACING', 'NASCAR', 'NFL', 'NBA', 'NHL', 'MLB',
+]
+
+// Owners that mean police.
+const POLICE_OWNER_WORDS: [RegExp, string][] = [
+  [/\bPOLICE\b/, 'a police department'],
+  [/\bSHERIFF/, "a sheriff's office"],
+  [/\b(HIGHWAY|STATE) PATROL\b/, 'a state patrol'],
+  [/\bSTATE POLICE\b|\bTROOPERS?\b/, 'state police'],
+  [/\bPUBLIC SAFETY\b/, 'a public safety department'],
+  [/\bLAW ENFORCEMENT\b/, 'a law enforcement agency'],
+  [/\bCONSTABULARY\b|\bCONSTABLE\b/, 'a police force'],
+]
+
+// Owners that mean air ambulance.
+const MEDICAL_OWNER_WORDS: [RegExp, string][] = [
+  [/\bAIR METHODS\b/, 'Air Methods, the largest US air-ambulance company'],
+  [/\bPHI (AVIATION|AIR MEDICAL|HEALTH|INC)\b/, 'PHI, an air-ambulance company'],
+  [/\bAIR EVAC\b/, 'Air Evac Lifeteam, an air-ambulance company'],
+  [/\bMED[- ]?TRANS\b/, 'Med-Trans, an air-ambulance company'],
+  [/\bGUARDIAN FLIGHT\b/, 'Guardian Flight, an air-ambulance company'],
+  [/\bGLOBAL MEDICAL RESPONSE\b/, 'Global Medical Response, an air-ambulance company'],
+  [/\bREACH AIR\b|\bCALSTAR\b/, 'REACH / CALSTAR air ambulance'],
+  [/\bMETRO AVIATION\b/, 'Metro Aviation, which flies hospital helicopters'],
+  [/\bLIFE ?(FLIGHT|STAR|NET|LINE|TEAM|GUARD)\b/, 'an air-ambulance program'],
+  [/\bCARE ?FLIGHT\b|\bMED ?FLIGHT\b|\bAIR ?MED\b|\bMEDSTAR\b|\bAEROCARE\b|\bSTAT MEDEVAC\b/, 'an air-ambulance program'],
+  [/\bAIR AMBULANCE\b|\bMEDEVAC\b|\bAEROMEDICAL\b|\bAIR MEDICAL\b/, 'an air ambulance'],
+  [/\bHOSPITAL\b|\bMEDICAL CENTER\b|\bHEALTH ?(SYSTEM|CARE|SERVICES)?\b|\bHEALTHCARE\b|\bMEDICAL\b/, 'a hospital or health system'],
 ]
 
 // Owners that mean TV news. Station helicopters are usually registered to the
@@ -144,6 +183,27 @@ export function detectSpecial(r: RawAircraft, callsign: string): SpecialMatch[] 
   // The feed's operator, or the registered owner if we've looked this plane up.
   const op = (r.ownOp || cachedOwner(r.hex)?.owner || '').toUpperCase()
   const reg = (r.r ?? '').toUpperCase().replace(/-/g, '')
+  const heli = r.category === 'A7' || inferCategory(r.t) === 'A7'
+  const ownerHit = (list: [RegExp, string][]) => {
+    const hit = op ? list.find(([re]) => re.test(op)) : undefined
+    return hit ? `Owned by ${titleCase(op)} (${hit[1]})` : null
+  }
+
+  // --- Police ------------------------------------------------------------
+  let police = ownerHit(POLICE_OWNER_WORDS)
+  if (!police && /^(NYPD|LAPD|LASD|CHP|POLICE|SHERIFF|TROOPER)\d*$/.test(callsign)) police = `Callsign ${callsign}`
+  // Police helicopters often have tail numbers ending in PD (N414PD).
+  if (!police && heli && /^N\d{1,3}[A-Z]?PD$/.test(reg)) police = `Tail number ${reg} ends in "PD", a common pick for police helicopters`
+  if (!police && heli && /\b(CITY|COUNTY|PARISH|TOWN|VILLAGE) OF\b/.test(op) && !/\bFIRE\b/.test(op))
+    police = `Owned by ${titleCase(op)}. City and county helicopters are usually police (sometimes fire)`
+
+  // --- Medical -----------------------------------------------------------
+  let medical = police ? null : ownerHit(MEDICAL_OWNER_WORDS)
+  // A plain "medical" or "health" company owning a jet is usually just a business jet.
+  if (medical && !heli && medical.includes('a hospital or health system')) medical = null
+  if (!medical && /^(MEDEVAC|LIFEGUARD|LIFEFLT|LIFEFLIGHT)\d*$/.test(callsign)) medical = `Callsign ${callsign}`
+  // UK air ambulances fly as "Helimed" (HLE + number).
+  if (!medical && heli && /^HLE\d{1,3}[A-Z]?$/.test(callsign)) medical = `Callsign ${callsign}: "Helimed", used by UK air ambulances`
 
   // --- Military / government -------------------------------------------
   let mil: string | null = null
@@ -151,12 +211,14 @@ export function detectSpecial(r: RawAircraft, callsign: string): SpecialMatch[] 
   else if (hexIn(r.hex, 0xadf7c8, 0xafffff)) mil = 'US military transponder address block'
   else if (hexIn(r.hex, 0x43c000, 0x43cfff)) mil = 'UK military transponder address block'
   else if (callsign) mil = prefixMatch(callsign, MILGOV_CALLSIGNS)
-  if (!mil && op) {
+  if (!mil && op && !police && !medical) {
     const w = MILGOV_OPERATOR_WORDS.find((x) => op.includes(x))
     if (w) mil = `Operator: ${titleCase(op)}`
   }
   if (!mil && r.category === 'A6') mil = 'High-performance category (usually military jets)'
   if (mil) out.push({ tag: 'milgov', reason: mil })
+  if (police) out.push({ tag: 'police', reason: heli || !police.startsWith('Owned') ? police : `${police}. A plane, not a helicopter` })
+  if (medical) out.push({ tag: 'medical', reason: heli || !medical.startsWith('Owned') ? medical : `${medical}. An air-ambulance plane` })
 
   // --- Sports ------------------------------------------------------------
   let sport: string | null = SPORTS_REGISTRATIONS[reg] ?? null
@@ -168,9 +230,8 @@ export function detectSpecial(r: RawAircraft, callsign: string): SpecialMatch[] 
   if (sport) out.push({ tag: 'sports', reason: sport })
 
   // --- TV news -------------------------------------------------------------
-  const heli = r.category === 'A7' || inferCategory(r.t) === 'A7'
   let news: string | null = null
-  if (op && !mil) {
+  if (op && !mil && !police && !medical) {
     const hit = NEWS_OWNER_WORDS.find(([re]) => re.test(op))
     if (hit) news = `Owned by ${titleCase(op)} (${hit[1]})`
   }

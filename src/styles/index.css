@@ -192,18 +192,24 @@ body {
   }
 }
 
-/* Always-on tag over TV news aircraft */
-.news-tag {
+/* Always-on tag over police, medical and TV news aircraft */
+.service-tag {
   position: absolute;
   left: 50%;
   bottom: 100%;
   transform: translate(-50%, -1px);
   font: 800 8px/1.3 ui-sans-serif, system-ui, sans-serif;
   letter-spacing: 0.06em;
-  color: #1e0a22;
+  color: #0b1220;
   background: #e879f9;
   padding: 0 3px;
   border-radius: 3px;
   white-space: nowrap;
   pointer-events: none;
+}
+.service-police {
+  background: #60a5fa;
+}
+.service-medical {
+  background: #2dd4bf;
 }

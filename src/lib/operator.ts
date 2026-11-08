@@ -92,6 +92,9 @@ export function guessOperator(a: Aircraft, owner?: string, fileCode?: string): O
       }
   }
   if (milgov) return { headline: 'Military / government', detail: milgov.reason, basis: 'military' }
+  const service = a.special.find((s) => s.tag === 'police' || s.tag === 'medical' || s.tag === 'news')
+  if (service)
+    return { headline: service.tag === 'police' ? 'Police' : service.tag === 'medical' ? 'Air ambulance' : 'TV news', detail: service.reason, basis: 'owner' }
   const ownerClass = classifyOwner(owner)
   if (fileCode && airlineName(fileCode)) return { headline: airlineName(fileCode)!, detail: `The aircraft database lists ${fileCode} as its usual operator.`, basis: 'owner' }
   if (ownerClass && ownerClass.role !== 'A company (corporate or private)' && ownerClass.role !== 'A private owner')

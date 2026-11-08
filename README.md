@@ -183,12 +183,18 @@ Sightings are saved to your profile like the logbook.
   aircraft broadcasts itself: Light, Small, Large, B757 (high vortex), Heavy, High performance,
   Rotorcraft, Glider, Balloon, Ultralight, Drone, Ground vehicle, Unknown
 - **Who's flying** chips:
-  - **Military / Gov**: air forces, navies, coast guards, police, customs, NASA and similar.
+  - **Military / Gov**: air forces, navies, coast guards, customs, NASA and similar.
     Matched by the aircraft database's military flag, the US/UK military transponder address
     blocks, known callsigns (RCH, SAM, SPAR, CNV, RRR…) or the registered operator.
   - **Sports**: likely sports-team flights. Matched by team-owned jets, charter airlines that
     mostly fly teams (GlobalX, iAero) or the operator name. Many team flights go out on regular
     airline charters with ordinary callsigns, so this group misses some.
+  - **Police**: police, sheriff and state patrol aircraft, tagged POLICE on the map. Matched by the
+    registered owner (police department, sheriff, state patrol, public safety), NYPD/LAPD/CHP-style
+    callsigns, tail numbers ending in PD (N414PD), or helicopters owned by a city or county.
+  - **Medical**: air ambulances, tagged MEDICAL on the map. Matched by the owner (Air Methods, PHI,
+    Air Evac, Med-Trans, Guardian Flight, Life Flight-type programs; hospitals and health systems for
+    helicopters only), MEDEVAC/LIFEGUARD callsigns, or "Helimed" (HLE) for UK air ambulances.
   - **News**: TV news helicopters (and station planes), tagged NEWS on the map. Matched by the
     registered owner (TV stations, broadcasters and their parent companies like TEGNA, Nexstar,
     Sinclair, Gray, Scripps, Hearst, Fox, NBC, CBS, ABC, plus Helinet and Angel City Air, which fly

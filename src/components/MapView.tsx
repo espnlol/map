@@ -82,6 +82,12 @@ function planeSvg(color: string, rotation: number, size: number, isHeli: boolean
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" style="transform: rotate(${rotation}deg)">${body}</svg>`
 }
 
+const SERVICE_TAGS = { police: 'POLICE', medical: 'MEDICAL', news: 'NEWS' } as const
+function serviceTag(a: Aircraft) {
+  const sp = a.special.find((s) => s.tag in SERVICE_TAGS)
+  return sp ? `<span class="service-tag service-${sp.tag}">${SERVICE_TAGS[sp.tag as keyof typeof SERVICE_TAGS]}</span>` : ''
+}
+
 function iconFor(a: Aircraft, selected: boolean, label: boolean) {
   const info = categoryInfo(a.category)
   const color = a.emergency ? '#ef4444' : a.onGround ? '#64748b' : info.color
@@ -92,7 +98,7 @@ function iconFor(a: Aircraft, selected: boolean, label: boolean) {
     className: 'plane-icon',
     html: `<div style="position:relative;width:${size}px;height:${size}px">${ring}${sel}${planeSvg(color, a.track ?? 0, size, a.category === 'A7')}${
       label ? `<span class="plane-label">${a.callsign}</span>` : ''
-    }${a.special.some((s) => s.tag === 'news') ? '<span class="news-tag">NEWS</span>' : ''}</div>`,
+    }${serviceTag(a)}</div>`,
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
   })
