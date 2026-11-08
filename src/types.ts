@@ -1,46 +1,38 @@
-// Domain types for the strain & terpene explorer.
+export type Category = 'Commercial' | 'Cargo' | 'Military / State' | 'General aviation'
 
-export type StrainLineage = 'indica' | 'sativa' | 'hybrid'
+export type Cause =
+  | 'Mechanical'
+  | 'Human error'
+  | 'Weather'
+  | 'Fire'
+  | 'Collision'
+  | 'Bird strike'
+  | 'Terrorism'
+  | 'Shootdown'
+  | 'Deliberate'
+  | 'Unknown'
 
-export const LINEAGE_LABEL: Record<StrainLineage, string> = {
-  indica: 'Indica',
-  sativa: 'Sativa',
-  hybrid: 'Hybrid',
-}
+export type Phase = 'Takeoff' | 'Climb' | 'Cruise' | 'Approach' | 'Landing'
 
-export const LINEAGES: StrainLineage[] = ['indica', 'sativa', 'hybrid']
-
-/** A real cannabis genetic (cultivar). Effects/flavors/helpsWith are the
- * commonly-reported characteristics you'd see on a seed bank listing or
- * dispensary placard for this genetic — general industry-common knowledge,
- * not lab results for any specific batch, and not scraped from any single
- * commercial platform. Genetic lineage/parentage mentioned in `description`
- * is noted as "commonly cited" where the actual cross is disputed or
- * unconfirmed, rather than stated as settled fact. */
-export interface Strain {
+export interface Crash {
   id: string
   name: string
-  lineage: StrainLineage
-  effects: string[]
-  flavors: string[]
-  /** Terpene ids most commonly reported as dominant in this genetic. */
-  dominantTerpenes: string[]
-  /** Commonly-reported reasons people reach for this strain — general,
-   * user-reported association, not a medical claim or dosing guidance. */
-  helpsWith: string[]
-  description: string
-}
-
-/** A cannabis aroma compound. General, widely-published aromatic-chemistry
- * reference info — not per-product lab data, and not sourced from any
- * single commercial platform. Boiling points are approximate; vaporization
- * guides vary by a few degrees between sources. */
-export interface Terpene {
-  id: string
-  name: string
-  aroma: string[]
-  effects: string[]
-  alsoFoundIn: string[]
-  boilingPoint: string
-  description: string
+  /** ISO date, YYYY-MM-DD */
+  date: string
+  lat: number
+  lng: number
+  location: string
+  operator: string
+  aircraft: string
+  flight?: string
+  fatalities: number
+  survivors?: number
+  category: Category
+  cause: Cause
+  phase: Phase
+  summary: string
+  /** English Wikipedia article title */
+  wiki: string
+  /** Optional specific YouTube video URL; overrides the default search link */
+  video?: string
 }
