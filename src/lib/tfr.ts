@@ -25,6 +25,11 @@ export interface Tfr {
   lat?: number
   lon?: number
   url: string
+  /** Limits, when the FAA feed includes them (as text, ready to show). */
+  start?: string
+  end?: string
+  lower?: string
+  upper?: string
 }
 
 export const TFR_KINDS: Record<TfrKind, { label: string; color: string; emoji: string }> = {
@@ -122,6 +127,7 @@ export function parseTfrs(list: unknown, geo: unknown): Tfr[] {
     t.title = prop(o, 'description', 'title', 'name') ?? t.title
     t.state = prop(o, 'state') ?? t.state
     t.facility = prop(o, 'facility') ?? t.facility
+    readLimits(t, o)
   }
 
   const feats: unknown[] = Array.isArray((geo as Obj)?.features) ? ((geo as Obj).features as unknown[]) : []
@@ -135,6 +141,7 @@ export function parseTfrs(list: unknown, geo: unknown): Tfr[] {
     if (!t.title) t.title = prop(p, 'title', 'description', 'legal') ?? ''
     if (!t.type) t.type = prop(p, 'legal', 'type') ?? ''
     if (!t.state) t.state = prop(p, 'state')
+    readLimits(t, p)
   }
 
   const out: Tfr[] = []
@@ -150,6 +157,197 @@ export function parseTfrs(list: unknown, geo: unknown): Tfr[] {
   }
   const order: TfrKind[] = ['vip', 'space', 'security', 'hazard', 'event', 'other']
   return out.sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind) || a.id.localeCompare(b.id))
+}
+
+// ---------------------------------------------------------------------------
+// Times and altitudes, if the feed has them (field names vary, so match loosely)
+// ---------------------------------------------------------------------------
+
+function fmtWhen(v: string): string | undefined {
+  const n = Number(v)
+  const d = /^\d{12,13}$/.test(v) ? new Date(n) : /^\d{4}-\d{2}-\d{2}/.test(v) ? new Date(v) : null
+  if (!d || Number.isNaN(d.getTime())) return undefined
+  return d.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
+
+function fmtAltitude(v: string): string | undefined {
+  const t = v.trim().toUpperCase()
+  if (!t) return undefined
+  if (/^(SFC|SURFACE|GND|0)$/.test(t)) return 'the ground'
+  if (/^\d+$/.test(t)) return `${Number(t).toLocaleString()} ft`
+  if (/^FL\s?\d+$/.test(t)) return t.replace(/\s/, '')
+  return t.length < 30 ? t.toLowerCase() : undefined
+}
+
+function readLimits(t: Tfr, o: Obj) {
+  for (const [k, raw] of Object.entries(o)) {
+    if (raw == null || typeof raw === 'object') continue
+    const key = k.toLowerCase()
+    const v = String(raw).trim()
+    if (!v || /mod|creat|updat|issue/.test(key)) continue
+    if (!t.start && /effective|start|begin/.test(key)) t.start = fmtWhen(v)
+    else if (!t.end && /expir|end_|_end|^end|stop/.test(key)) t.end = fmtWhen(v)
+    else if (!t.upper && /upper|ceiling|top/.test(key)) t.upper = fmtAltitude(v)
+    else if (!t.lower && /lower|floor|bottom/.test(key)) t.lower = fmtAltitude(v)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Plain-English explanations
+// ---------------------------------------------------------------------------
+
+export interface TfrExplanation {
+  /** Short, specific name: "Wildfire", "Stadium", "Drones only"… */
+  what: string
+  /** Why it's there. */
+  why: string
+  /** Who can and can't fly in it. */
+  who: string
+  /** What these usually look like. */
+  usual?: string
+  /** The rule that creates it. */
+  rule?: string
+}
+
+export function explainTfr(t: Tfr): TfrExplanation {
+  const all = `${t.type} ${t.title}`.toUpperCase()
+  const drones = /\bUAS\b|UNMANNED|DRONE/.test(all)
+
+  if (t.kind === 'vip')
+    return {
+      what: /VICE PRESIDENT/.test(all) ? 'Vice President visit' : /PRESIDENT|POTUS/.test(all) ? 'Presidential visit' : 'VIP visit',
+      why: 'Protects the President, Vice President or another top official while they travel or stay in the area. These follow the motorcade and Air Force One, so they can appear and disappear within hours.',
+      who: 'Usually a 10-nautical-mile inner core where almost all private flying, drones and banner towing are banned, inside a 30-mile outer ring where pilots must file a flight plan, stay in contact with air traffic control and squawk an assigned code. Airline flights at major airports keep flying. Military jets and Coast Guard helicopters intercept planes that stray in.',
+      usual: 'Inner core 10 nm, outer ring 30 nm, from the ground up to 17,999 ft.',
+      rule: '14 CFR 91.141',
+    }
+
+  if (t.kind === 'space')
+    return {
+      what: /REENTRY|RE-ENTRY|RECOVERY/.test(all) ? 'Spacecraft reentry' : 'Rocket launch',
+      why: 'Keeps aircraft out from under the rocket\'s path and the area where debris could fall if something goes wrong.',
+      who: 'Closed to all aircraft during the launch window except those working the launch. Airline flights are rerouted around it, which can add delays across Florida and the Atlantic.',
+      usual: 'Long corridors stretching offshore along the flight path, active only for the launch window (often a few hours) and moved to a backup day if the launch slips.',
+      rule: '14 CFR 91.143',
+    }
+
+  if (t.kind === 'hazard') {
+    if (/FIRE/.test(all))
+      return {
+        what: 'Wildfire',
+        why: 'Keeps the sky clear for firefighting air tankers, helicopters and spotter planes working low over the fire.',
+        who: 'Only aircraft working the fire, plus others with permission from the fire\'s air operations. A single drone flying here can force every firefighting aircraft to land until it\'s gone.',
+        usual: 'A few miles around the fire, up to several thousand feet. It grows or moves as the fire does.',
+        rule: '14 CFR 91.137',
+      }
+    if (/HURRICANE|FLOOD|TORNADO|EARTHQUAKE|DISASTER|STORM/.test(all))
+      return {
+        what: 'Disaster relief',
+        why: 'Gives relief and rescue aircraft room to work after a natural disaster.',
+        who: 'Relief, rescue and medical flights only. News and sightseeing flights need permission.',
+        usual: 'Sized to the disaster area, usually from the ground up to a few thousand feet.',
+        rule: '14 CFR 91.137',
+      }
+    if (/VOLCAN/.test(all))
+      return {
+        what: 'Volcano',
+        why: 'Keeps aircraft away from an erupting or restless volcano. Ash can stop jet engines.',
+        who: 'Closed to most aircraft. Scientists\' and authorized flights only.',
+        rule: '14 CFR 91.137',
+      }
+    if (/SEARCH|RESCUE|RECOVERY/.test(all))
+      return {
+        what: 'Search and rescue',
+        why: 'Keeps the area clear for aircraft searching for missing people or recovering a crash.',
+        who: 'Search and rescue aircraft only. Others need permission.',
+        rule: '14 CFR 91.137',
+      }
+    if (/CHEMICAL|HAZMAT|GAS|SPILL|EXPLOS|NUCLEAR|RADIA/.test(all))
+      return {
+        what: 'Hazardous materials',
+        why: 'Keeps aircraft away from a chemical spill, gas leak, explosion or similar hazard on the ground.',
+        who: 'Closed to aircraft except those responding to the incident.',
+        rule: '14 CFR 91.137',
+      }
+    if (/POLICE|LAW ENFORCEMENT|SECURITY/.test(all))
+      return {
+        what: 'Police incident',
+        why: 'Gives police helicopters room to work over an active incident on the ground.',
+        who: 'Police and emergency aircraft only. News helicopters need permission and often orbit just outside.',
+        usual: 'Small, often 1–3 nm, up to a few thousand feet, for a few hours.',
+        rule: '14 CFR 91.137',
+      }
+    return {
+      what: 'Emergency on the ground',
+      why: 'Protects people on the ground or emergency aircraft working an incident (accident, fire, rescue or other emergency).',
+      who: 'Emergency and relief aircraft only. Others need permission.',
+      usual: 'Usually a few miles wide, up to a few thousand feet.',
+      rule: '14 CFR 91.137',
+    }
+  }
+
+  if (t.kind === 'event') {
+    if (/AIR ?SHOW|DEMONSTRATION|AEROBATIC|FLYOVER|PARACHUTE|BLUE ANGELS|THUNDERBIRDS/.test(all))
+      return {
+        what: /PARACHUTE/.test(all) ? 'Parachute jumping' : 'Air show',
+        why: 'Reserves the airspace for performers at an air show or flying demonstration.',
+        who: 'Only the performing aircraft and those with permission, during show times.',
+        usual: 'A few miles around the show area, active only during performances.',
+        rule: '14 CFR 91.145',
+      }
+    return {
+      what: /RACE|SPEEDWAY|NASCAR|INDY/.test(all) ? 'Motor race' : 'Stadium event',
+      why: 'Protects big crowds at a major sporting event.',
+      who: 'No private planes, banner towers or drones. Broadcast, police and medical aircraft with permission can fly.',
+      usual: 'Stadiums with 30,000+ seats for MLB, NFL, NCAA Division I football and major motor races: 3 nm around the venue, up to 3,000 ft above the ground, from 1 hour before to 1 hour after the event.',
+      rule: drones ? '14 CFR 99.7' : '14 CFR 99.7 / 91.145',
+    }
+  }
+
+  if (t.kind === 'security') {
+    if (/DISNEY/.test(all))
+      return {
+        what: 'Disney park',
+        why: 'A permanent restriction over Disneyland and Walt Disney World, set up after 9/11.',
+        who: 'No private planes, banner towers or drones. Police, medical and some other flights are allowed.',
+        usual: '3 nm around the park, up to 3,000 ft above the ground, always active.',
+        rule: '14 CFR 99.7',
+      }
+    if (drones)
+      return {
+        what: 'Drones only',
+        why: 'Keeps drones away from a sensitive site such as a military base, prison, power plant or government facility.',
+        who: 'Drones are banned. Regular planes and helicopters can still fly through.',
+        usual: 'Usually small, often under 1 nm, up to 400 ft above the ground.',
+        rule: '14 CFR 99.7',
+      }
+    return {
+      what: /MILITARY|BASE|NAVAL|ARMY|AIR FORCE/.test(all) ? 'Military security' : 'Security zone',
+      why: 'A national security restriction, for example a sensitive site, a major event or a protective operation.',
+      who: 'Varies. Read the FAA notice for who can enter and what pilots must do.',
+      rule: '14 CFR 99.7',
+    }
+  }
+
+  return {
+    what: 'Flight restriction',
+    why: 'A temporary restriction the FAA put up for safety or security.',
+    who: 'Pilots need permission to enter. Read the FAA notice for details.',
+  }
+}
+
+/** Is a point inside the TFR's outline? */
+export function insideTfr(t: Tfr, lat: number, lon: number): boolean {
+  for (const ring of t.polygons) {
+    let inside = false
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [yi, xi] = ring[i]
+      const [yj, xj] = ring[j]
+      if (yi > lat !== yj > lat && lon < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) inside = !inside
+    }
+    if (inside) return true
+  }
+  return false
 }
 
 let cache: { at: number; data: Tfr[] } | null = null

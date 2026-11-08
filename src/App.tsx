@@ -689,6 +689,7 @@ export default function App() {
           }}
           tfrs={tfrs}
           tfrOn={cfg.restrictedAreas}
+          aircraft={traffic.aircraft}
           center={center}
           radiusNm={radius}
           onOpenTfr={(id) => {

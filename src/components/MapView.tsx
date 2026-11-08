@@ -7,7 +7,7 @@ import { busyness, liveAtcUrl, loadAirports, type AirportInfo } from '../lib/air
 import { settings, type BaseMap } from '../lib/settings'
 import type { Hotspot } from '../lib/happening'
 import type { MilitaryPattern } from '../lib/patterns'
-import { TFR_KINDS, type Tfr } from '../lib/tfr'
+import { TFR_KINDS, explainTfr, type Tfr } from '../lib/tfr'
 
 /** Altitude → colour, low = orange, high = violet (same idea as most flight trackers). */
 export function altColor(alt: number | null): string {
@@ -399,8 +399,8 @@ export default function MapView({ aircraft, selected, onSelect, center, radiusNm
         fillOpacity: t.kind === 'vip' ? 0.14 : 0.08,
         renderer: renderer.current,
       })
-        .bindTooltip(`${k.emoji} ${esc(k.label)} TFR`, { sticky: true })
-        .bindPopup(tfrPopup(t))
+        .bindTooltip(`${k.emoji} ${esc(explainTfr(t).what)}`, { sticky: true })
+        .bindPopup(tfrPopup(t), { maxWidth: 300, maxHeight: 330, autoPanPaddingTopLeft: [20, 70], autoPanPaddingBottomRight: [20, 40 + insetRef.current] })
         .addTo(tfrLayer.current)
       tfrShapes.current.set(t.id, shape)
     }
@@ -572,12 +572,23 @@ function airportPopup(ap: AirportInfo, b: ReturnType<typeof busyness>) {
 
 function tfrPopup(t: Tfr) {
   const k = TFR_KINDS[t.kind]
+  const x = explainTfr(t)
   const where = [t.facility, t.state].filter(Boolean).join(' · ')
-  return `<div style="font-size:12px;line-height:1.45;max-width:260px">
-    <div style="font-weight:700;font-size:14px;color:${k.color}">${k.emoji} ${esc(k.label)}</div>
-    <div style="color:#64748b">NOTAM ${esc(t.id)}${where ? ` · ${esc(where)}` : ''}${t.type ? ` · ${esc(t.type)}` : ''}</div>
-    ${t.title ? `<div style="margin-top:6px">${esc(t.title)}</div>` : ''}
-    <div style="margin-top:6px;color:#64748b">Pilots need permission to fly in here. Outline is approximate; the FAA notice has the exact limits and times.</div>
+  const limits = [
+    t.lower || t.upper ? `From ${esc(t.lower ?? 'the ground')} up to ${esc(t.upper ?? '?')}` : '',
+    t.start || t.end ? `${t.start ? `Starts ${esc(t.start)}` : ''}${t.start && t.end ? ', ' : ''}${t.end ? `ends ${esc(t.end)}` : ''}` : '',
+  ].filter(Boolean)
+  const part = (label: string, text?: string) =>
+    text ? `<div style="margin-top:6px"><b style="color:#94a3b8;font-size:10px;letter-spacing:.06em;text-transform:uppercase">${label}</b><br/>${text}</div>` : ''
+  return `<div style="font-size:12px;line-height:1.45;max-width:280px">
+    <div style="font-weight:700;font-size:14px;color:${k.color}">${k.emoji} ${esc(x.what)}</div>
+    <div style="color:#64748b">${esc(k.label)} · NOTAM ${esc(t.id)}${where ? ` · ${esc(where)}` : ''}</div>
+    ${t.title ? `<div style="margin-top:6px;font-style:italic">"${esc(t.title)}"</div>` : ''}
+    ${part('Why it\'s here', esc(x.why))}
+    ${part('Who can fly in it', esc(x.who))}
+    ${part('This one', limits.join('<br/>'))}
+    ${part('Usually', x.usual && esc(x.usual))}
+    <div style="margin-top:6px;color:#64748b">${x.rule ? `FAA rule ${esc(x.rule)}. ` : ''}The outline is approximate; the FAA notice has the exact limits and times.</div>
     <a href="${t.url}" target="_blank" rel="noreferrer" style="display:block;margin-top:8px;text-align:center;padding:6px;border-radius:6px;border:1px solid #334155;color:#7dd3fc;font-weight:600;text-decoration:none">Read the FAA notice ↗</a>
   </div>`
 }

@@ -4,8 +4,9 @@ import type { Hotspot } from '../lib/happening'
 import type { MilitaryPattern } from '../lib/patterns'
 import { fmtAlt, fmtClock, fmtRelative } from '../lib/format'
 import { fmtDist } from '../lib/format'
-import { TFR_KINDS, tfrsNear, type Tfr } from '../lib/tfr'
-import type { Center } from '../types'
+import { TFR_KINDS, explainTfr, insideTfr, tfrsNear, type Tfr } from '../lib/tfr'
+import { SPECIAL_GROUPS } from '../lib/special'
+import type { Aircraft, Center } from '../types'
 
 const TIER_STYLE = {
   legendary: 'bg-amber-400 text-slate-950',
@@ -32,9 +33,10 @@ interface Props {
   center: Center
   radiusNm: number
   onOpenTfr: (id: string) => void
+  aircraft: Aircraft[]
 }
 
-export default function AlertsMenu({ onClose, hotspots, placeOf, onOpenRare, onOpenHotspot, onScan, scanning, rareOn, happeningOn, military, onOpenHex, onRareList, onMilWatch, tfrs, tfrOn, center, radiusNm, onOpenTfr }: Props) {
+export default function AlertsMenu({ onClose, hotspots, placeOf, onOpenRare, onOpenHotspot, onScan, scanning, rareOn, happeningOn, military, onOpenHex, onRareList, onMilWatch, tfrs, tfrOn, center, radiusNm, onOpenTfr, aircraft }: Props) {
   const rare = rareStore.use()
   useEffect(() => markRareViewed, [])
   const near = rare.current.filter((r) => r.nearby)
@@ -44,6 +46,12 @@ export default function AlertsMenu({ onClose, hotspots, placeOf, onOpenRare, onO
   const vipElsewhere = tfrs ? tfrs.filter((t) => t.kind === 'vip' && !nearTfrs.includes(t)) : []
   const tfrRow = (t: Tfr) => {
     const k = TFR_KINDS[t.kind]
+    const x = explainTfr(t)
+    const inside = t.polygons.length ? aircraft.filter((a) => !a.onGround && insideTfr(t, a.lat, a.lon)) : []
+    const tagOf = (a: Aircraft) => {
+      const sp = a.special[0]
+      return sp ? ` (${SPECIAL_GROUPS.find((g) => g.tag === sp.tag)?.label})` : ''
+    }
     return (
       <li key={t.id}>
         <button
@@ -52,13 +60,27 @@ export default function AlertsMenu({ onClose, hotspots, placeOf, onOpenRare, onO
         >
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded px-1.5 text-[10px] font-bold uppercase text-slate-950" style={{ background: k.color }}>
-              {k.label}
+              {x.what}
             </span>
             <span className="text-xs text-slate-400">
               {[t.state, t.facility].filter(Boolean).join(' · ')} · NOTAM {t.id}
             </span>
           </div>
           {t.title && <div className="line-clamp-2 text-xs text-slate-300">{t.title}</div>}
+          <div className="text-[11px] text-slate-400">{x.who.split('. ')[0]}.</div>
+          {(t.upper || t.end) && (
+            <div className="text-[11px] text-slate-500">
+              {t.upper && `Up to ${t.upper}`}
+              {t.upper && t.end && ' · '}
+              {t.end && `until ${t.end}`}
+            </div>
+          )}
+          {inside.length > 0 && (
+            <div className="text-[11px] text-amber-200">
+              {inside.length === 1 ? '1 aircraft' : `${inside.length} aircraft`} inside now: {inside.slice(0, 4).map((a) => a.callsign + tagOf(a)).join(', ')}
+              {inside.length > 4 ? '…' : ''}
+            </div>
+          )}
         </button>
       </li>
     )
