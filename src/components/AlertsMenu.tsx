@@ -1,10 +1,10 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { markRareViewed, rareStore, type RareSighting } from '../lib/rare'
 import type { Hotspot } from '../lib/happening'
 import type { MilitaryPattern } from '../lib/patterns'
 import { fmtAlt, fmtClock, fmtRelative } from '../lib/format'
 import { fmtDist } from '../lib/format'
-import { TFR_KINDS, explainTfr, insideTfr, tfrsNear, type Tfr } from '../lib/tfr'
+import { TFR_KINDS, explainTfr, fetchTfrDetail, liveContext, quickCauses, tfrsNear, type Tfr, type TfrDetail } from '../lib/tfr'
 import { SPECIAL_GROUPS } from '../lib/special'
 import type { Aircraft, Center } from '../types'
 
@@ -44,10 +44,20 @@ export default function AlertsMenu({ onClose, hotspots, placeOf, onOpenRare, onO
 
   const nearTfrs = tfrs ? tfrsNear(tfrs, center.lat, center.lon, Math.max(radiusNm, 60) * 1.3) : []
   const vipElsewhere = tfrs ? tfrs.filter((t) => t.kind === 'vip' && !nearTfrs.includes(t)) : []
+  const [details, setDetails] = useState<Record<string, TfrDetail | null>>({})
+  const shownIds = [...nearTfrs, ...vipElsewhere].slice(0, 12).map((t) => t.id).join()
+  useEffect(() => {
+    for (const t of [...nearTfrs, ...vipElsewhere].slice(0, 12)) fetchTfrDetail(t).then((d) => setDetails((m) => ({ ...m, [t.id]: d })))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shownIds])
+
   const tfrRow = (t: Tfr) => {
     const k = TFR_KINDS[t.kind]
     const x = explainTfr(t)
-    const inside = t.polygons.length ? aircraft.filter((a) => !a.onGround && insideTfr(t, a.lat, a.lon)) : []
+    const d = details[t.id]
+    const live = liveContext(t, aircraft)
+    const inside = live.inside
+    const causes = d?.causes.length ? d.causes : quickCauses(t)
     const tagOf = (a: Aircraft) => {
       const sp = a.special[0]
       return sp ? ` (${SPECIAL_GROUPS.find((g) => g.tag === sp.tag)?.label})` : ''
@@ -67,12 +77,18 @@ export default function AlertsMenu({ onClose, hotspots, placeOf, onOpenRare, onO
             </span>
           </div>
           {t.title && <div className="line-clamp-2 text-xs text-slate-300">{t.title}</div>}
+          {causes.length > 0 && <div className="text-xs font-semibold text-slate-100">{causes.join(' · ')}</div>}
+          {d?.purpose && <div className="line-clamp-2 text-[11px] text-slate-300">{d.purpose}</div>}
+          {d?.inCharge && <div className="text-[11px] text-slate-400">Run by {d.inCharge}</div>}
+          {live.notes.map((n) => (
+            <div key={n} className="text-[11px] text-amber-200">● {n}</div>
+          ))}
           <div className="text-[11px] text-slate-400">{x.who.split('. ')[0]}.</div>
-          {(t.upper || t.end) && (
+          {(d?.upper ?? t.upper ?? d?.end ?? t.end) && (
             <div className="text-[11px] text-slate-500">
-              {t.upper && `Up to ${t.upper}`}
-              {t.upper && t.end && ' · '}
-              {t.end && `until ${t.end}`}
+              {(d?.upper ?? t.upper) && `Up to ${d?.upper ?? t.upper}`}
+              {(d?.upper ?? t.upper) && (d?.end ?? t.end) && ' · '}
+              {(d?.end ?? t.end) && `until ${d?.end ?? t.end}`}
             </div>
           )}
           {inside.length > 0 && (

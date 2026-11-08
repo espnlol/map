@@ -7,7 +7,7 @@ import { busyness, liveAtcUrl, loadAirports, type AirportInfo } from '../lib/air
 import { settings, type BaseMap } from '../lib/settings'
 import type { Hotspot } from '../lib/happening'
 import type { MilitaryPattern } from '../lib/patterns'
-import { TFR_KINDS, explainTfr, type Tfr } from '../lib/tfr'
+import { TFR_KINDS, explainTfr, fetchTfrDetail, liveContext, quickCauses, type Tfr, type TfrDetail } from '../lib/tfr'
 
 /** Altitude → colour, low = orange, high = violet (same idea as most flight trackers). */
 export function altColor(alt: number | null): string {
@@ -400,6 +400,11 @@ export default function MapView({ aircraft, selected, onSelect, center, radiusNm
         renderer: renderer.current,
       })
         .bindTooltip(`${k.emoji} ${esc(explainTfr(t).what)}`, { sticky: true })
+        .on('popupopen', () => {
+          const live = liveContext(t, aircraftRef.current).notes
+          shape.setPopupContent(tfrPopup(t, undefined, live))
+          fetchTfrDetail(t).then((d) => shape.isPopupOpen() && shape.setPopupContent(tfrPopup(t, d, liveContext(t, aircraftRef.current).notes)))
+        })
         .bindPopup(tfrPopup(t), { maxWidth: 300, maxHeight: 330, autoPanPaddingTopLeft: [20, 70], autoPanPaddingBottomRight: [20, 40 + insetRef.current] })
         .addTo(tfrLayer.current)
       tfrShapes.current.set(t.id, shape)
@@ -570,24 +575,40 @@ function airportPopup(ap: AirportInfo, b: ReturnType<typeof busyness>) {
   </div>`
 }
 
-function tfrPopup(t: Tfr) {
+/** detail: undefined = still loading, null = couldn't load. */
+function tfrPopup(t: Tfr, detail?: TfrDetail | null, live: string[] = []) {
   const k = TFR_KINDS[t.kind]
   const x = explainTfr(t)
   const where = [t.facility, t.state].filter(Boolean).join(' · ')
+  const causes = detail?.causes.length ? detail.causes : quickCauses(t)
+  const lower = detail?.lower ?? t.lower
+  const upper = detail?.upper ?? t.upper
+  const start = detail?.start ?? t.start
+  const end = detail?.end ?? t.end
   const limits = [
-    t.lower || t.upper ? `From ${esc(t.lower ?? 'the ground')} up to ${esc(t.upper ?? '?')}` : '',
-    t.start || t.end ? `${t.start ? `Starts ${esc(t.start)}` : ''}${t.start && t.end ? ', ' : ''}${t.end ? `ends ${esc(t.end)}` : ''}` : '',
+    lower || upper ? `From ${esc(lower ?? 'the ground')} up to ${esc(upper ?? '?')}` : '',
+    start || end ? `${start ? `Starts ${esc(start)}` : ''}${start && end ? ', ' : ''}${end ? `ends ${esc(end)}` : ''}` : '',
   ].filter(Boolean)
-  const part = (label: string, text?: string) =>
-    text ? `<div style="margin-top:6px"><b style="color:#94a3b8;font-size:10px;letter-spacing:.06em;text-transform:uppercase">${label}</b><br/>${text}</div>` : ''
+  const label = (s: string) => `<b style="color:#94a3b8;font-size:10px;letter-spacing:.06em;text-transform:uppercase">${s}</b>`
+  const part = (name: string, text?: string) => (text ? `<div style="margin-top:7px">${label(name)}<br/>${text}</div>` : '')
+  const cause = [
+    ...causes.map((c) => `<b>${esc(c)}</b>`),
+    ...live.map((n) => `<span style="color:#fbbf24">● ${esc(n)}</span>`),
+    detail?.purpose ? esc(detail.purpose) : '',
+    detail?.inCharge ? `Run by ${esc(detail.inCharge)}` : '',
+    detail?.place ? `Location: ${esc(detail.place)}` : '',
+    detail === undefined ? '<span style="color:#64748b">Reading the FAA notice…</span>' : '',
+    detail === null && !causes.length ? '<span style="color:#64748b">The FAA notice didn\'t load, so this is based on the zone\'s type.</span>' : '',
+  ].filter(Boolean)
   return `<div style="font-size:12px;line-height:1.45;max-width:280px">
     <div style="font-weight:700;font-size:14px;color:${k.color}">${k.emoji} ${esc(x.what)}</div>
     <div style="color:#64748b">${esc(k.label)} · NOTAM ${esc(t.id)}${where ? ` · ${esc(where)}` : ''}</div>
     ${t.title ? `<div style="margin-top:6px;font-style:italic">"${esc(t.title)}"</div>` : ''}
-    ${part('Why it\'s here', esc(x.why))}
-    ${part('Who can fly in it', esc(x.who))}
+    ${part("What's causing it", cause.join('<br/>'))}
     ${part('This one', limits.join('<br/>'))}
-    ${part('Usually', x.usual && esc(x.usual))}
+    ${part('Who can fly in it', esc(x.who))}
+    ${part('About this kind of zone', esc(x.why) + (x.usual ? ` ${esc(x.usual)}` : ''))}
+    ${detail?.text ? `<details style="margin-top:7px"><summary style="cursor:pointer;color:#7dd3fc">Full FAA notice</summary><div style="margin-top:4px;color:#cbd5e1;white-space:pre-wrap">${esc(detail.text)}</div></details>` : ''}
     <div style="margin-top:6px;color:#64748b">${x.rule ? `FAA rule ${esc(x.rule)}. ` : ''}The outline is approximate; the FAA notice has the exact limits and times.</div>
     <a href="${t.url}" target="_blank" rel="noreferrer" style="display:block;margin-top:8px;text-align:center;padding:6px;border-radius:6px;border:1px solid #334155;color:#7dd3fc;font-weight:600;text-decoration:none">Read the FAA notice ↗</a>
   </div>`

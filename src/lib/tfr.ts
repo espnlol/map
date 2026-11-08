@@ -350,6 +350,219 @@ export function insideTfr(t: Tfr, lat: number, lon: number): boolean {
   return false
 }
 
+// ---------------------------------------------------------------------------
+// The full FAA notice: what's actually causing a zone
+// ---------------------------------------------------------------------------
+
+export interface TfrDetail {
+  /** The notice's stated purpose, in plain case. */
+  purpose?: string
+  /** Specific causes pulled from the notice: "The Ridge Fire", "SpaceX Falcon 9 launch"… */
+  causes: string[]
+  /** Who runs it / who to call, if named. */
+  inCharge?: string
+  place?: string
+  start?: string
+  end?: string
+  upper?: string
+  lower?: string
+  /** The full notice, lightly cleaned up. */
+  text?: string
+}
+
+const ACRONYMS = /\b(faa|tfr|vip|uas|notam|atc|artcc|fdc|nm|nmr|ft|msl|agl|utc|usc|cfr|us|usa|nfl|mlb|ncaa|nascar|nhl|nba|mls|ifr|vfr|cal|dod|nasa|noaa|fbi|dhs|tsa|ems|ny|nj|dc|ca|fl|tx|nypd|lapd|lasd|chp|dec|sfs|afb|ula)\b/g
+
+/** NOTAM text is all caps; make it readable. */
+export function sentenceCase(s: string): string {
+  return s
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase()
+    .replace(ACRONYMS, (m) => m.toUpperCase())
+    .replace(/(^|[.!?]\s+)([a-z])/g, (_, a, b) => a + b.toUpperCase())
+}
+
+const title = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/\b([a-z])/g, (m) => m.toUpperCase())
+    .replace(/\bOf\b|\bThe\b|\bAnd\b/g, (m, i) => (i ? m.toLowerCase() : m))
+    .replace(new RegExp(ACRONYMS.source, 'gi'), (m) => m.toUpperCase())
+
+const STOP = new Set(['THE', 'A', 'AN', 'FOR', 'OF', 'TO', 'AND', 'IN', 'AT', 'ON', 'WITH', 'NEAR', 'BY', 'FROM', 'DUE', 'GAME', 'EVENT', 'IS', 'ARE'])
+/** Keep only the words after the last little word ("SAFE ENVIRONMENT FOR" → "", "NFL GAME AT METLIFE" → "METLIFE"). */
+function tail(words: string): string {
+  const w = words.trim().split(' ')
+  let i = w.length
+  while (i > 0 && !STOP.has(w[i - 1])) i--
+  return w.slice(i).join(' ')
+}
+
+const ROCKETS: [RegExp, string][] = [
+  [/FALCON ?9/, 'SpaceX Falcon 9'], [/FALCON HEAVY/, 'SpaceX Falcon Heavy'], [/STARSHIP|SUPER HEAVY/, 'SpaceX Starship'],
+  [/NEW GLENN/, 'Blue Origin New Glenn'], [/NEW SHEPARD/, 'Blue Origin New Shepard'], [/ATLAS ?V/, 'ULA Atlas V'],
+  [/VULCAN/, 'ULA Vulcan'], [/ELECTRON/, 'Rocket Lab Electron'], [/NEUTRON/, 'Rocket Lab Neutron'], [/ANTARES/, 'Northrop Grumman Antares'],
+  [/MINOTAUR/, 'Minotaur'], [/\bSLS\b|ARTEMIS/, 'NASA SLS / Artemis'], [/DRAGON/, 'SpaceX Dragon'], [/STARLINER/, 'Boeing Starliner'],
+  [/\bMISSILE\b/, 'Missile test'],
+]
+
+const EVENTS: [RegExp, string][] = [
+  [/SUPER ?BOWL/, 'the Super Bowl'], [/WORLD SERIES/, 'the World Series'], [/\bNFL\b/, 'an NFL game'], [/\bMLB\b|BASEBALL/, 'an MLB game'],
+  [/NCAA|COLLEGE FOOTBALL/, 'a college football game'], [/NASCAR/, 'a NASCAR race'], [/INDY ?CAR|INDIANAPOLIS 500|INDY 500/, 'an IndyCar race'],
+  [/FORMULA (1|ONE)|\bF1\b|GRAND PRIX/, 'a Formula 1 race'], [/KENTUCKY DERBY/, 'the Kentucky Derby'], [/MARATHON/, 'a marathon'],
+  [/PARADE/, 'a parade'], [/CONCERT|FESTIVAL/, 'a concert or festival'], [/GRADUATION|COMMENCEMENT/, 'a graduation'],
+  [/UNITED NATIONS|UN GENERAL ASSEMBLY|UNGA/, 'the UN General Assembly'], [/STATE OF THE UNION/, 'the State of the Union'],
+  [/INAUGURATION/, 'the inauguration'], [/G7|G20|SUMMIT/, 'a summit'], [/CONVENTION/, 'a convention'], [/FUNERAL|MEMORIAL/, 'a memorial or funeral'],
+]
+
+const INCIDENTS: [RegExp, string][] = [
+  [/AIRCRAFT (ACCIDENT|CRASH)|PLANE CRASH/, 'an aircraft accident'], [/BUILDING COLLAPSE/, 'a building collapse'], [/BRIDGE COLLAPSE/, 'a bridge collapse'],
+  [/CHEMICAL (SPILL|RELEASE|FIRE)|HAZMAT|HAZARDOUS MATERIAL/, 'a hazardous-materials incident'], [/GAS (LEAK|EXPLOSION)|PIPELINE/, 'a gas or pipeline incident'],
+  [/TRAIN DERAIL|DERAILMENT/, 'a train derailment'], [/OIL SPILL/, 'an oil spill'], [/SEARCH AND RESCUE|\bSAR\b/, 'search and rescue'],
+  [/LAW ENFORCEMENT/, 'law enforcement activity'], [/VOLCANIC|ERUPTION/, 'volcanic activity'], [/FLOOD/, 'flooding'],
+  [/PRESCRIBED (BURN|FIRE)|CONTROLLED BURN/, 'a prescribed (controlled) burn'], [/DEMOLITION|IMPLOSION/, 'a demolition'],
+  [/HURRICANE ([A-Z]+)/, ''], [/TROPICAL STORM ([A-Z]+)/, ''],
+]
+
+/** Pull the specific causes out of a notice's text. */
+export function findCauses(raw: string, t?: Tfr): { causes: string[]; inCharge?: string; purpose?: string } {
+  const u = raw.toUpperCase().replace(/\s+/g, ' ')
+  const causes: string[] = []
+  const add = (c: string) => c && !causes.includes(c) && causes.push(c)
+
+  // Named fires: "THE RIDGE FIRE", "DIXIE COMPLEX"
+  for (const m of u.matchAll(/\b([A-Z][A-Z0-9'-]*(?: [A-Z][A-Z0-9'-]*){0,3}) (FIRE|COMPLEX)\b/g)) {
+    if (/^ ?(FIGHT|SUPPRESS|DEPARTMENT|DEPT|RESCUE|AIRCRAFT|OPERATIONS|TRAINING)/.test(u.slice((m.index ?? 0) + m[0].length))) continue
+    const name = tail(m[1])
+    if (!name || /^(WILD|BRUSH|FOREST|SUPPORT|ACTIVE|STRUCTURE|GRASS|LARGE|PRESCRIBED|CONTROLLED|VEHICLE|HOUSE|BUILDING)$/.test(name)) continue
+    if (/(FIGHTING|SUPPRESSION|RELIEF|AIRCRAFT|OPERATIONS)$/.test(name)) continue
+    add(`The ${title(name)} ${m[2] === 'COMPLEX' ? 'Complex fire' : 'Fire'}`)
+  }
+  for (const [re, label] of ROCKETS) if (re.test(u)) add(/test/.test(label) ? label : `${label} ${/REENTRY|RE-ENTRY|RECOVERY|SPLASHDOWN/.test(u) ? 'return' : 'launch'}`)
+  for (const [re, label] of EVENTS) if (re.test(u)) add(`For ${label}`)
+  for (const [re, label] of INCIDENTS) {
+    const m = u.match(re)
+    if (m) add(label ? `Because of ${label}` : `Because of ${title(m[0])}`)
+  }
+  // Venue: "AT METLIFE STADIUM", "DAYTONA INTERNATIONAL SPEEDWAY"
+  const venue = u.match(/\b((?:[A-Z][A-Z.&'-]*\s){0,4}(?:STADIUM|SPEEDWAY|FIELD|ARENA|BALLPARK|RACEWAY|MOTOR SPEEDWAY|COLISEUM|BOWL|DOME))\b/)
+  const venueName = venue ? tail(venue[1].trim()) : ''
+  if (venueName && venueName.includes(' ') && (t?.kind === 'event' || t?.kind === 'security') && !/AIRFIELD|AIRPORT/.test(venueName)) add(`At ${title(venueName)}`)
+  if (/VIP MOVEMENT|VIP/.test(u) && t?.kind === 'vip') add(/VICE PRESIDENT/.test(u) ? 'Vice Presidential movement' : 'VIP movement (usually the President)')
+  if (/\bUAS\b|UNMANNED/.test(u) && !causes.length) add('Drone (UAS) restriction')
+
+  const purposeM = u.match(/(TO PROVIDE A SAFE ENVIRONMENT FOR [^.]+|DUE TO [^.]{8,140}|FOR THE PURPOSE OF [^.]+|TO PROTECT [^.]+)/)
+  const chargeM = u.match(/UNDER (?:THE )?DIRECTION OF ([^.]{4,90}?)(?: ARE AUTHORIZED| IS AUTHORIZED|\.|,| TELEPHONE| PHONE| FREQ)/) ?? u.match(/(?:^|\. )([A-Z][A-Z .&'-]{3,60}?) IS IN CHARGE OF THE ON SCENE EMERGENCY RESPONSE/)
+  return {
+    causes,
+    purpose: purposeM ? sentenceCase(purposeM[1]) + '.' : undefined,
+    inCharge: chargeM ? title(chargeM[1].trim()) : undefined,
+  }
+}
+
+function xmlField(doc: Document, ...names: string[]): string | undefined {
+  const wanted = names.map((n) => n.toLowerCase())
+  for (const el of Array.from(doc.getElementsByTagName('*'))) {
+    if (wanted.includes(el.localName.toLowerCase()) && el.textContent?.trim()) return el.textContent.trim()
+  }
+  return undefined
+}
+
+function parseDetail(body: string, t?: Tfr): TfrDetail | null {
+  let text = ''
+  let d: Partial<TfrDetail> = {}
+  if (/^\s*</.test(body) && /<\?xml|<XNOTAM|<Group|<Not/i.test(body.slice(0, 500))) {
+    const doc = new DOMParser().parseFromString(body, 'text/xml')
+    text = xmlField(doc, 'txtDescrUSNS', 'txtDescrTraditional', 'txtDescrModern') ?? ''
+    const purpose = xmlField(doc, 'txtDescrPurpose')
+    const upperVal = xmlField(doc, 'valDistVerUpper')
+    const lowerVal = xmlField(doc, 'valDistVerLower')
+    const upperRef = xmlField(doc, 'codeDistVerUpper')
+    const lowerRef = xmlField(doc, 'codeDistVerLower')
+    const ref = (r?: string) => (r === 'HEI' ? ' above the ground' : r === 'ALT' ? ' above sea level' : '')
+    const city = [xmlField(doc, 'txtNameCity'), xmlField(doc, 'txtNameUSState')].filter(Boolean).join(', ')
+    d = {
+      purpose: purpose ? sentenceCase(purpose) : undefined,
+      place: city ? title(city) : undefined,
+      start: (() => { const v = xmlField(doc, 'dateEffective'); return v ? fmtWhen(v.endsWith('Z') ? v : v + 'Z') ?? v : undefined })(),
+      end: (() => { const v = xmlField(doc, 'dateExpire'); return v ? fmtWhen(v.endsWith('Z') ? v : v + 'Z') ?? v : undefined })(),
+      upper: upperVal ? (fmtAltitude(upperVal) ?? upperVal) + ref(upperRef) : undefined,
+      lower: lowerVal ? (fmtAltitude(lowerVal) ?? lowerVal) + (lowerVal === '0' ? '' : ref(lowerRef)) : undefined,
+    }
+    if (!text) text = Array.from(doc.getElementsByTagName('*')).map((e) => (e.children.length ? '' : e.textContent ?? '')).sort((a, b) => b.length - a.length)[0] ?? ''
+  } else {
+    // HTML or plain text
+    text = body.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
+    try {
+      const j = JSON.parse(body)
+      if (typeof j === 'string') text = j
+      else if (j && typeof j === 'object') text = Object.values(j).filter((v) => typeof v === 'string').sort((a, b) => (b as string).length - (a as string).length)[0] as string
+    } catch {
+      /* not JSON */
+    }
+  }
+  text = text.trim()
+  if (!text && !d.purpose) return null
+  const found = findCauses(`${d.purpose ?? ''} ${text}`, t)
+  return {
+    ...d,
+    causes: found.causes,
+    inCharge: found.inCharge,
+    purpose: (() => {
+      const pur = d.purpose ?? found.purpose
+      const norm = (x: string) => x.toLowerCase().replace(/[^a-z ]/g, '').trim()
+      // Skip a purpose that just repeats a cause ("VIP movement").
+      return pur && !found.causes.some((c) => norm(c).includes(norm(pur)) || norm(pur).length < 16) ? pur : undefined
+    })(),
+    text: text ? sentenceCase(text) : undefined,
+  }
+}
+
+const details = new Map<string, Promise<TfrDetail | null>>()
+
+/** The full notice for one TFR, with its causes pulled out. Cached. */
+export function fetchTfrDetail(t: Tfr): Promise<TfrDetail | null> {
+  let p = details.get(t.id)
+  if (!p) {
+    const base = upstream('tfr')
+    const get = async (path: string) => {
+      const r = await fetch(base + path)
+      if (!r.ok) throw new Error(String(r.status))
+      return r.text()
+    }
+    p = get(`/save_pages/detail_${t.id.replace('/', '_')}.xml`)
+      .catch(() => get(`/tfrapi/getWebText?notamId=${encodeURIComponent(t.id)}`))
+      .then((body) => parseDetail(body, t))
+      .catch(() => {
+        details.delete(t.id) // try again next time
+        return null
+      })
+    details.set(t.id, p)
+  }
+  return p
+}
+
+/** Causes we can tell from the short description alone (before the full notice loads). */
+export const quickCauses = (t: Tfr) => findCauses(`${t.type} ${t.title}`, t).causes
+
+/** What live traffic says about a zone: presidential planes nearby, who's inside. */
+export function liveContext<A extends { callsign: string; typeCode?: string; lat: number; lon: number; onGround: boolean }>(t: Tfr, aircraft: A[]): { notes: string[]; inside: A[] } {
+  const notes: string[] = []
+  if (t.kind === 'vip' && t.lat != null && t.lon != null) {
+    const vip = aircraft.filter(
+      (a) =>
+        (/^(AF1|AF2|SAM\d|EXEC1F|EXEC2F|VENUS)/.test(a.callsign) || ['VC25', 'C32', 'C40', 'B748'].includes(a.typeCode ?? '') && /^(AF|SAM|EXEC|VENUS)/.test(a.callsign)) &&
+        Math.abs(a.lat - t.lat!) < 1.2 && Math.abs(a.lon - t.lon!) < 1.6,
+    )
+    for (const a of vip.slice(0, 3))
+      notes.push(`${a.callsign === 'AF1' ? 'Air Force One' : a.callsign === 'AF2' ? 'Air Force Two' : `VIP jet ${a.callsign}`} is ${a.onGround ? 'on the ground' : 'flying'} nearby`)
+  }
+  const inside = t.polygons.length ? aircraft.filter((a) => !a.onGround && insideTfr(t, a.lat, a.lon)) : []
+  const fireFighting = inside.filter((a) => ['C130', 'DC10', 'B737', 'RJ85', 'B462', 'B463', 'S2P', 'S2T', 'AT8T', 'AT802', 'CL2T', 'CL415', 'DH8D', 'S64', 'H64', 'K-MAX', 'KMAX', 'UH60', 'H60', 'B212', 'B412'].includes(a.typeCode ?? ''))
+  if (t.kind === 'hazard' && fireFighting.length) notes.push(`${fireFighting.length} likely firefighting aircraft inside right now (${fireFighting.slice(0, 3).map((a) => a.callsign).join(', ')})`)
+  return { notes, inside }
+}
+
 let cache: { at: number; data: Tfr[] } | null = null
 
 export async function fetchTfrs(force = false): Promise<Tfr[]> {

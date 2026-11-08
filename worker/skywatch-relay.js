@@ -39,13 +39,13 @@ const ALLOWED_PATHS = {
   hexdb: /^\/api\/v1\/aircraft\/[0-9a-fA-F]{6}$/,
   airportdata: /^\/api\/ac_thumb\.json$/,
   faa: /^\/api\/airport-status-information$/,
-  tfr: /^\/(geoserver\/TFR\/ows|tfrapi\/[A-Za-z]+)$/,
+  tfr: /^\/(geoserver\/TFR\/ows|tfrapi\/[A-Za-z]+|save_pages\/detail_\d{1,2}_\d{3,5}\.xml)$/,
 }
 
 const SLOW_PATHS = /^\/v2\/(type|reg|callsign|hex|mil|sqk)\b/
 
 const APP_URL = 'https://espnlol.github.io/map/'
-const RELAY_VERSION = '2026-11-08'
+const RELAY_VERSION = '2026-11-09'
 const UA = 'SkyWatch relay (personal flight tracker)'
 
 export default {
