@@ -166,6 +166,25 @@ async function modelPhoto(model?: string): Promise<Photo[]> {
   return [{ src: page.thumbnail.source, thumb: page.thumbnail.source, link: page.fullurl, credit: `Wikipedia: ${page.title}`, source: 'Wikipedia', exact: false, width: 1600 }]
 }
 
+/** Load a photo to learn its real width (and switch to the fallback if the big one is missing). */
+function measure(p: Photo): Promise<Photo | null> {
+  const tryLoad = (src: string) =>
+    new Promise<number>((resolve, reject) => {
+      const img = new Image()
+      const timer = setTimeout(() => reject(new Error('slow')), 4000)
+      img.onload = () => (clearTimeout(timer), resolve(img.naturalWidth))
+      img.onerror = () => (clearTimeout(timer), reject(new Error('failed')))
+      img.src = src
+    })
+  return tryLoad(p.src)
+    .then((w) => ({ ...p, width: w }))
+    .catch((e) => {
+      if (e.message === 'slow') return p // keep it, just unmeasured
+      if (!p.fallback) return null // broken image: drop it
+      return tryLoad(p.fallback).then((w) => ({ ...p, src: p.fallback!, width: w }), () => null)
+    })
+}
+
 /** Every photo we can find, exact-airframe photos first. */
 export function findPhotos(hexRaw: string, registration?: string, model?: string): Promise<Photo[]> {
   const hex = hexRaw.toLowerCase().replace(/^~/, '')
@@ -174,9 +193,11 @@ export function findPhotos(hexRaw: string, registration?: string, model?: string
   if (!p) {
     p = (async () => {
       const lists = await Promise.all([planespotters(hex, registration), airportData(hex, registration), commons(registration)])
-      // Sharpest first (stable, so each source keeps its own order).
-      const exact = lists.flat().sort((a, b) => b.width - a.width)
-      if (exact.length) return exact.slice(0, 12)
+      // Measure the real sizes, drop broken ones, and show the sharpest first.
+      const exact = (await Promise.all(lists.flat().slice(0, 12).map(measure)))
+        .filter((x): x is Photo => !!x)
+        .sort((a, b) => b.width - a.width)
+      if (exact.length) return exact
       return modelPhoto(model)
     })()
     cache.set(key, p)

@@ -87,7 +87,7 @@ export default function PhotoGallery({ hex, registration, model, demo }: Props) 
             Same model, not this exact plane
           </span>
         )}
-        {cur.width < 600 && (
+        {cur.width < (strip.current?.clientWidth ?? 380) * Math.min(window.devicePixelRatio || 1, 2) * 0.9 && (
           <a
             href={cur.link}
             target="_blank"
