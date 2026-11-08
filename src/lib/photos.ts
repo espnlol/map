@@ -25,6 +25,8 @@ export interface Photo {
   credit: string
   source: 'Planespotters' | 'airport-data.com' | 'Wikimedia Commons' | 'Wikipedia'
   exact: boolean // a photo of this very airframe, not just the model
+  /** Roughly how many pixels wide the image is, to show the sharpest first. */
+  width: number
 }
 
 const cache = new Map<string, Promise<Photo[]>>()
@@ -50,7 +52,8 @@ async function planespotters(hex: string, reg?: string): Promise<Photo[]> {
     for (const p of j?.photos ?? []) {
       const big = p.thumbnail_large ?? p.thumbnail
       if (!big || out.some((o) => o.link === p.link)) continue
-      out.push({ src: big.src, thumb: (p.thumbnail ?? big).src, link: p.link, credit: p.photographer, source: 'Planespotters', exact: true })
+      // Planespotters only lets apps show its preview size; the full photo is on their site.
+      out.push({ src: big.src, thumb: (p.thumbnail ?? big).src, link: p.link, credit: p.photographer, source: 'Planespotters', exact: true, width: p.thumbnail_large ? 420 : 200 })
     }
     if (out.length) break
   }
@@ -74,6 +77,7 @@ async function airportData(hex: string, reg?: string): Promise<Photo[]> {
         credit: p.photographer || 'airport-data.com',
         source: 'airport-data.com',
         exact: true,
+        width: 1000,
       })
     }
   }
@@ -82,7 +86,7 @@ async function airportData(hex: string, reg?: string): Promise<Photo[]> {
 
 interface WikiPage {
   title: string
-  imageinfo?: { url: string; thumburl?: string; descriptionurl: string; extmetadata?: Record<string, { value: string }> }[]
+  imageinfo?: { url: string; thumburl?: string; thumbwidth?: number; width?: number; descriptionurl: string; extmetadata?: Record<string, { value: string }> }[]
 }
 
 const stripHtml = (s?: string) => (s ?? '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim()
@@ -105,8 +109,8 @@ async function commons(reg?: string): Promise<Photo[]> {
     gsrnamespace: '6',
     gsrlimit: '12',
     prop: 'imageinfo',
-    iiprop: 'url|extmetadata',
-    iiurlwidth: '960',
+    iiprop: 'url|size|extmetadata',
+    iiurlwidth: '1600',
   })
   const j = await getJson<{ query?: { pages?: Record<string, WikiPage> } }>(`https://commons.wikimedia.org/w/api.php?${params}`)
   const re = regPattern(reg)
@@ -125,7 +129,15 @@ async function commons(reg?: string): Promise<Photo[]> {
       const ii = p.imageinfo![0]
       const artist = stripHtml(ii.extmetadata?.Artist?.value) || 'Wikimedia Commons'
       const lic = stripHtml(ii.extmetadata?.LicenseShortName?.value)
-      return { src: ii.thumburl ?? ii.url, thumb: ii.thumburl ?? ii.url, link: ii.descriptionurl, credit: lic ? `${artist} (${lic})` : artist, source: 'Wikimedia Commons' as const, exact: true }
+      return {
+        src: ii.thumburl ?? ii.url,
+        thumb: ii.thumburl ?? ii.url,
+        link: ii.descriptionurl,
+        credit: lic ? `${artist} (${lic})` : artist,
+        source: 'Wikimedia Commons' as const,
+        exact: true,
+        width: ii.thumbwidth ?? ii.width ?? 960,
+      }
     })
 }
 
@@ -140,7 +152,7 @@ async function modelPhoto(model?: string): Promise<Photo[]> {
     gsrlimit: '5',
     prop: 'pageimages|info|description',
     piprop: 'thumbnail',
-    pithumbsize: '960',
+    pithumbsize: '1600',
     inprop: 'url',
   })
   type Page = { title: string; fullurl: string; index?: number; description?: string; thumbnail?: { source: string } }
@@ -151,7 +163,7 @@ async function modelPhoto(model?: string): Promise<Photo[]> {
     .sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
     .find((p) => p.thumbnail && (AVIATION.test(p.description ?? '') || (!p.description && p.title.toLowerCase().includes(maker) && AVIATION.test(p.title))))
   if (!page?.thumbnail) return []
-  return [{ src: page.thumbnail.source, thumb: page.thumbnail.source, link: page.fullurl, credit: `Wikipedia: ${page.title}`, source: 'Wikipedia', exact: false }]
+  return [{ src: page.thumbnail.source, thumb: page.thumbnail.source, link: page.fullurl, credit: `Wikipedia: ${page.title}`, source: 'Wikipedia', exact: false, width: 1600 }]
 }
 
 /** Every photo we can find, exact-airframe photos first. */
@@ -162,7 +174,8 @@ export function findPhotos(hexRaw: string, registration?: string, model?: string
   if (!p) {
     p = (async () => {
       const lists = await Promise.all([planespotters(hex, registration), airportData(hex, registration), commons(registration)])
-      const exact = lists.flat()
+      // Sharpest first (stable, so each source keeps its own order).
+      const exact = lists.flat().sort((a, b) => b.width - a.width)
       if (exact.length) return exact.slice(0, 12)
       return modelPhoto(model)
     })()

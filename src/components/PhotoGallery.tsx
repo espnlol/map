@@ -87,6 +87,16 @@ export default function PhotoGallery({ hex, registration, model, demo }: Props) 
             Same model, not this exact plane
           </span>
         )}
+        {cur.width < 600 && (
+          <a
+            href={cur.link}
+            target="_blank"
+            rel="noreferrer"
+            className="absolute bottom-8 right-2 rounded bg-slate-900/85 px-1.5 py-0.5 text-[10px] font-semibold text-sky-200"
+          >
+            Preview size · tap for full photo ↗
+          </a>
+        )}
         {photos.length > 1 && (
           <>
             <span className="absolute right-2 top-2 rounded-full bg-slate-900/85 px-2 py-0.5 text-[10px] font-semibold tabular-nums">
