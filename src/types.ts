@@ -22,6 +22,8 @@ export interface Crash {
   lat: number
   lng: number
   location: string
+  /** Country (or ocean) where it happened */
+  country: string
   operator: string
   aircraft: string
   flight?: string

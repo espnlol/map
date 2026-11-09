@@ -16,7 +16,18 @@ body {
   @apply bg-slate-950 text-slate-100;
 }
 
-.leaflet-container {
+
+.crash-tip .maplibregl-popup-content {
   background: #0f172a;
-  font-family: inherit;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+.crash-tip .maplibregl-popup-tip {
+  display: none;
+}
+.maplibregl-ctrl-attrib {
+  font-size: 10px;
 }

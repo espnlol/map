@@ -6,23 +6,24 @@ to a YouTube video and a written article about it.**
 
 ## Features
 
-- **World map** (Leaflet + CARTO dark tiles). Each crash is a circle sized by
-  fatalities and colored by cause. Hover for a quick label, click for details.
-- **Detail panel** with date, location, flight number, operator, aircraft,
-  phase of flight, fatalities, survivors, and a short summary of what happened.
-- **▶ Find on YouTube**: opens a YouTube search for that crash
-  (e.g. "US Airways Flight 1549 2009 crash").
-- **📰 Read article**: opens the crash's Wikipedia article.
-- **Pin your own video**: paste any YouTube link into a crash's panel. It
-  replaces the search button with a direct "Watch video" link and embeds the
-  player right in the panel. It's saved in your browser (localStorage).
-- **Filters**: search (flight, airline, aircraft, place), year range, cause,
-  type (commercial / cargo / military & state / general aviation), and
-  minimum deaths. Sort by newest, oldest or deadliest.
-- **🎲 Random** picks a crash from the current filter.
-- **Shareable links**: the selected crash goes in the URL hash
-  (e.g. `/#tenerife-1977`).
-- Works on phones: toggle between map and list, details in a bottom sheet.
+- **3D globe or flat map** with satellite, terrain or dark map styles (layers
+  button, top right). Tiles come from Esri's free basemaps, so there's no API
+  key and they work on GitHub Pages.
+- **Markers or heatmap**: each crash is a plane icon colored by cause and sized
+  by fatalities. Heatmap mode shows where accidents cluster, weighted by deaths.
+- **Search bar** with instant suggestions (name, flight, aircraft, airline,
+  place, country). Press `/` to jump to it.
+- **Filters**: year range, cause, flight type and minimum deaths.
+- **Detail panel** (left side; bottom sheet on phones): flight number,
+  airline, date, country, aircraft, operator, phase of flight, flight type,
+  fatalities, survivors, location, cause and summary. Nothing is locked.
+- **▶ Watch on YouTube** and **📰 Read the full article** on every crash, plus
+  a "Sources" list. Paste any YouTube link to **pin a video** to a crash: the
+  Watch button then goes straight to it and it plays in the panel (saved in
+  your browser).
+- **Browse** list (sort newest, oldest or deadliest), **Statistics** (by cause,
+  decade, phase, country, deadliest), **About**, **Random** and **Get App**.
+- **Shareable links**: the selected crash goes in the URL (e.g. `#tenerife-1977`).
 
 ## Data
 
@@ -64,4 +65,4 @@ npm run dev      # http://localhost:5173
 npm run build    # static site in dist/
 ```
 
-React 18, TypeScript, Vite, Tailwind, react-leaflet. No backend.
+React 18, TypeScript, Vite, Tailwind, MapLibre GL. No backend.

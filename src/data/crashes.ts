@@ -8,7 +8,7 @@ import type { Crash } from '../types'
 // specific YouTube URL there to override the default YouTube search link.
 export const CRASHES: Crash[] = [
   {
-    id: 'tenerife-1977', name: 'Tenerife airport disaster', date: '1977-03-27',
+    id: 'tenerife-1977', country: 'Spain', name: 'Tenerife airport disaster', date: '1977-03-27',
     lat: 28.4818, lng: -16.3415, location: 'Los Rodeos Airport, Tenerife, Spain',
     operator: 'KLM & Pan Am', aircraft: 'Boeing 747 (x2)', flight: 'KLM 4805 / Pan Am 1736',
     fatalities: 583, survivors: 61, category: 'Commercial', cause: 'Collision', phase: 'Takeoff',
@@ -16,7 +16,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Tenerife airport disaster',
   },
   {
-    id: 'jal123-1985', name: 'Japan Air Lines Flight 123', date: '1985-08-12',
+    id: 'jal123-1985', country: 'Japan', name: 'Japan Air Lines Flight 123', date: '1985-08-12',
     lat: 36.0014, lng: 138.6936, location: 'Mount Takamagahara, Gunma, Japan',
     operator: 'Japan Air Lines', aircraft: 'Boeing 747SR', flight: 'JL 123',
     fatalities: 520, survivors: 4, category: 'Commercial', cause: 'Mechanical', phase: 'Cruise',
@@ -24,7 +24,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Japan Air Lines Flight 123',
   },
   {
-    id: 'charkhi-dadri-1996', name: 'Charkhi Dadri mid-air collision', date: '1996-11-12',
+    id: 'charkhi-dadri-1996', country: 'India', name: 'Charkhi Dadri mid-air collision', date: '1996-11-12',
     lat: 28.56, lng: 76.27, location: 'Charkhi Dadri, Haryana, India',
     operator: 'Saudia & Kazakhstan Airlines', aircraft: 'Boeing 747-100B & Ilyushin Il-76', flight: 'SV 763 / KZA 1907',
     fatalities: 349, survivors: 0, category: 'Commercial', cause: 'Collision', phase: 'Climb',
@@ -32,7 +32,7 @@ export const CRASHES: Crash[] = [
     wiki: '1996 Charkhi Dadri mid-air collision',
   },
   {
-    id: 'thy981-1974', name: 'Turkish Airlines Flight 981', date: '1974-03-03',
+    id: 'thy981-1974', country: 'France', name: 'Turkish Airlines Flight 981', date: '1974-03-03',
     lat: 49.143, lng: 2.637, location: 'Ermenonville Forest, near Paris, France',
     operator: 'Turkish Airlines', aircraft: 'McDonnell Douglas DC-10', flight: 'TK 981',
     fatalities: 346, survivors: 0, category: 'Commercial', cause: 'Mechanical', phase: 'Climb',
@@ -40,7 +40,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Turkish Airlines Flight 981',
   },
   {
-    id: 'ai182-1985', name: 'Air India Flight 182', date: '1985-06-23',
+    id: 'ai182-1985', country: 'Ireland (at sea)', name: 'Air India Flight 182', date: '1985-06-23',
     lat: 51.06, lng: -12.82, location: 'Atlantic Ocean, off south-west Ireland',
     operator: 'Air India', aircraft: 'Boeing 747-237B', flight: 'AI 182',
     fatalities: 329, survivors: 0, category: 'Commercial', cause: 'Terrorism', phase: 'Cruise',
@@ -48,7 +48,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Air India Flight 182',
   },
   {
-    id: 'sv163-1980', name: 'Saudia Flight 163', date: '1980-08-19',
+    id: 'sv163-1980', country: 'Saudi Arabia', name: 'Saudia Flight 163', date: '1980-08-19',
     lat: 24.71, lng: 46.72, location: 'Riyadh, Saudi Arabia',
     operator: 'Saudia', aircraft: 'Lockheed L-1011 TriStar', flight: 'SV 163',
     fatalities: 301, survivors: 0, category: 'Commercial', cause: 'Fire', phase: 'Landing',
@@ -56,7 +56,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Saudia Flight 163',
   },
   {
-    id: 'mh17-2014', name: 'Malaysia Airlines Flight 17', date: '2014-07-17',
+    id: 'mh17-2014', country: 'Ukraine', name: 'Malaysia Airlines Flight 17', date: '2014-07-17',
     lat: 48.13, lng: 38.65, location: 'Hrabove, Donetsk Oblast, Ukraine',
     operator: 'Malaysia Airlines', aircraft: 'Boeing 777-200ER', flight: 'MH 17',
     fatalities: 298, survivors: 0, category: 'Commercial', cause: 'Shootdown', phase: 'Cruise',
@@ -64,7 +64,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Malaysia Airlines Flight 17',
   },
   {
-    id: 'ir655-1988', name: 'Iran Air Flight 655', date: '1988-07-03',
+    id: 'ir655-1988', country: 'Iran (at sea)', name: 'Iran Air Flight 655', date: '1988-07-03',
     lat: 26.67, lng: 56.04, location: 'Strait of Hormuz',
     operator: 'Iran Air', aircraft: 'Airbus A300B2', flight: 'IR 655',
     fatalities: 290, survivors: 0, category: 'Commercial', cause: 'Shootdown', phase: 'Climb',
@@ -72,7 +72,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Iran Air Flight 655',
   },
   {
-    id: 'aa191-1979', name: 'American Airlines Flight 191', date: '1979-05-25',
+    id: 'aa191-1979', country: 'United States', name: 'American Airlines Flight 191', date: '1979-05-25',
     lat: 42.01, lng: -87.93, location: "Des Plaines, near O'Hare Airport, Chicago, USA",
     operator: 'American Airlines', aircraft: 'McDonnell Douglas DC-10-10', flight: 'AA 191',
     fatalities: 273, survivors: 0, category: 'Commercial', cause: 'Mechanical', phase: 'Takeoff',
@@ -80,7 +80,7 @@ export const CRASHES: Crash[] = [
     wiki: 'American Airlines Flight 191',
   },
   {
-    id: 'aa587-2001', name: 'American Airlines Flight 587', date: '2001-11-12',
+    id: 'aa587-2001', country: 'United States', name: 'American Airlines Flight 587', date: '2001-11-12',
     lat: 40.577, lng: -73.85, location: 'Belle Harbor, Queens, New York, USA',
     operator: 'American Airlines', aircraft: 'Airbus A300B4-600R', flight: 'AA 587',
     fatalities: 265, survivors: 0, category: 'Commercial', cause: 'Human error', phase: 'Climb',
@@ -88,7 +88,7 @@ export const CRASHES: Crash[] = [
     wiki: 'American Airlines Flight 587',
   },
   {
-    id: 'ci140-1994', name: 'China Airlines Flight 140', date: '1994-04-26',
+    id: 'ci140-1994', country: 'Japan', name: 'China Airlines Flight 140', date: '1994-04-26',
     lat: 35.25, lng: 136.92, location: 'Nagoya Airport, Japan',
     operator: 'China Airlines', aircraft: 'Airbus A300B4-600R', flight: 'CI 140',
     fatalities: 264, survivors: 7, category: 'Commercial', cause: 'Human error', phase: 'Landing',
@@ -96,7 +96,7 @@ export const CRASHES: Crash[] = [
     wiki: 'China Airlines Flight 140',
   },
   {
-    id: 'pa103-1988', name: 'Pan Am Flight 103 (Lockerbie)', date: '1988-12-21',
+    id: 'pa103-1988', country: 'United Kingdom', name: 'Pan Am Flight 103 (Lockerbie)', date: '1988-12-21',
     lat: 55.115, lng: -3.358, location: 'Lockerbie, Scotland, UK',
     operator: 'Pan Am', aircraft: 'Boeing 747-121', flight: 'PA 103',
     fatalities: 270, survivors: 0, category: 'Commercial', cause: 'Terrorism', phase: 'Cruise',
@@ -104,7 +104,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Pan Am Flight 103',
   },
   {
-    id: 'ke007-1983', name: 'Korean Air Lines Flight 007', date: '1983-09-01',
+    id: 'ke007-1983', country: 'Russia (at sea)', name: 'Korean Air Lines Flight 007', date: '1983-09-01',
     lat: 46.57, lng: 141.28, location: 'Sea of Japan, near Moneron Island',
     operator: 'Korean Air Lines', aircraft: 'Boeing 747-230B', flight: 'KE 007',
     fatalities: 269, survivors: 0, category: 'Commercial', cause: 'Shootdown', phase: 'Cruise',
@@ -112,7 +112,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Korean Air Lines Flight 007',
   },
   {
-    id: 'twa800-1996', name: 'TWA Flight 800', date: '1996-07-17',
+    id: 'twa800-1996', country: 'United States', name: 'TWA Flight 800', date: '1996-07-17',
     lat: 40.65, lng: -72.63, location: 'Atlantic Ocean, off East Moriches, New York, USA',
     operator: 'Trans World Airlines', aircraft: 'Boeing 747-131', flight: 'TW 800',
     fatalities: 230, survivors: 0, category: 'Commercial', cause: 'Mechanical', phase: 'Climb',
@@ -120,7 +120,7 @@ export const CRASHES: Crash[] = [
     wiki: 'TWA Flight 800',
   },
   {
-    id: 'af447-2009', name: 'Air France Flight 447', date: '2009-06-01',
+    id: 'af447-2009', country: 'Atlantic Ocean', name: 'Air France Flight 447', date: '2009-06-01',
     lat: 3.065, lng: -30.56, location: 'Atlantic Ocean, between Brazil and Senegal',
     operator: 'Air France', aircraft: 'Airbus A330-203', flight: 'AF 447',
     fatalities: 228, survivors: 0, category: 'Commercial', cause: 'Human error', phase: 'Cruise',
@@ -128,7 +128,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Air France Flight 447',
   },
   {
-    id: 'sr111-1998', name: 'Swissair Flight 111', date: '1998-09-02',
+    id: 'sr111-1998', country: 'Canada', name: 'Swissair Flight 111', date: '1998-09-02',
     lat: 44.41, lng: -63.97, location: "Atlantic Ocean, off Peggy's Cove, Nova Scotia, Canada",
     operator: 'Swissair', aircraft: 'McDonnell Douglas MD-11', flight: 'SR 111',
     fatalities: 229, survivors: 0, category: 'Commercial', cause: 'Fire', phase: 'Cruise',
@@ -136,7 +136,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Swissair Flight 111',
   },
   {
-    id: 'ke801-1997', name: 'Korean Air Flight 801', date: '1997-08-06',
+    id: 'ke801-1997', country: 'Guam (US)', name: 'Korean Air Flight 801', date: '1997-08-06',
     lat: 13.45, lng: 144.73, location: 'Nimitz Hill, Guam',
     operator: 'Korean Air', aircraft: 'Boeing 747-3B5', flight: 'KE 801',
     fatalities: 228, survivors: 26, category: 'Commercial', cause: 'Human error', phase: 'Approach',
@@ -144,7 +144,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Korean Air Flight 801',
   },
   {
-    id: 'metrojet9268-2015', name: 'Metrojet Flight 9268', date: '2015-10-31',
+    id: 'metrojet9268-2015', country: 'Egypt', name: 'Metrojet Flight 9268', date: '2015-10-31',
     lat: 30.17, lng: 34.17, location: 'Sinai Peninsula, Egypt',
     operator: 'Metrojet', aircraft: 'Airbus A321-231', flight: '7K 9268',
     fatalities: 224, survivors: 0, category: 'Commercial', cause: 'Terrorism', phase: 'Climb',
@@ -152,7 +152,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Metrojet Flight 9268',
   },
   {
-    id: 'mh370-2014', name: 'Malaysia Airlines Flight 370', date: '2014-03-08',
+    id: 'mh370-2014', country: 'Indian Ocean', name: 'Malaysia Airlines Flight 370', date: '2014-03-08',
     lat: -35.6, lng: 92.8, location: 'Southern Indian Ocean (final location unknown; marker shows the approximate search area)',
     operator: 'Malaysia Airlines', aircraft: 'Boeing 777-200ER', flight: 'MH 370',
     fatalities: 239, survivors: 0, category: 'Commercial', cause: 'Unknown', phase: 'Cruise',
@@ -160,7 +160,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Malaysia Airlines Flight 370',
   },
   {
-    id: 'jt610-2018', name: 'Lion Air Flight 610', date: '2018-10-29',
+    id: 'jt610-2018', country: 'Indonesia', name: 'Lion Air Flight 610', date: '2018-10-29',
     lat: -5.81, lng: 107.12, location: 'Java Sea, off Karawang, Indonesia',
     operator: 'Lion Air', aircraft: 'Boeing 737 MAX 8', flight: 'JT 610',
     fatalities: 189, survivors: 0, category: 'Commercial', cause: 'Mechanical', phase: 'Climb',
@@ -168,7 +168,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Lion Air Flight 610',
   },
   {
-    id: 'et302-2019', name: 'Ethiopian Airlines Flight 302', date: '2019-03-10',
+    id: 'et302-2019', country: 'Ethiopia', name: 'Ethiopian Airlines Flight 302', date: '2019-03-10',
     lat: 8.877, lng: 39.25, location: 'Near Bishoftu, Ethiopia',
     operator: 'Ethiopian Airlines', aircraft: 'Boeing 737 MAX 8', flight: 'ET 302',
     fatalities: 157, survivors: 0, category: 'Commercial', cause: 'Mechanical', phase: 'Climb',
@@ -176,7 +176,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Ethiopian Airlines Flight 302',
   },
   {
-    id: 'ci611-2002', name: 'China Airlines Flight 611', date: '2002-05-25',
+    id: 'ci611-2002', country: 'Taiwan', name: 'China Airlines Flight 611', date: '2002-05-25',
     lat: 23.99, lng: 119.68, location: 'Taiwan Strait, near the Penghu Islands',
     operator: 'China Airlines', aircraft: 'Boeing 747-209B', flight: 'CI 611',
     fatalities: 225, survivors: 0, category: 'Commercial', cause: 'Mechanical', phase: 'Cruise',
@@ -184,7 +184,7 @@ export const CRASHES: Crash[] = [
     wiki: 'China Airlines Flight 611',
   },
   {
-    id: 'sa295-1987', name: 'South African Airways Flight 295', date: '1987-11-28',
+    id: 'sa295-1987', country: 'Mauritius (at sea)', name: 'South African Airways Flight 295', date: '1987-11-28',
     lat: -19.17, lng: 59.63, location: 'Indian Ocean, near Mauritius',
     operator: 'South African Airways', aircraft: 'Boeing 747-244B Combi', flight: 'SA 295',
     fatalities: 159, survivors: 0, category: 'Commercial', cause: 'Fire', phase: 'Cruise',
@@ -192,7 +192,7 @@ export const CRASHES: Crash[] = [
     wiki: 'South African Airways Flight 295',
   },
   {
-    id: 'ms990-1999', name: 'EgyptAir Flight 990', date: '1999-10-31',
+    id: 'ms990-1999', country: 'United States (at sea)', name: 'EgyptAir Flight 990', date: '1999-10-31',
     lat: 40.35, lng: -69.76, location: 'Atlantic Ocean, south of Nantucket, USA',
     operator: 'EgyptAir', aircraft: 'Boeing 767-366ER', flight: 'MS 990',
     fatalities: 217, survivors: 0, category: 'Commercial', cause: 'Deliberate', phase: 'Cruise',
@@ -200,7 +200,7 @@ export const CRASHES: Crash[] = [
     wiki: 'EgyptAir Flight 990',
   },
   {
-    id: 'ua232-1989', name: 'United Airlines Flight 232', date: '1989-07-19',
+    id: 'ua232-1989', country: 'United States', name: 'United Airlines Flight 232', date: '1989-07-19',
     lat: 42.40, lng: -96.38, location: 'Sioux Gateway Airport, Sioux City, Iowa, USA',
     operator: 'United Airlines', aircraft: 'McDonnell Douglas DC-10-10', flight: 'UA 232',
     fatalities: 112, survivors: 184, category: 'Commercial', cause: 'Mechanical', phase: 'Landing',
@@ -208,7 +208,7 @@ export const CRASHES: Crash[] = [
     wiki: 'United Airlines Flight 232',
   },
   {
-    id: 'us1549-2009', name: 'US Airways Flight 1549 ("Miracle on the Hudson")', date: '2009-01-15',
+    id: 'us1549-2009', country: 'United States', name: 'US Airways Flight 1549 ("Miracle on the Hudson")', date: '2009-01-15',
     lat: 40.77, lng: -74.004, location: 'Hudson River, New York City, USA',
     operator: 'US Airways', aircraft: 'Airbus A320-214', flight: 'US 1549',
     fatalities: 0, survivors: 155, category: 'Commercial', cause: 'Bird strike', phase: 'Climb',
@@ -216,7 +216,7 @@ export const CRASHES: Crash[] = [
     wiki: 'US Airways Flight 1549',
   },
   {
-    id: 'aa11-2001', name: 'American Airlines Flight 11 (9/11)', date: '2001-09-11',
+    id: 'aa11-2001', country: 'United States', name: 'American Airlines Flight 11 (9/11)', date: '2001-09-11',
     lat: 40.7127, lng: -74.0134, location: 'World Trade Center North Tower, New York, USA',
     operator: 'American Airlines', aircraft: 'Boeing 767-223ER', flight: 'AA 11',
     fatalities: 92, survivors: 0, category: 'Commercial', cause: 'Terrorism', phase: 'Cruise',
@@ -224,7 +224,7 @@ export const CRASHES: Crash[] = [
     wiki: 'American Airlines Flight 11',
   },
   {
-    id: 'ua175-2001', name: 'United Airlines Flight 175 (9/11)', date: '2001-09-11',
+    id: 'ua175-2001', country: 'United States', name: 'United Airlines Flight 175 (9/11)', date: '2001-09-11',
     lat: 40.7110, lng: -74.0130, location: 'World Trade Center South Tower, New York, USA',
     operator: 'United Airlines', aircraft: 'Boeing 767-222', flight: 'UA 175',
     fatalities: 65, survivors: 0, category: 'Commercial', cause: 'Terrorism', phase: 'Cruise',
@@ -232,7 +232,7 @@ export const CRASHES: Crash[] = [
     wiki: 'United Airlines Flight 175',
   },
   {
-    id: 'aa77-2001', name: 'American Airlines Flight 77 (9/11)', date: '2001-09-11',
+    id: 'aa77-2001', country: 'United States', name: 'American Airlines Flight 77 (9/11)', date: '2001-09-11',
     lat: 38.8710, lng: -77.0560, location: 'The Pentagon, Arlington, Virginia, USA',
     operator: 'American Airlines', aircraft: 'Boeing 757-223', flight: 'AA 77',
     fatalities: 64, survivors: 0, category: 'Commercial', cause: 'Terrorism', phase: 'Cruise',
@@ -240,7 +240,7 @@ export const CRASHES: Crash[] = [
     wiki: 'American Airlines Flight 77',
   },
   {
-    id: 'ua93-2001', name: 'United Airlines Flight 93 (9/11)', date: '2001-09-11',
+    id: 'ua93-2001', country: 'United States', name: 'United Airlines Flight 93 (9/11)', date: '2001-09-11',
     lat: 40.051, lng: -78.905, location: 'Stonycreek Township, near Shanksville, Pennsylvania, USA',
     operator: 'United Airlines', aircraft: 'Boeing 757-222', flight: 'UA 93',
     fatalities: 44, survivors: 0, category: 'Commercial', cause: 'Terrorism', phase: 'Cruise',
@@ -248,7 +248,7 @@ export const CRASHES: Crash[] = [
     wiki: 'United Airlines Flight 93',
   },
   {
-    id: 'ea401-1972', name: 'Eastern Air Lines Flight 401', date: '1972-12-29',
+    id: 'ea401-1972', country: 'United States', name: 'Eastern Air Lines Flight 401', date: '1972-12-29',
     lat: 25.865, lng: -80.595, location: 'Florida Everglades, USA',
     operator: 'Eastern Air Lines', aircraft: 'Lockheed L-1011 TriStar', flight: 'EA 401',
     fatalities: 101, survivors: 75, category: 'Commercial', cause: 'Human error', phase: 'Approach',
@@ -256,7 +256,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Eastern Air Lines Flight 401',
   },
   {
-    id: 'psa182-1978', name: 'PSA Flight 182', date: '1978-09-25',
+    id: 'psa182-1978', country: 'United States', name: 'PSA Flight 182', date: '1978-09-25',
     lat: 32.7377, lng: -117.13, location: 'North Park, San Diego, California, USA',
     operator: 'Pacific Southwest Airlines', aircraft: 'Boeing 727-214 & Cessna 172', flight: 'PS 182',
     fatalities: 144, survivors: 0, category: 'Commercial', cause: 'Collision', phase: 'Approach',
@@ -264,7 +264,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Pacific Southwest Airlines Flight 182',
   },
   {
-    id: 'am498-1986', name: 'Aeroméxico Flight 498 (Cerritos)', date: '1986-08-31',
+    id: 'am498-1986', country: 'United States', name: 'Aeroméxico Flight 498 (Cerritos)', date: '1986-08-31',
     lat: 33.87, lng: -118.06, location: 'Cerritos, California, USA',
     operator: 'Aeroméxico', aircraft: 'McDonnell Douglas DC-9-32 & Piper PA-28', flight: 'AM 498',
     fatalities: 82, survivors: 0, category: 'Commercial', cause: 'Collision', phase: 'Approach',
@@ -272,7 +272,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Aeroméxico Flight 498',
   },
   {
-    id: 'grand-canyon-1956', name: '1956 Grand Canyon mid-air collision', date: '1956-06-30',
+    id: 'grand-canyon-1956', country: 'United States', name: '1956 Grand Canyon mid-air collision', date: '1956-06-30',
     lat: 36.18, lng: -111.92, location: 'Grand Canyon, Arizona, USA',
     operator: 'TWA & United Airlines', aircraft: 'Lockheed Super Constellation & Douglas DC-7', flight: 'TW 2 / UA 718',
     fatalities: 128, survivors: 0, category: 'Commercial', cause: 'Collision', phase: 'Cruise',
@@ -280,7 +280,7 @@ export const CRASHES: Crash[] = [
     wiki: '1956 Grand Canyon mid-air collision',
   },
   {
-    id: 'nyc-midair-1960', name: '1960 New York mid-air collision', date: '1960-12-16',
+    id: 'nyc-midair-1960', country: 'United States', name: '1960 New York mid-air collision', date: '1960-12-16',
     lat: 40.677, lng: -73.97, location: 'Park Slope, Brooklyn, New York, USA',
     operator: 'United Airlines & TWA', aircraft: 'Douglas DC-8 & Lockheed Super Constellation', flight: 'UA 826 / TW 266',
     fatalities: 134, survivors: 0, category: 'Commercial', cause: 'Collision', phase: 'Approach',
@@ -288,7 +288,7 @@ export const CRASHES: Crash[] = [
     wiki: '1960 New York mid-air collision',
   },
   {
-    id: 'uberlingen-2002', name: 'Überlingen mid-air collision', date: '2002-07-01',
+    id: 'uberlingen-2002', country: 'Germany', name: 'Überlingen mid-air collision', date: '2002-07-01',
     lat: 47.78, lng: 9.18, location: 'Überlingen, Germany',
     operator: 'Bashkirian Airlines & DHL', aircraft: 'Tupolev Tu-154M & Boeing 757-23APF', flight: 'BTC 2937 / DHL 611',
     fatalities: 71, survivors: 0, category: 'Commercial', cause: 'Collision', phase: 'Cruise',
@@ -296,7 +296,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Überlingen mid-air collision',
   },
   {
-    id: 'gol1907-2006', name: 'Gol Transportes Aéreos Flight 1907', date: '2006-09-29',
+    id: 'gol1907-2006', country: 'Brazil', name: 'Gol Transportes Aéreos Flight 1907', date: '2006-09-29',
     lat: -10.46, lng: -53.27, location: 'Mato Grosso, Brazil',
     operator: 'Gol', aircraft: 'Boeing 737-8EH & Embraer Legacy 600', flight: 'G3 1907',
     fatalities: 154, survivors: 7, category: 'Commercial', cause: 'Collision', phase: 'Cruise',
@@ -304,7 +304,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Gol Transportes Aéreos Flight 1907',
   },
   {
-    id: 'munich-1958', name: 'Munich air disaster', date: '1958-02-06',
+    id: 'munich-1958', country: 'West Germany', name: 'Munich air disaster', date: '1958-02-06',
     lat: 48.137, lng: 11.69, location: 'Munich-Riem Airport, West Germany',
     operator: 'British European Airways', aircraft: 'Airspeed AS.57 Ambassador', flight: 'BE 609',
     fatalities: 23, survivors: 21, category: 'Commercial', cause: 'Weather', phase: 'Takeoff',
@@ -312,7 +312,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Munich air disaster',
   },
   {
-    id: 'music-died-1959', name: 'The Day the Music Died', date: '1959-02-03',
+    id: 'music-died-1959', country: 'United States', name: 'The Day the Music Died', date: '1959-02-03',
     lat: 43.22, lng: -93.38, location: 'Near Clear Lake, Iowa, USA',
     operator: 'Dwyer Flying Service (charter)', aircraft: 'Beechcraft 35 Bonanza',
     fatalities: 4, survivors: 0, category: 'General aviation', cause: 'Weather', phase: 'Climb',
@@ -320,7 +320,7 @@ export const CRASHES: Crash[] = [
     wiki: 'The Day the Music Died',
   },
   {
-    id: 'jfkjr-1999', name: 'John F. Kennedy Jr. plane crash', date: '1999-07-16',
+    id: 'jfkjr-1999', country: 'United States', name: 'John F. Kennedy Jr. plane crash', date: '1999-07-16',
     lat: 41.29, lng: -70.98, location: "Atlantic Ocean, off Martha's Vineyard, Massachusetts, USA",
     operator: 'Private', aircraft: 'Piper PA-32R Saratoga',
     fatalities: 3, survivors: 0, category: 'General aviation', cause: 'Human error', phase: 'Approach',
@@ -328,7 +328,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Death of John F. Kennedy Jr.',
   },
   {
-    id: 'calabasas-2020', name: 'Calabasas helicopter crash (Kobe Bryant)', date: '2020-01-26',
+    id: 'calabasas-2020', country: 'United States', name: 'Calabasas helicopter crash (Kobe Bryant)', date: '2020-01-26',
     lat: 34.137, lng: -118.69, location: 'Calabasas, California, USA',
     operator: 'Island Express Helicopters', aircraft: 'Sikorsky S-76B',
     fatalities: 9, survivors: 0, category: 'General aviation', cause: 'Weather', phase: 'Cruise',
@@ -336,7 +336,7 @@ export const CRASHES: Crash[] = [
     wiki: '2020 Calabasas helicopter crash',
   },
   {
-    id: 'hindenburg-1937', name: 'Hindenburg disaster', date: '1937-05-06',
+    id: 'hindenburg-1937', country: 'United States', name: 'Hindenburg disaster', date: '1937-05-06',
     lat: 40.03, lng: -74.33, location: 'Naval Air Station Lakehurst, New Jersey, USA',
     operator: 'Deutsche Zeppelin-Reederei', aircraft: 'Zeppelin LZ 129 Hindenburg (airship)',
     fatalities: 36, survivors: 62, category: 'Commercial', cause: 'Fire', phase: 'Landing',
@@ -344,7 +344,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Hindenburg disaster',
   },
   {
-    id: 'smolensk-2010', name: 'Smolensk air disaster', date: '2010-04-10',
+    id: 'smolensk-2010', country: 'Russia', name: 'Smolensk air disaster', date: '2010-04-10',
     lat: 54.825, lng: 32.05, location: 'Near Smolensk North Airport, Russia',
     operator: 'Polish Air Force', aircraft: 'Tupolev Tu-154M',
     fatalities: 96, survivors: 0, category: 'Military / State', cause: 'Human error', phase: 'Approach',
@@ -352,7 +352,7 @@ export const CRASHES: Crash[] = [
     wiki: '2010 Polish Air Force Tu-154 crash',
   },
   {
-    id: 'andes-1972', name: 'Uruguayan Air Force Flight 571 (Andes)', date: '1972-10-13',
+    id: 'andes-1972', country: 'Argentina', name: 'Uruguayan Air Force Flight 571 (Andes)', date: '1972-10-13',
     lat: -34.76, lng: -70.29, location: 'Andes Mountains, Argentina/Chile border',
     operator: 'Uruguayan Air Force (charter)', aircraft: 'Fairchild FH-227D',
     fatalities: 29, survivors: 16, category: 'Military / State', cause: 'Human error', phase: 'Cruise',
@@ -360,7 +360,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Uruguayan Air Force Flight 571',
   },
   {
-    id: 'oz214-2013', name: 'Asiana Airlines Flight 214', date: '2013-07-06',
+    id: 'oz214-2013', country: 'United States', name: 'Asiana Airlines Flight 214', date: '2013-07-06',
     lat: 37.6125, lng: -122.37, location: 'San Francisco International Airport, USA',
     operator: 'Asiana Airlines', aircraft: 'Boeing 777-28EER', flight: 'OZ 214',
     fatalities: 3, survivors: 304, category: 'Commercial', cause: 'Human error', phase: 'Landing',
@@ -368,7 +368,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Asiana Airlines Flight 214',
   },
   {
-    id: 'helios522-2005', name: 'Helios Airways Flight 522', date: '2005-08-14',
+    id: 'helios522-2005', country: 'Greece', name: 'Helios Airways Flight 522', date: '2005-08-14',
     lat: 38.23, lng: 23.97, location: 'Grammatiko, near Athens, Greece',
     operator: 'Helios Airways', aircraft: 'Boeing 737-31S', flight: 'ZU 522',
     fatalities: 121, survivors: 0, category: 'Commercial', cause: 'Mechanical', phase: 'Cruise',
@@ -376,7 +376,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Helios Airways Flight 522',
   },
   {
-    id: '4u9525-2015', name: 'Germanwings Flight 9525', date: '2015-03-24',
+    id: '4u9525-2015', country: 'France', name: 'Germanwings Flight 9525', date: '2015-03-24',
     lat: 44.28, lng: 6.44, location: 'French Alps, near Prads-Haute-Bléone, France',
     operator: 'Germanwings', aircraft: 'Airbus A320-211', flight: '4U 9525',
     fatalities: 150, survivors: 0, category: 'Commercial', cause: 'Deliberate', phase: 'Cruise',
@@ -384,7 +384,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Germanwings Flight 9525',
   },
   {
-    id: 'af4590-2000', name: 'Air France Flight 4590 (Concorde)', date: '2000-07-25',
+    id: 'af4590-2000', country: 'France', name: 'Air France Flight 4590 (Concorde)', date: '2000-07-25',
     lat: 48.985, lng: 2.47, location: 'Gonesse, near Paris, France',
     operator: 'Air France', aircraft: 'Aérospatiale-BAC Concorde', flight: 'AF 4590',
     fatalities: 113, survivors: 0, category: 'Commercial', cause: 'Fire', phase: 'Takeoff',
@@ -392,7 +392,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Air France Flight 4590',
   },
   {
-    id: 'colgan3407-2009', name: 'Colgan Air Flight 3407', date: '2009-02-12',
+    id: 'colgan3407-2009', country: 'United States', name: 'Colgan Air Flight 3407', date: '2009-02-12',
     lat: 43.01, lng: -78.64, location: 'Clarence Center, New York, USA',
     operator: 'Colgan Air (Continental Connection)', aircraft: 'Bombardier Q400', flight: '9L 3407',
     fatalities: 50, survivors: 0, category: 'Commercial', cause: 'Human error', phase: 'Approach',
@@ -400,7 +400,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Colgan Air Flight 3407',
   },
   {
-    id: 'linate-2001', name: 'Linate Airport disaster', date: '2001-10-08',
+    id: 'linate-2001', country: 'Italy', name: 'Linate Airport disaster', date: '2001-10-08',
     lat: 45.46, lng: 9.28, location: 'Linate Airport, Milan, Italy',
     operator: 'Scandinavian Airlines & private', aircraft: 'McDonnell Douglas MD-87 & Cessna Citation CJ2', flight: 'SK 686',
     fatalities: 118, survivors: 0, category: 'Commercial', cause: 'Collision', phase: 'Takeoff',
@@ -408,7 +408,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Linate Airport disaster',
   },
   {
-    id: 'us427-1994', name: 'USAir Flight 427', date: '1994-09-08',
+    id: 'us427-1994', country: 'United States', name: 'USAir Flight 427', date: '1994-09-08',
     lat: 40.60, lng: -80.31, location: 'Hopewell Township, near Pittsburgh, Pennsylvania, USA',
     operator: 'USAir', aircraft: 'Boeing 737-3B7', flight: 'US 427',
     fatalities: 132, survivors: 0, category: 'Commercial', cause: 'Mechanical', phase: 'Approach',
@@ -416,7 +416,7 @@ export const CRASHES: Crash[] = [
     wiki: 'USAir Flight 427',
   },
   {
-    id: 'ua585-1991', name: 'United Airlines Flight 585', date: '1991-03-03',
+    id: 'ua585-1991', country: 'United States', name: 'United Airlines Flight 585', date: '1991-03-03',
     lat: 38.78, lng: -104.83, location: 'Colorado Springs, Colorado, USA',
     operator: 'United Airlines', aircraft: 'Boeing 737-291', flight: 'UA 585',
     fatalities: 25, survivors: 0, category: 'Commercial', cause: 'Mechanical', phase: 'Approach',
@@ -424,7 +424,7 @@ export const CRASHES: Crash[] = [
     wiki: 'United Airlines Flight 585',
   },
   {
-    id: 'valujet592-1996', name: 'ValuJet Flight 592', date: '1996-05-11',
+    id: 'valujet592-1996', country: 'United States', name: 'ValuJet Flight 592', date: '1996-05-11',
     lat: 25.91, lng: -80.58, location: 'Florida Everglades, USA',
     operator: 'ValuJet Airlines', aircraft: 'McDonnell Douglas DC-9-32', flight: 'J7 592',
     fatalities: 110, survivors: 0, category: 'Commercial', cause: 'Fire', phase: 'Climb',
@@ -432,7 +432,7 @@ export const CRASHES: Crash[] = [
     wiki: 'ValuJet Flight 592',
   },
   {
-    id: 'te901-1979', name: 'Air New Zealand Flight 901 (Mount Erebus)', date: '1979-11-28',
+    id: 'te901-1979', country: 'Antarctica', name: 'Air New Zealand Flight 901 (Mount Erebus)', date: '1979-11-28',
     lat: -77.42, lng: 167.47, location: 'Mount Erebus, Ross Island, Antarctica',
     operator: 'Air New Zealand', aircraft: 'McDonnell Douglas DC-10-30', flight: 'TE 901',
     fatalities: 257, survivors: 0, category: 'Commercial', cause: 'Human error', phase: 'Cruise',
@@ -440,7 +440,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Air New Zealand Flight 901',
   },
   {
-    id: 'elal1862-1992', name: 'El Al Flight 1862 (Bijlmer)', date: '1992-10-04',
+    id: 'elal1862-1992', country: 'Netherlands', name: 'El Al Flight 1862 (Bijlmer)', date: '1992-10-04',
     lat: 52.318, lng: 4.975, location: 'Bijlmermeer, Amsterdam, Netherlands',
     operator: 'El Al', aircraft: 'Boeing 747-258F', flight: 'LY 1862',
     fatalities: 43, survivors: 0, category: 'Cargo', cause: 'Mechanical', phase: 'Climb',
@@ -448,7 +448,7 @@ export const CRASHES: Crash[] = [
     wiki: 'El Al Flight 1862',
   },
   {
-    id: 'lamia2933-2016', name: 'LaMia Flight 2933 (Chapecoense)', date: '2016-11-28',
+    id: 'lamia2933-2016', country: 'Colombia', name: 'LaMia Flight 2933 (Chapecoense)', date: '2016-11-28',
     lat: 6.07, lng: -75.42, location: 'Near La Unión, Antioquia, Colombia',
     operator: 'LaMia', aircraft: 'Avro RJ85', flight: 'LMI 2933',
     fatalities: 71, survivors: 6, category: 'Commercial', cause: 'Human error', phase: 'Approach',
@@ -456,7 +456,7 @@ export const CRASHES: Crash[] = [
     wiki: 'LaMia Flight 2933',
   },
   {
-    id: 'ps752-2020', name: 'Ukraine International Airlines Flight 752', date: '2020-01-08',
+    id: 'ps752-2020', country: 'Iran', name: 'Ukraine International Airlines Flight 752', date: '2020-01-08',
     lat: 35.56, lng: 51.10, location: 'Near Tehran, Iran',
     operator: 'Ukraine International Airlines', aircraft: 'Boeing 737-8KV', flight: 'PS 752',
     fatalities: 176, survivors: 0, category: 'Commercial', cause: 'Shootdown', phase: 'Climb',
@@ -464,7 +464,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Ukraine International Airlines Flight 752',
   },
   {
-    id: '8u771-2010', name: 'Afriqiyah Airways Flight 771', date: '2010-05-12',
+    id: '8u771-2010', country: 'Libya', name: 'Afriqiyah Airways Flight 771', date: '2010-05-12',
     lat: 32.66, lng: 13.16, location: 'Tripoli International Airport, Libya',
     operator: 'Afriqiyah Airways', aircraft: 'Airbus A330-202', flight: '8U 771',
     fatalities: 103, survivors: 1, category: 'Commercial', cause: 'Human error', phase: 'Approach',
@@ -472,7 +472,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Afriqiyah Airways Flight 771',
   },
   {
-    id: 'mu5735-2022', name: 'China Eastern Airlines Flight 5735', date: '2022-03-21',
+    id: 'mu5735-2022', country: 'China', name: 'China Eastern Airlines Flight 5735', date: '2022-03-21',
     lat: 23.32, lng: 111.10, location: 'Teng County, Guangxi, China',
     operator: 'China Eastern Airlines', aircraft: 'Boeing 737-89P', flight: 'MU 5735',
     fatalities: 132, survivors: 0, category: 'Commercial', cause: 'Unknown', phase: 'Cruise',
@@ -480,7 +480,7 @@ export const CRASHES: Crash[] = [
     wiki: 'China Eastern Airlines Flight 5735',
   },
   {
-    id: 'yeti691-2023', name: 'Yeti Airlines Flight 691', date: '2023-01-15',
+    id: 'yeti691-2023', country: 'Nepal', name: 'Yeti Airlines Flight 691', date: '2023-01-15',
     lat: 28.20, lng: 83.98, location: 'Pokhara, Nepal',
     operator: 'Yeti Airlines', aircraft: 'ATR 72-500', flight: 'YT 691',
     fatalities: 72, survivors: 0, category: 'Commercial', cause: 'Human error', phase: 'Approach',
@@ -488,7 +488,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Yeti Airlines Flight 691',
   },
   {
-    id: 'jeju2216-2024', name: 'Jeju Air Flight 2216', date: '2024-12-29',
+    id: 'jeju2216-2024', country: 'South Korea', name: 'Jeju Air Flight 2216', date: '2024-12-29',
     lat: 34.99, lng: 126.38, location: 'Muan International Airport, South Korea',
     operator: 'Jeju Air', aircraft: 'Boeing 737-8AS', flight: '7C 2216',
     fatalities: 179, survivors: 2, category: 'Commercial', cause: 'Bird strike', phase: 'Landing',
@@ -496,7 +496,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Jeju Air Flight 2216',
   },
   {
-    id: 'potomac-2025', name: '2025 Potomac River mid-air collision', date: '2025-01-29',
+    id: 'potomac-2025', country: 'United States', name: '2025 Potomac River mid-air collision', date: '2025-01-29',
     lat: 38.85, lng: -77.04, location: 'Potomac River, near Reagan National Airport, Washington, D.C., USA',
     operator: 'American Eagle (PSA Airlines) & US Army', aircraft: 'Bombardier CRJ700 & Sikorsky UH-60 Black Hawk', flight: 'AA 5342',
     fatalities: 67, survivors: 0, category: 'Commercial', cause: 'Collision', phase: 'Approach',
@@ -504,7 +504,7 @@ export const CRASHES: Crash[] = [
     wiki: '2025 Potomac River mid-air collision',
   },
   {
-    id: 'ai171-2025', name: 'Air India Flight 171', date: '2025-06-12',
+    id: 'ai171-2025', country: 'India', name: 'Air India Flight 171', date: '2025-06-12',
     lat: 23.05, lng: 72.60, location: 'Ahmedabad, Gujarat, India',
     operator: 'Air India', aircraft: 'Boeing 787-8 Dreamliner', flight: 'AI 171',
     fatalities: 260, survivors: 1, category: 'Commercial', cause: 'Unknown', phase: 'Takeoff',
@@ -512,7 +512,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Air India Flight 171',
   },
   {
-    id: 'ndola-1961', name: 'Ndola crash (Dag Hammarskjöld)', date: '1961-09-18',
+    id: 'ndola-1961', country: 'Zambia', name: 'Ndola crash (Dag Hammarskjöld)', date: '1961-09-18',
     lat: -12.98, lng: 28.65, location: 'Near Ndola, Northern Rhodesia (now Zambia)',
     operator: 'Transair Sweden (UN charter)', aircraft: 'Douglas DC-6B',
     fatalities: 16, survivors: 0, category: 'Military / State', cause: 'Unknown', phase: 'Approach',
@@ -520,7 +520,7 @@ export const CRASHES: Crash[] = [
     wiki: '1961 Ndola Transair Sweden DC-6 crash',
   },
   {
-    id: 'superga-1949', name: 'Superga air disaster', date: '1949-05-04',
+    id: 'superga-1949', country: 'Italy', name: 'Superga air disaster', date: '1949-05-04',
     lat: 45.08, lng: 7.77, location: 'Superga hill, Turin, Italy',
     operator: 'Avio Linee Italiane', aircraft: 'Fiat G.212',
     fatalities: 31, survivors: 0, category: 'Commercial', cause: 'Weather', phase: 'Approach',
@@ -528,7 +528,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Superga air disaster',
   },
   {
-    id: 'skynyrd-1977', name: 'Lynyrd Skynyrd plane crash', date: '1977-10-20',
+    id: 'skynyrd-1977', country: 'United States', name: 'Lynyrd Skynyrd plane crash', date: '1977-10-20',
     lat: 31.06, lng: -90.66, location: 'Near Gillsburg, Mississippi, USA',
     operator: 'L&J Company (charter)', aircraft: 'Convair CV-240',
     fatalities: 6, survivors: 20, category: 'General aviation', cause: 'Human error', phase: 'Cruise',
@@ -536,7 +536,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Lynyrd Skynyrd plane crash',
   },
   {
-    id: 'tam3054-2007', name: 'TAM Airlines Flight 3054', date: '2007-07-17',
+    id: 'tam3054-2007', country: 'Brazil', name: 'TAM Airlines Flight 3054', date: '2007-07-17',
     lat: -23.62, lng: -46.66, location: 'Congonhas Airport, São Paulo, Brazil',
     operator: 'TAM Airlines', aircraft: 'Airbus A320-233', flight: 'JJ 3054',
     fatalities: 199, survivors: 0, category: 'Commercial', cause: 'Human error', phase: 'Landing',
@@ -544,7 +544,7 @@ export const CRASHES: Crash[] = [
     wiki: 'TAM Airlines Flight 3054',
   },
   {
-    id: 'spanair5022-2008', name: 'Spanair Flight 5022', date: '2008-08-20',
+    id: 'spanair5022-2008', country: 'Spain', name: 'Spanair Flight 5022', date: '2008-08-20',
     lat: 40.50, lng: -3.57, location: 'Madrid–Barajas Airport, Spain',
     operator: 'Spanair', aircraft: 'McDonnell Douglas MD-82', flight: 'JK 5022',
     fatalities: 154, survivors: 18, category: 'Commercial', cause: 'Human error', phase: 'Takeoff',
@@ -552,7 +552,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Spanair Flight 5022',
   },
   {
-    id: 'airblue202-2010', name: 'Airblue Flight 202', date: '2010-07-28',
+    id: 'airblue202-2010', country: 'Pakistan', name: 'Airblue Flight 202', date: '2010-07-28',
     lat: 33.75, lng: 73.05, location: 'Margalla Hills, Islamabad, Pakistan',
     operator: 'Airblue', aircraft: 'Airbus A321-231', flight: 'ED 202',
     fatalities: 152, survivors: 0, category: 'Commercial', cause: 'Human error', phase: 'Approach',
@@ -560,7 +560,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Airblue Flight 202',
   },
   {
-    id: 'avianca52-1990', name: 'Avianca Flight 52', date: '1990-01-25',
+    id: 'avianca52-1990', country: 'United States', name: 'Avianca Flight 52', date: '1990-01-25',
     lat: 40.88, lng: -73.50, location: 'Cove Neck, Long Island, New York, USA',
     operator: 'Avianca', aircraft: 'Boeing 707-321B', flight: 'AV 52',
     fatalities: 73, survivors: 85, category: 'Commercial', cause: 'Human error', phase: 'Approach',
@@ -568,7 +568,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Avianca Flight 52',
   },
   {
-    id: 'af90-1982', name: 'Air Florida Flight 90', date: '1982-01-13',
+    id: 'af90-1982', country: 'United States', name: 'Air Florida Flight 90', date: '1982-01-13',
     lat: 38.88, lng: -77.04, location: '14th Street Bridge, Potomac River, Washington, D.C., USA',
     operator: 'Air Florida', aircraft: 'Boeing 737-222', flight: 'QH 90',
     fatalities: 78, survivors: 5, category: 'Commercial', cause: 'Weather', phase: 'Climb',
@@ -576,7 +576,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Air Florida Flight 90',
   },
   {
-    id: 'nw255-1987', name: 'Northwest Airlines Flight 255', date: '1987-08-16',
+    id: 'nw255-1987', country: 'United States', name: 'Northwest Airlines Flight 255', date: '1987-08-16',
     lat: 42.22, lng: -83.35, location: 'Romulus, near Detroit Metro Airport, Michigan, USA',
     operator: 'Northwest Airlines', aircraft: 'McDonnell Douglas MD-82', flight: 'NW 255',
     fatalities: 156, survivors: 1, category: 'Commercial', cause: 'Human error', phase: 'Takeoff',
@@ -584,7 +584,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Northwest Airlines Flight 255',
   },
   {
-    id: 'aa965-1995', name: 'American Airlines Flight 965', date: '1995-12-20',
+    id: 'aa965-1995', country: 'Colombia', name: 'American Airlines Flight 965', date: '1995-12-20',
     lat: 3.85, lng: -76.13, location: 'Near Buga, Colombia',
     operator: 'American Airlines', aircraft: 'Boeing 757-223', flight: 'AA 965',
     fatalities: 159, survivors: 4, category: 'Commercial', cause: 'Human error', phase: 'Approach',
@@ -592,7 +592,7 @@ export const CRASHES: Crash[] = [
     wiki: 'American Airlines Flight 965',
   },
   {
-    id: 'flash604-2004', name: 'Flash Airlines Flight 604', date: '2004-01-03',
+    id: 'flash604-2004', country: 'Egypt (at sea)', name: 'Flash Airlines Flight 604', date: '2004-01-03',
     lat: 27.88, lng: 34.38, location: 'Red Sea, off Sharm el-Sheikh, Egypt',
     operator: 'Flash Airlines', aircraft: 'Boeing 737-3Q8', flight: 'FSH 604',
     fatalities: 148, survivors: 0, category: 'Commercial', cause: 'Human error', phase: 'Climb',
@@ -600,7 +600,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Flash Airlines Flight 604',
   },
   {
-    id: 'su1492-2019', name: 'Aeroflot Flight 1492', date: '2019-05-05',
+    id: 'su1492-2019', country: 'Russia', name: 'Aeroflot Flight 1492', date: '2019-05-05',
     lat: 55.97, lng: 37.41, location: 'Sheremetyevo Airport, Moscow, Russia',
     operator: 'Aeroflot', aircraft: 'Sukhoi Superjet 100', flight: 'SU 1492',
     fatalities: 41, survivors: 37, category: 'Commercial', cause: 'Weather', phase: 'Landing',
@@ -608,7 +608,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Aeroflot Flight 1492',
   },
   {
-    id: 'ix1344-2020', name: 'Air India Express Flight 1344', date: '2020-08-07',
+    id: 'ix1344-2020', country: 'India', name: 'Air India Express Flight 1344', date: '2020-08-07',
     lat: 11.13, lng: 75.95, location: 'Kozhikode (Calicut) Airport, Kerala, India',
     operator: 'Air India Express', aircraft: 'Boeing 737-8HG', flight: 'IX 1344',
     fatalities: 21, survivors: 169, category: 'Commercial', cause: 'Weather', phase: 'Landing',
@@ -616,7 +616,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Air India Express Flight 1344',
   },
   {
-    id: 'arrow1285-1985', name: 'Arrow Air Flight 1285', date: '1985-12-12',
+    id: 'arrow1285-1985', country: 'Canada', name: 'Arrow Air Flight 1285', date: '1985-12-12',
     lat: 48.95, lng: -54.58, location: 'Gander, Newfoundland, Canada',
     operator: 'Arrow Air (US military charter)', aircraft: 'Douglas DC-8-63CF', flight: 'MLT 1285',
     fatalities: 256, survivors: 0, category: 'Military / State', cause: 'Unknown', phase: 'Takeoff',
@@ -624,7 +624,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Arrow Air Flight 1285',
   },
   {
-    id: 'lokomotiv-2011', name: 'Lokomotiv Yaroslavl plane crash', date: '2011-09-07',
+    id: 'lokomotiv-2011', country: 'Russia', name: 'Lokomotiv Yaroslavl plane crash', date: '2011-09-07',
     lat: 57.6, lng: 39.8, location: 'Near Yaroslavl, Russia',
     operator: 'Yak-Service', aircraft: 'Yakovlev Yak-42D',
     fatalities: 44, survivors: 1, category: 'Commercial', cause: 'Human error', phase: 'Takeoff',
@@ -632,7 +632,7 @@ export const CRASHES: Crash[] = [
     wiki: 'Lokomotiv Yaroslavl plane crash',
   },
   {
-    id: 'sochi-tu154-2016', name: 'Russian Defence Ministry Tu-154 crash', date: '2016-12-25',
+    id: 'sochi-tu154-2016', country: 'Russia (at sea)', name: 'Russian Defence Ministry Tu-154 crash', date: '2016-12-25',
     lat: 43.57, lng: 39.73, location: 'Black Sea, off Sochi, Russia',
     operator: 'Russian Ministry of Defence', aircraft: 'Tupolev Tu-154B-2',
     fatalities: 92, survivors: 0, category: 'Military / State', cause: 'Human error', phase: 'Climb',
@@ -640,7 +640,7 @@ export const CRASHES: Crash[] = [
     wiki: '2016 Russian Defence Ministry Tupolev Tu-154 crash',
   },
   {
-    id: 'southern932-1970', name: 'Southern Airways Flight 932 (Marshall University)', date: '1970-11-14',
+    id: 'southern932-1970', country: 'United States', name: 'Southern Airways Flight 932 (Marshall University)', date: '1970-11-14',
     lat: 38.37, lng: -82.56, location: 'Near Tri-State Airport, Huntington, West Virginia, USA',
     operator: 'Southern Airways', aircraft: 'McDonnell Douglas DC-9-31', flight: 'SO 932',
     fatalities: 75, survivors: 0, category: 'Commercial', cause: 'Human error', phase: 'Approach',
