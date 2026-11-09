@@ -11,7 +11,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: pages
+  group: pages-skywatch
   cancel-in-progress: true
 
 jobs:
@@ -30,13 +30,39 @@ jobs:
       - name: Build for https://<owner>.github.io/<repo>/
         run: npx tsc --noEmit && npx vite build --base=/${{ github.event.repository.name }}/
 
-      - name: Publish to the gh-pages branch
+      # Other sites share this gh-pages branch from their own folders (crashes/ is
+      # Black Box Atlas, published from claude/zen-maxwell-46802a). Replace
+      # SkyWatch's files and leave those folders alone.
+      - name: Publish to the gh-pages branch (keeping the other sites' folders)
+        env:
+          REPO_URL: https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+          KEEP: crashes
         run: |
-          cd dist
-          touch .nojekyll
-          git init -q -b gh-pages
-          git config user.name "github-actions[bot]"
-          git config user.email "41898699+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -q -m "Publish SkyWatch from ${GITHUB_SHA::7}"
-          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" gh-pages
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898699+github-actions[bot]@users.noreply.github.com"
+          for attempt in 1 2 3 4; do
+            rm -rf site
+            status=0
+            git ls-remote --exit-code --heads "$REPO_URL" gh-pages >/dev/null || status=$?
+            if [ "$status" = 0 ]; then
+              git clone -q --depth 1 --branch gh-pages "$REPO_URL" site
+            elif [ "$status" = 2 ]; then
+              mkdir site && git -C site init -q -b gh-pages && git -C site remote add origin "$REPO_URL"
+            else
+              echo "Could not read the repository"; exit 1
+            fi
+            keep_args=(! -name .git)
+            for k in $KEEP; do keep_args+=(! -name "$k"); done
+            find site -mindepth 1 -maxdepth 1 "${keep_args[@]}" -exec rm -rf {} +
+            cp -r dist/. site/
+            touch site/.nojekyll
+            cd site
+            git add -A
+            if git diff --cached --quiet; then echo "Nothing changed"; exit 0; fi
+            git commit -q -m "Publish SkyWatch from ${GITHUB_SHA::7}"
+            if git push -q origin gh-pages; then exit 0; fi
+            cd ..
+            echo "Push raced with another publish; retrying ($attempt)"
+            sleep $((attempt * 5))
+          done
+          exit 1
