@@ -32,11 +32,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: claude/zen-maxwell-46802a
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
 
@@ -57,6 +57,15 @@ jobs:
           git config user.email "41898699+github-actions[bot]@users.noreply.github.com"
           git add public/data/crashes.json
           git commit -m "Refresh crash data from Wikipedia ($(date -u +%Y-%m-%d))"
-          git push origin HEAD:claude/zen-maxwell-46802a
+          # If someone pushed while this ran, replay the data commit on top of theirs.
+          for attempt in 1 2 3; do
+            if git push origin HEAD:claude/zen-maxwell-46802a; then break; fi
+            if [ "$attempt" = 3 ]; then echo "Could not push after 3 tries"; exit 1; fi
+            if ! git pull --rebase origin claude/zen-maxwell-46802a; then
+              git rebase --abort || true
+              echo "The crash data changed on the branch while this ran; that commit's own refresh will cover it."
+              exit 0
+            fi
+          done
           # pushes made by a workflow don't trigger other workflows, so start the publish one directly
           gh workflow run pages.yml --ref claude/zen-maxwell-46802a
