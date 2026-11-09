@@ -185,7 +185,7 @@ export default function App() {
     (minDeaths > 0 ? 1 : 0) +
     (groupFilter ? 1 : 0)
 
-  const selected = useMemo(() => all.find((c) => c.id === selectedId) ?? null, [all, selectedId])
+  const selected = useMemo(() => all.find((c) => c.id === selectedId || c.wikiId === selectedId) ?? null, [all, selectedId])
   const totalDeaths = filtered.reduce((n, c) => n + deaths(c), 0)
   const panelOpen = !!selected || browseOpen
 

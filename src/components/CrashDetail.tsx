@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { Crash } from '../types'
 import { CAUSE_COLORS, formatDate } from '../styles'
 import { articleUrl, wikiSummary, youtubeId, youtubeSearchUrl, type WikiSummary } from '../links'
-import { aircraftFamily } from '../stats'
+import { aircraftFamily, familiesOf } from '../stats'
 import type { GroupRef } from './Stats'
 
 function Fact({ label, children, wide }: { label: string; children: React.ReactNode; wide?: boolean }) {
@@ -50,6 +50,9 @@ export function CrashDetail({ crash: c, customLink, onCustomLink, onClose, onOpe
   const headline = flightNo ? flightNo.replace(/^[A-Z]{2,3}\s*(?=\d)|^[A-Z]\d\s*(?=\d)|^\d[A-Z]\s*(?=\d)/, '') || flightNo : c.date.slice(0, 4)
   const operators = c.operators ?? (c.operator ? [c.operator] : [])
   const types = c.aircraftTypes ?? (c.aircraft ? [c.aircraft] : [])
+  const families = familiesOf(c)
+  // the family each listed type belongs to (same order when the infobox gave one link per type)
+  const familyFor = (t: string, i: number) => (families.length === types.length ? families[i] : families.find((f) => aircraftFamily(t) === f) ?? families[0] ?? aircraftFamily(t))
   const atSea = !!c.region
   const longText = c.curated ? c.summary : wiki?.extract
   const oneLiner = c.curated ? undefined : c.summary
@@ -94,14 +97,14 @@ export function CrashDetail({ crash: c, customLink, onCustomLink, onClose, onOpe
           <Fact label="Aircraft">
             {types.length ? types.map((t, i) => (
               <span key={t}>
-                <LinkBtn onClick={() => onOpenGroup({ kind: 'aircraft', name: aircraftFamily(t) })}>{t}</LinkBtn>{i < types.length - 1 ? ', ' : ''}
+                <LinkBtn onClick={() => onOpenGroup({ kind: 'aircraft', name: familyFor(t, i) })}>{t}</LinkBtn>{i < types.length - 1 ? ', ' : ''}
               </span>
             )) : '—'}
           </Fact>
           <Fact label="Registration">{c.registration ?? '—'}</Fact>
           <Fact label="Flight phase">{c.phase ?? '—'}</Fact>
           <Fact label="Flight type">{c.category}</Fact>
-          <Fact label="Fatalities"><span className="text-red-400">{c.fatalities?.toLocaleString() ?? '—'}</span></Fact>
+          <Fact label="Fatalities"><span className="text-red-400">{c.fatalities?.toLocaleString() ?? 'Not recorded'}</span></Fact>
           <Fact label="Survivors"><span className="text-emerald-400">{c.survivors?.toLocaleString() ?? '—'}</span></Fact>
           {c.aboard != null && <Fact label="Aboard">{c.aboard.toLocaleString()}</Fact>}
           {c.injured != null && c.injured > 0 && <Fact label="Injured">{c.injured.toLocaleString()}</Fact>}
@@ -111,6 +114,11 @@ export function CrashDetail({ crash: c, customLink, onCustomLink, onClose, onOpe
             </Fact>
           )}
           {c.location && <Fact label="Crash site" wide>{c.location}</Fact>}
+          {c.approx && (
+            <p className="col-span-2 -mt-2 text-[11px] text-amber-300/80">
+              📍 Approximate position: Wikipedia has no exact coordinates for this crash, so it’s shown at the place its crash site names.
+            </p>
+          )}
         </dl>
       </Section>
 

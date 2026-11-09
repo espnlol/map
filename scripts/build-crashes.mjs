@@ -21,14 +21,16 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { classifyCause, classifyCategory, countryFromSite, oceanFor, waterBodyIn } from './crash-classify.mjs'
-import { fetchWikitext, parseInfobox, phaseFrom } from './infobox.mjs'
+import { DEFUNCT_STATES, classifyCause, classifyCategory, countryFromSite, modernCountry, oceanFor, waterBodyIn } from './crash-classify.mjs'
+import { articlesUsingTemplate, fetchWikitext, lookupPages, parseInfobox, phaseFrom } from './infobox.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const OUT = join(ROOT, 'public/data/crashes.json')
 const UA = 'BlackBoxAtlas/1.0 (https://github.com/espnlol/map; weekly data refresh)'
 const ENDPOINT = 'https://query.wikidata.org/sparql'
 
+// --offline: never download; anything not in the cache is treated as missing (for local testing)
+const OFFLINE = process.argv.includes('--offline')
 const cacheIdx = process.argv.indexOf('--cache')
 const CACHE = cacheIdx > 0 ? process.argv[cacheIdx + 1] : null
 
@@ -153,6 +155,62 @@ const MODEL_CLASS = /model|family|series|variant|airliner|aircraft type|helicopt
 // Infobox text like "Boeing 747-206B · Boeing 747-121" or "Flight 4805, KLM"
 const splitList = (s) => (s ? s.split(/\s*(?:·|;| and |, (?=[A-Z][a-z]+ [A-Z0-9]))\s*/).map((x) => x.trim()).filter(Boolean) : [])
 
+/**
+ * How precisely a linked place pins down a crash site: an airport or a peak is
+ * a point; a town is close; a river, region or country could be far off.
+ */
+function placePrecision(name) {
+  if (/airport|airfield|aerodrome|air ?base|airstrip|heliport/i.test(name)) return 3
+  if (/\bmount\b|mountain|peak|\bhill\b|volcano|island|\bisle\b/i.test(name)) return 2
+  if (/river|creek|lake|sea\b|ocean|bay\b|gulf|strait|channel|province|state\b|region|district|county|oblast|krai|prefecture|territory|desert|forest|range|valley/i.test(name)) return 0
+  return 1 // towns, villages, neighbourhoods
+}
+
+/** "Air Florida (1971–1991)" -> "Air Florida"; "Aeroflot (airline)" -> "Aeroflot". */
+function cleanTitle(t) {
+  return t.replace(/\s*\((?:airline|airlines|air carrier|carrier|company|aviation|aircraft|airliner|helicopter|\d{4}[^)]*)\)$/i, '').trim()
+}
+
+// Same airline under different names after redirects are resolved.
+const OPERATOR_ALIASES = new Map(Object.entries({
+  'Pan American World Airways': 'Pan Am',
+  'Pan American Airways': 'Pan Am',
+  'United Air Lines': 'United Airlines',
+  'Japan Air Lines': 'Japan Airlines',
+  'Trans World Airlines': 'Trans World Airlines',
+  TWA: 'Trans World Airlines',
+  'Eastern Airlines': 'Eastern Air Lines',
+  'Northwest Orient': 'Northwest Airlines',
+  'Northwest Orient Airlines': 'Northwest Airlines',
+  'USAir': 'US Airways',
+  'Allegheny Airlines': 'US Airways',
+  'Aeroflot – Russian Airlines': 'Aeroflot',
+  'Aeroflot Soviet Airlines': 'Aeroflot',
+  'Air France–KLM': 'Air France',
+  'British Overseas Airways Corporation': 'BOAC',
+  'Korean Air Lines': 'Korean Air',
+  'USAF': 'United States Air Force',
+  'U.S. Air Force': 'United States Air Force',
+  'US Air Force': 'United States Air Force',
+  'RAF': 'Royal Air Force',
+  'U.S. Navy': 'United States Navy',
+  'US Navy': 'United States Navy',
+  'U.S. Army': 'United States Army',
+  'US Army': 'United States Army',
+  'U.S. Marine Corps': 'United States Marine Corps',
+  'Indian Airlines Corporation': 'Indian Airlines',
+  'Garuda Indonesian Airways': 'Garuda Indonesia',
+  'Philippine Air Lines': 'Philippine Airlines',
+}))
+function normOperator(name) {
+  const n = cleanTitle(name).replace(/\s+/g, ' ').trim()
+  return OPERATOR_ALIASES.get(n) ?? n
+}
+// Infobox operator cells sometimes hold notes rather than names.
+const isOperatorName = (n) =>
+  !!n && n.length <= 80 && !/^[A-Z]{2,4}$/.test(n) && // a bare country code from {{air force|IDN}}-style templates
+  !/^(unknown|none|n\/a|private|privately owned|various)$/i.test(n) && !/^(on behalf of|leased|wet[- ]lease|for )/i.test(n)
+
 function cleanFlight(f) {
   if (!f) return undefined
   const s = f.replace(/\s+/g, ' ').trim().toUpperCase()
@@ -203,19 +261,102 @@ async function main() {
     if (cls && !item.classes.includes(cls)) item.classes.push(cls)
   }
 
-  // Wikipedia infoboxes for every crash that has an article.
-  const titles = uniq([...byId.values()].map((e) => e.title))
-  let wikitext = readCache('wikitext')
-  if (wikitext) console.log('Using cached Wikipedia articles')
+  // 1. Crash articles Wikidata doesn't tag as accidents: every Wikipedia
+  //    article that uses the aircraft-occurrence infobox.
+  let catTitles = readCache('infobox-articles') ?? (OFFLINE ? [] : null)
+  if (catTitles) console.log('Using cached list of infobox articles')
   else {
-    console.log(`Reading ${titles.length} Wikipedia articles...`)
-    const map = await fetchWikitext(titles, {
+    console.log('Listing every Wikipedia article with an aircraft-occurrence infobox...')
+    catTitles = [...(await articlesUsingTemplate('Template:Infobox aircraft occurrence', { userAgent: UA }))].sort()
+    writeCache('infobox-articles', catTitles)
+  }
+  const knownTitles = new Set([...byId.values()].map((e) => e.title).filter(Boolean))
+  const newTitles = catTitles.filter((t) => !knownTitles.has(t))
+  console.log(`${catTitles.length} articles use the infobox, ${newTitles.length} not already from Wikidata`)
+
+  // 2. The wikitext of every article (cached between runs while developing).
+  const wikitext = readCache('wikitext') ?? {}
+  const wanted = uniq([...knownTitles, ...newTitles]).filter((t) => !(t in wikitext))
+  if (wanted.length && !OFFLINE) {
+    console.log(`Reading ${wanted.length} Wikipedia articles...`)
+    const map = await fetchWikitext(wanted, {
       userAgent: UA,
       onProgress: (n, total) => { if (n % 500 === 0 || n === total) console.log(`  ${n}/${total}`) },
     })
-    wikitext = Object.fromEntries(map)
+    for (const t of wanted) wikitext[t] = map.get(t) ?? ''
     writeCache('wikitext', wikitext)
   }
+  const boxes = new Map()
+  for (const t of uniq([...knownTitles, ...newTitles])) {
+    const box = wikitext[t] ? parseInfobox(wikitext[t]) : null
+    if (box) boxes.set(t, box)
+  }
+
+  // Infobox-only articles become crashes if the infobox has a date.
+  const pendingIds = new Map()
+  for (const t of newTitles) {
+    const box = boxes.get(t)
+    if (!box?.date) continue
+    pendingIds.set(t, { id: null, title: t, links: {}, date: box.date, fromCategory: true })
+  }
+
+  // 3. Look up, through Wikipedia: what each operator/aircraft link redirects
+  //    to (so "United Air Lines" and "United Airlines" are one airline), the
+  //    Wikidata id of category-only articles, and coordinates of the places
+  //    crash sites link to (for crashes without coordinates of their own).
+  const lookups = new Set(pendingIds.keys())
+  for (const box of boxes.values()) {
+    for (const pl of box.planes) for (const t of [...pl.operatorLinks, ...pl.typeLinks]) lookups.add(t)
+    if (!box.coord) for (const t of box.siteLinks) lookups.add(t)
+  }
+  let pages = readCache('pages') ?? {}
+  const missing = [...lookups].filter((t) => !(t in pages))
+  if (missing.length && !OFFLINE) {
+    console.log(`Looking up ${missing.length} linked Wikipedia pages...`)
+    const map = await lookupPages(missing, { userAgent: UA })
+    pages = { ...pages }
+    for (const t of missing) pages[t] = map.get(t) ?? null
+    writeCache('pages', pages)
+  }
+  const canonical = (t) => pages[t]?.title ?? t
+
+  // What kind of organisation each infobox operator is (airline, cargo airline,
+  // air force, ...), asked of Wikidata by the operators' ids.
+  // Which country each linked crash-site place is in today (for crashes whose
+  // own country is missing or a state that no longer exists).
+  const siteQids = uniq([...boxes.values()].flatMap((b) => b.siteLinks.map((t) => pages[t]?.qid))).sort()
+  const siteCountry = {}
+  for (let i = 0; i < siteQids.length; i += 800) {
+    const chunk = siteQids.slice(i, i + 800)
+    const rows = await sparql(`site-countries-${i / 800}`, `
+SELECT ?place ?countryLabel WHERE {
+  VALUES ?place { ${chunk.map((q) => `wd:${q}`).join(' ')} }
+  ?place wdt:P17 ?country . ?country rdfs:label ?countryLabel FILTER(lang(?countryLabel) = 'en')
+  FILTER NOT EXISTS { ?country wdt:P576 ?dissolved }
+}`)
+    for (const r of rows) siteCountry[qid(val(r.place))] ??= val(r.countryLabel)
+  }
+
+  const opQids = uniq([...boxes.values()].flatMap((b) => b.planes.flatMap((p) => p.operatorLinks.map((t) => pages[t]?.qid)))).sort()
+  const opClasses = {}
+  for (let i = 0; i < opQids.length; i += 800) {
+    const chunk = opQids.slice(i, i + 800)
+    const rows = await sparql(`operator-classes-${i / 800}`, `
+SELECT ?op ?classLabel WHERE {
+  VALUES ?op { ${chunk.map((q) => `wd:${q}`).join(' ')} }
+  ?op wdt:P31 ?class . ?class rdfs:label ?classLabel FILTER(lang(?classLabel) = 'en')
+}`)
+    for (const r of rows) (opClasses[qid(val(r.op))] ??= []).push(val(r.classLabel))
+  }
+
+  const wikidataIds = new Set(byId.keys())
+  for (const [t, e] of pendingIds) {
+    const qidOf = pages[t]?.qid
+    if (qidOf && wikidataIds.has(qidOf)) continue // same crash, already there under another title
+    e.id = qidOf ?? `wp:${t}`
+    byId.set(e.id, e)
+  }
+  console.log(`${[...byId.values()].filter((e) => e.fromCategory).length} extra crashes found through the infobox list`)
 
   // Every country name Wikidata uses, to recognise them in crash-site text.
   const knownCountries = new Set(
@@ -225,21 +366,36 @@ async function main() {
   const out = []
   let skipped = 0
   let withInfobox = 0
+  let approximate = 0
   for (const e of byId.values()) {
     const L = (k) => (e.links[k] ?? []).filter((x) => x.label && !/^Q\d+$/.test(x.label))
-    const box = e.title && wikitext[e.title] ? parseInfobox(wikitext[e.title]) : null
+    const box = e.title ? boxes.get(e.title) ?? null : null
     if (box) withInfobox++
     // Of several locations, use one with coordinates, preferring a specific
     // place (an airport, mountain, sea, ...) over a city or "runway".
-    const SPECIFIC = /airport|airfield|aerodrome|air base|airbase|mountain|mount |peak|volcano|lake|river|sea|ocean|bay|gulf|strait|channel|island/i
-    const location = [...L('location')].sort((a, b) => (+!!b.coord - +!!a.coord) || (+SPECIFIC.test(b.label) - +SPECIFIC.test(a.label)))[0]
-    const coord = box?.coord ?? e.coord ?? location?.coord ?? null
+    const location = [...L('location')].sort((a, b) => (+!!b.coord - +!!a.coord) || placePrecision(b.label) - placePrecision(a.label))[0]
+    // Position: the crash's own coordinates; failing that, the place the
+    // crash site links to (first, most specific link), marked approximate.
+    // No coordinates of its own: use the most precise place we know of, from
+    // Wikidata's location or the places the infobox's crash site links to.
+    const candidates = !box?.coord && !e.coord
+      ? [
+          ...(location?.coord ? [{ name: location.label, coord: location.coord }] : []),
+          ...(box?.siteLinks ?? []).filter((t) => pages[t]?.coord).map((t) => ({ name: t, coord: pages[t].coord })),
+        ]
+      : []
+    const bestPlace = candidates.sort((a, b) => placePrecision(b.name) - placePrecision(a.name))[0]
+    const coord = box?.coord ?? e.coord ?? bestPlace?.coord ?? null
+    const approx = !box?.coord && !e.coord
     if (!e.date || !coord || !(e.title || e.label)) { skipped++; continue }
+    if (approx) approximate++
     const [lat, lng] = coord
 
-    // Aircraft types: the infobox names them; otherwise Wikidata's "vehicle" is
-    // either a model (Boeing 747) or one airframe whose class is the model.
+    // Aircraft: the infobox names the exact variant; its link gives the family
+    // ("Boeing 747-206B" links to "Boeing 747"). Otherwise Wikidata's "vehicle"
+    // is either a model or one airframe whose class is the model.
     let types = uniq((box?.planes ?? []).flatMap((p) => splitList(p.type)))
+    let families = uniq((box?.planes ?? []).flatMap((p) => p.typeLinks.map(canonical).map(cleanTitle)))
     let reg = uniq((box?.planes ?? []).map((p) => p.registration))[0] ?? e.reg
     if (!types.length) {
       for (const v of [...L('vehicle'), ...L('operated')]) {
@@ -252,9 +408,19 @@ async function main() {
       }
       types = uniq(types)
     }
+    if (!families.length) families = []
 
+    // Operators: the article the infobox links to (redirects resolved), else
+    // its text, else Wikidata's operator.
     const wdOperators = L('operator')
-    const operators = uniq([...(box?.planes ?? []).flatMap((p) => splitList(p.operator)), ...(box?.planes?.length ? [] : wdOperators.map((o) => o.label))])
+    const boxOperators = (box?.planes ?? []).flatMap((p) => (p.operatorLinks.length ? p.operatorLinks.map(canonical).map(cleanTitle) : splitList(p.operator)))
+    let operators = uniq(boxOperators.map(normOperator)).filter(isOperatorName)
+    if (!operators.length) operators = uniq(wdOperators.map((o) => normOperator(o.label))).filter(isOperatorName)
+    // What each operator is (airline, air force, ...), from Wikidata.
+    const operatorClasses = [
+      ...wdOperators.flatMap((o) => o.classes),
+      ...(box?.planes ?? []).flatMap((p) => p.operatorLinks.flatMap((t) => opClasses[pages[t]?.qid] ?? [])),
+    ]
     const countries = L('country').map((c) => c.label)
     const classes = L('class').map((c) => c.label)
     const causes = L('cause').map((c) => c.label)
@@ -263,11 +429,13 @@ async function main() {
     const water = waterBodyIn(site) ?? (countries.length ? null : waterBodyIn(location?.label))
     // Country: the accident's own, else the country of its location or
     // administrative area, else one named in the crash-site text.
-    const country =
-      countries[0] ??
+    const placeCountry =
       L('location').find((x) => x.country)?.country ??
       L('admin').find((x) => x.country)?.country ??
-      countryFromSite(site, knownCountries)
+      (box?.siteLinks ?? []).map((t) => siteCountry[pages[t]?.qid]).find(Boolean)
+    let country = countries.find((c) => !DEFUNCT_STATES.has(c)) ?? placeCountry ?? countries[0] ?? countryFromSite(site, knownCountries)
+    if (DEFUNCT_STATES.has(country) && placeCountry) country = placeCountry
+    country = modernCountry(country, e.date)
     const plane1 = box?.planes?.[0]
     const fromWd = L('from')[0]
     const toWd = L('to')[0]
@@ -280,6 +448,7 @@ async function main() {
       date: e.date,
       lat: +lat.toFixed(4),
       lng: +lng.toFixed(4),
+      approx: approx || undefined,
       location: site || undefined,
       // At sea: the ocean/sea name. No country recorded: a best guess from the
       // coordinates, flagged as such.
@@ -289,13 +458,14 @@ async function main() {
       operators: operators.length ? operators : undefined,
       aircraft: types.join(' & ') || undefined,
       aircraftTypes: types.length ? types : undefined,
+      aircraftFamilies: families.length ? families : undefined,
       flight: cleanFlight(plane1?.flight) ?? e.flight,
       registration: reg || undefined,
       fatalities: box?.fatalities ?? e.deaths,
       survivors: box?.survivors ?? e.survivors,
       injured: box?.injuries ?? e.injured,
       aboard: box?.occupants,
-      category: classifyCategory(wdOperators.flatMap((o) => o.classes), classes, operators),
+      category: classifyCategory(operatorClasses, classes, operators, !!(cleanFlight(plane1?.flight) ?? e.flight), types, e.title ?? e.label),
       cause: classifyCause([summary ?? '', ...causes, ...classes]),
       summary,
       phase: phaseFrom(summary),
@@ -305,6 +475,7 @@ async function main() {
       wiki: e.title,
     })
   }
+  console.log(`${approximate} placed approximately (at the place their crash site links to)`)
 
   // Wikidata sometimes files a second item for the same event (e.g. one of the
   // aircraft, with no article of its own). Drop article-less entries that share

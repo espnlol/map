@@ -1,15 +1,19 @@
 import type { Cause, Crash } from './types'
 
+/** Deaths, counting an unknown number as 0 (only for sorting and sums; check hasDeaths before showing it) */
 export const deaths = (c: Crash) => c.fatalities ?? 0
+export const hasDeaths = (c: Crash) => c.fatalities != null
 
 /** Groups variants into a family: "Boeing 737-8AS" and "Boeing 737-800" -> "Boeing 737". */
 export function aircraftFamily(type: string): string {
   const t = type.replace(/\s*\(.*?\)/g, '').replace(/\s+/g, ' ').trim()
   const rules: [RegExp, (m: RegExpExecArray) => string][] = [
     [/^Boeing (\d{3})/i, (m) => `Boeing ${m[1]}`],
+    [/^Boeing (7\d7) (Classic|Next Generation|MAX)/i, (m) => `Boeing ${m[1]}`],
     [/^Boeing ([A-Z]+-?\d+)/i, (m) => `Boeing ${m[1].toUpperCase()}`],
     [/^Airbus (A\d{3})/i, (m) => `Airbus ${m[1].toUpperCase()}`],
     [/^(?:McDonnell )?Douglas ((?:DC|MD|C)-\d+)/i, (m) => `${/^MD/i.test(m[1]) ? 'McDonnell Douglas' : 'Douglas'} ${m[1].toUpperCase()}`],
+    [/^(?:McDonnell Douglas )?(MD-\d+)/i, (m) => `McDonnell Douglas ${m[1].toUpperCase()}`],
     [/^Lockheed (?:Martin )?((?:L-|C-)?\d+|[A-Z][a-z]+(?: [A-Z][a-z]+)?)/, (m) => `Lockheed ${m[1]}`],
     [/^(Tupolev Tu|Ilyushin Il|Antonov An|Yakovlev Yak|Mil Mi|Sukhoi Su|Let L|Beriev Be)-(\d+)/i, (m) => `${m[1]}-${m[2]}`],
     [/^(ATR) (\d+)/i, (m) => `ATR ${m[2]}`],
@@ -33,8 +37,11 @@ export interface Group {
   name: string
   crashes: Crash[]
   count: number
+  /** Known deaths only */
   deaths: number
   survivors: number
+  /** Crashes in the group with no recorded death toll */
+  unknownDeaths: number
 }
 
 export function groupBy(crashes: Crash[], keys: (c: Crash) => (string | undefined)[]): Group[] {
@@ -52,11 +59,17 @@ export function groupBy(crashes: Crash[], keys: (c: Crash) => (string | undefine
     count: list.length,
     deaths: list.reduce((n, c) => n + deaths(c), 0),
     survivors: list.reduce((n, c) => n + (c.survivors ?? 0), 0),
+    unknownDeaths: list.filter((c) => !hasDeaths(c)).length,
   }))
 }
 
 export const byAirline = (crashes: Crash[]) => groupBy(crashes, (c) => c.operators ?? (c.operator ? [c.operator] : []))
-export const byAircraft = (crashes: Crash[]) => groupBy(crashes, (c) => (c.aircraftTypes ?? (c.aircraft ? [c.aircraft] : [])).map(aircraftFamily))
+/** Aircraft families in a crash: from the articles the infobox links to, else from the type names. */
+export function familiesOf(c: Crash): string[] {
+  const src = c.aircraftFamilies?.length ? c.aircraftFamilies : c.aircraftTypes ?? (c.aircraft ? [c.aircraft] : [])
+  return [...new Set(src.map(aircraftFamily))]
+}
+export const byAircraft = (crashes: Crash[]) => groupBy(crashes, familiesOf)
 export const byPlace = (crashes: Crash[]) => groupBy(crashes, (c) => [place(c)])
 export const isOcean = (name: string) => /\b(Ocean|Sea|Gulf|Strait|Channel)\b/.test(name)
 

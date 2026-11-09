@@ -3,7 +3,7 @@ import type { Crash } from '../types'
 import { CAUSE_COLORS, formatDate } from '../styles'
 import { Bars, Modal } from './Modals'
 import {
-  aircraftFamily, byAircraft, byAirline, byPlace, countBy, deaths, isOcean, place, topFives,
+  byAircraft, byAirline, byPlace, countBy, deaths, familiesOf, hasDeaths, isOcean, place, topFives,
   type Group,
 } from '../stats'
 
@@ -17,7 +17,7 @@ const decade = (c: Crash) => `${c.date.slice(0, 3)}0s`
 /** Crashes that belong to an airline / aircraft family / place. */
 export function crashesIn(crashes: Crash[], g: GroupRef): Crash[] {
   if (g.kind === 'airline') return crashes.filter((c) => (c.operators ?? (c.operator ? [c.operator] : [])).includes(g.name))
-  if (g.kind === 'aircraft') return crashes.filter((c) => (c.aircraftTypes ?? (c.aircraft ? [c.aircraft] : [])).some((t) => aircraftFamily(t) === g.name))
+  if (g.kind === 'aircraft') return crashes.filter((c) => familiesOf(c).includes(g.name))
   return crashes.filter((c) => place(c) === g.name)
 }
 
@@ -53,7 +53,7 @@ function CrashList({ crashes, onSelect, limit = 50 }: { crashes: Crash[]; onSele
                 <span className="block truncate text-sm text-white">{c.name}</span>
                 <span className="block truncate text-xs text-slate-500">{formatDate(c.date)} · {c.aircraft ?? 'Unknown aircraft'} · {c.country}</span>
               </span>
-              <span className="shrink-0 text-sm font-semibold tabular-nums text-red-400">{c.fatalities ?? '—'}</span>
+              <span className="shrink-0 text-sm font-semibold tabular-nums text-red-400" title={c.fatalities == null ? 'Death toll not recorded' : undefined}>{c.fatalities ?? '?'}</span>
             </button>
           </li>
         ))}
@@ -137,6 +137,7 @@ function GroupDetail({ crashes, group, onBack, onSelect, onShowOnMap, onOpen }: 
     )
   }
   const total = list.reduce((n, c) => n + deaths(c), 0)
+  const known = list.filter(hasDeaths).length
   const surv = list.reduce((n, c) => n + (c.survivors ?? 0), 0)
   const years = list.map((c) => +c.date.slice(0, 4))
   const worst = [...list].sort((a, b) => deaths(b) - deaths(a))[0]
@@ -158,7 +159,8 @@ function GroupDetail({ crashes, group, onBack, onSelect, onShowOnMap, onOpen }: 
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Tile label="Crashes" value={fmt(list.length)} />
-        <Tile label="Deaths" value={fmt(total)} tone="text-red-400" sub={`${(total / list.length).toFixed(0)} per crash on average`} />
+        <Tile label="Deaths" value={fmt(total)} tone="text-red-400"
+          sub={known < list.length ? `${list.length - known} crash${list.length - known > 1 ? 'es' : ''} with no recorded toll` : `${(total / Math.max(known, 1)).toFixed(0)} per crash on average`} />
         <Tile label="Survivors" value={fmt(surv)} tone="text-emerald-400" />
         <Tile label="Years" value={`${Math.min(...years)}${Math.max(...years) !== Math.min(...years) ? `–${Math.max(...years)}` : ''}`} />
       </div>
@@ -221,6 +223,7 @@ export function StatsModal({ crashes, total, initial, onSelect, onShowOnMap, onC
   }
 
   const totalDeaths = crashes.reduce((n, c) => n + deaths(c), 0)
+  const unknownTolls = crashes.filter((c) => !hasDeaths(c)).length
   const totalSurvivors = crashes.reduce((n, c) => n + (c.survivors ?? 0), 0)
   const tabs: { id: Tab; label: string }[] = [
     { id: 'overview', label: 'Overview' },
@@ -253,12 +256,22 @@ export function StatsModal({ crashes, total, initial, onSelect, onShowOnMap, onC
         <div className="space-y-6">
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
             <Tile label="Crashes" value={fmt(crashes.length)} />
-            <Tile label="Deaths" value={fmt(totalDeaths)} tone="text-red-400" />
+            <Tile label="Deaths" value={fmt(totalDeaths)} tone="text-red-400" sub={unknownTolls ? `${fmt(unknownTolls)} tolls unknown` : undefined} />
             <Tile label="Survivors" value={fmt(totalSurvivors)} tone="text-emerald-400" />
             <Tile label="Airlines" value={fmt(airlines.length)} />
             <Tile label="Aircraft types" value={fmt(aircraft.length)} />
             <Tile label="Countries & seas" value={fmt(places.length)} />
           </div>
+          <details className="rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-3 text-xs leading-relaxed text-slate-400">
+            <summary className="cursor-pointer font-semibold text-slate-200">How accurate are these numbers?</summary>
+            <ul className="mt-2 list-disc space-y-1 pl-4">
+              <li><b className="text-slate-200">Only crashes on Wikipedia.</b> Wikipedia covers notable accidents (most airliner crashes, few small-plane ones), so this is a big sample, not every crash ever. Specialist databases list tens of thousands more.</li>
+              <li><b className="text-slate-200">Counts aren’t risk.</b> Airlines and aircraft that flew more, or that Wikipedia covers in more detail (e.g. Aeroflot, US carriers), show more crashes. Nothing here is adjusted for number of flights.</li>
+              <li><b className="text-slate-200">Causes and flight phases are sorted automatically</b> from Wikipedia’s one-line summary, so some are “Unknown” or simplified. Flight type (commercial, military, …) is a best guess from the operator.</li>
+              <li><b className="text-slate-200">Unknown death tolls</b> ({fmt(unknownTolls)} crashes here) are left out of death totals rather than counted as zero. Some tolls include people killed on the ground.</li>
+              <li><b className="text-slate-200">Positions</b> for crashes without their own coordinates use the place their crash site links to (marked approximate).</li>
+            </ul>
+          </details>
           <div className="grid gap-6 sm:grid-cols-2">
             <Section title="Airlines with the most crashes">
               <Bars rows={top(airlines).map((g) => ({ label: g.name, value: g.count, color: '#a855f7' }))} onClick={(name) => open({ kind: 'airline', name })} />

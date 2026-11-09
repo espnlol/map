@@ -23,11 +23,15 @@ export interface RouteEnd {
 export interface Crash {
   /** Wikidata id (Q123) or a hand-written slug for the curated entries */
   id: string
+  /** For hand-written entries: the id the same crash has in the Wikipedia data */
+  wikiId?: string
   name: string
   /** ISO date: YYYY-MM-DD, or YYYY-MM / YYYY when only that is known */
   date: string
   lat: number
   lng: number
+  /** True when the position is the place the crash site links to, not the crash's own coordinates */
+  approx?: boolean
   /** Crash site as described on Wikipedia */
   location?: string
   /** Country, or the ocean/sea for crashes at sea */
@@ -38,6 +42,8 @@ export interface Crash {
   operators?: string[]
   aircraft?: string
   aircraftTypes?: string[]
+  /** The aircraft articles the infobox links to ("Boeing 747" for a 747-206B) */
+  aircraftFamilies?: string[]
   flight?: string
   registration?: string
   /** Deaths, including people on the ground where Wikipedia counts them */

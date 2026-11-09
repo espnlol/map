@@ -21,12 +21,18 @@ function merge(wiki: Crash, mine: Crash): Crash {
     ...mine,
     ...Object.fromEntries(Object.entries(wiki).filter(([, v]) => v !== undefined && v !== '')),
     id: mine.id,
+    // keep the Wikipedia/Wikidata id too, so links that use it still open this crash
+    wikiId: wiki.id,
+    // my coordinates are exact; Wikipedia's are sometimes only the place the crash site links to
+    ...(wiki.approx ? { lat: mine.lat, lng: mine.lng, approx: undefined } : {}),
     name: mine.name,
     summary: mine.summary,
     cause: mine.cause,
     phase: mine.phase ?? wiki.phase,
     category: mine.category,
-    country: mine.country,
+    // Wikipedia's country uses the same naming as every other crash (today's
+    // country names), so the stats group correctly; mine is only a fallback.
+    country: wiki.country && wiki.country !== 'Unknown' ? wiki.country : mine.country,
     location: mine.location,
     region: wiki.region,
     video: mine.video,

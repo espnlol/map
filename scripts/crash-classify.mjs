@@ -2,22 +2,31 @@
 
 // Checked in order; the first match wins.
 const CAUSE_RULES = [
-  ['Terrorism', /terror|\bbomb|hijack|sabotage|explosive device|suicide attack/i],
+  ['Terrorism', /terror|\bbomb|hijack|sabotage|explosive device|suicide attack|suicide bomb/i],
   ['Shootdown', /shoot ?down|shot down|\bmissile|anti-aircraft|surface-to-air|air-to-air|friendly fire|intercepted/i],
-  ['Deliberate', /pilot suicide|murder|deliberate|intentional/i],
+  ['Deliberate', /suicide|murder|deliberate|intentional/i],
   ['Collision', /collision|collided/i],
   ['Bird strike', /\bbird/i],
   ['Fire', /\bfires?\b|\bsmoke\b|\bblaze\b/i],
   ['Human error', /pilot error|human error|crew error|controlled flight into terrain|\bcfit\b|spatial disorientation|fuel (exhaustion|starvation)|ran out of fuel|navigation(al)? error|air traffic control error|\batc error/i],
   ['Weather', /weather|\bicing\b|\bice\b|wind ?shear|microburst|thunderstorm|turbulence|\bfog\b|lightning|\bsnow|\bstorm|downdraft|volcanic ash|\brain\b|\bheavy rain|poor visibility|low visibility|whiteout|crosswind|tailwind/i],
   ['Mechanical', /mechanical|engine failure|engine fire|structural|fatigue|\bfailure|malfunction|decompression|maintenance|design flaw|hydraulic|uncontained|flutter|corrosion|defect|separation|explosion of|fuel tank|cargo door|\bfaulty/i],
+  // Summaries that say the cause isn't known shouldn't fall through to the
+  // weak "human error" guesses below.
+  ['Unknown', /unknown (reason|cause)s?|undetermined|not (been )?determined|unexplained|not confirmed|under investigation|disputed|mystery|disappear/i],
   ['Human error', /pilot|crew|\bstall|runway excursion|overran|overrun|undershoot|flew into|into terrain|into a mountain|into the sea|navigation|disoriented|descended below|premature descent|misread|confusion/i],
 ]
 
 /** @param {string[]} labels cause labels and accident-class labels */
 export function classifyCause(labels) {
-  const text = labels.join(' | ')
-  for (const [cause, re] of CAUSE_RULES) if (re.test(text)) return cause
+  // Wikipedia's own summary (the first label) wins; Wikidata's labels are a fallback.
+  const [summary, ...rest] = labels
+  for (const raw of [summary ?? '', rest.join(' | ')]) {
+    if (!raw) continue
+    // "collision with terrain/a mountain" is flying into the ground, not two aircraft colliding
+    const text = raw.replace(/collision with (?:the |a |an )?(terrain|ground|mountain|mountainside|hill|hillside|trees?|water|sea|ocean|power ?lines?|cables?|tower|mast|building|obstacles?|cliff|ridge|volcano|glacier|runway)/gi, 'impact with $1')
+    for (const [cause, re] of CAUSE_RULES) if (re.test(text)) return cause
+  }
   return 'Unknown'
 }
 
@@ -26,16 +35,23 @@ export function classifyCause(labels) {
  * @param {string[]} accidentClasses what the accident is
  * @param {string[]} operatorNames
  */
-export function classifyCategory(operatorClasses, accidentClasses, operatorNames) {
+const MILITARY_TYPE = /\b(?:F|B|C|KC|EC|RC|P|A|E|U|T|AH|UH|CH|MH|HH|SH|OH|V|MV|CV|S)-\d|\b(?:MiG|Su|Yak-(?:9|28|38))-?\d|fighter|bomber|stratofortress|stratotanker|hercules|globemaster|galaxy|starlifter|thunder(?:jet|streak|chief|bolt)|sabre|phantom|tornado|harrier|stuka|spitfire|hurricane|mosquito|lancaster|halifax|liberator|flying fortress|black hawk|chinook|apache|osprey|super cobra|seahawk|sea king|warplane|military/i
+
+export function classifyCategory(operatorClasses, accidentClasses, operatorNames, hasFlightNumber = false, aircraftTypes = [], crashName = '') {
   const ops = operatorClasses.join(' | ')
-  const names = operatorNames.join(' | ')
+  // the crash's own name often says it ("2019 Indian Air Force An-32 crash", "... Cargo Flight 1045")
+  const names = [...operatorNames, crashName].join(' | ')
   if (/cargo|freight/i.test(ops) || /cargo|freight|fedex|\bups\b|dhl/i.test(names)) return 'Cargo'
   if (/air force|military|navy|army|armed forces|naval|marine corps|government|ministry|space agency|coast guard|police/i.test(ops + ' | ' + names)) {
     return 'Military / State'
   }
   if (/airline|air carrier|charter|regional|airway|air transport|aviation company|flag carrier|low-cost/i.test(ops)) return 'Commercial'
+  // no operator known: a military aircraft type gives it away
+  if (!operatorNames.length && MILITARY_TYPE.test(aircraftTypes.join(' | '))) return 'Military / State'
   if (/air(lines?|ways)\b|\bair\b|aero|aviation|express/i.test(names)) return 'Commercial'
   if (/airliner/i.test(accidentClasses.join(' | '))) return 'Commercial'
+  // a scheduled/charter flight number means an airline flight
+  if (hasFlightNumber) return 'Commercial'
   return 'General aviation'
 }
 
@@ -118,4 +134,84 @@ export function countryFromSite(site, known) {
     if (known.has(part)) return part
   }
   return null
+}
+
+// Historical names -> today's country, where that's unambiguous.
+const COUNTRY_RENAMES = new Map(Object.entries({
+  "People's Republic of China": 'China',
+  'Kingdom of Denmark': 'Denmark',
+  'Empire of Japan': 'Japan',
+  'Occupation of Japan': 'Japan',
+  'United States occupation of the Ryukyu Islands': 'Japan',
+  'German Reich': 'Germany',
+  'Nazi Germany': 'Germany',
+  'Weimar Republic': 'Germany',
+  'German Empire': 'Germany',
+  'West Germany': 'Germany',
+  'East Germany': 'Germany',
+  "Polish People's Republic": 'Poland',
+  'Second Polish Republic': 'Poland',
+  'Azerbaijan Soviet Socialist Republic': 'Azerbaijan',
+  'Kazakh Soviet Socialist Republic': 'Kazakhstan',
+  'Latvian Soviet Socialist Republic': 'Latvia',
+  'Lithuanian Soviet Socialist Republic': 'Lithuania',
+  'Estonian Soviet Socialist Republic': 'Estonia',
+  'Ukrainian Soviet Socialist Republic': 'Ukraine',
+  'Byelorussian Soviet Socialist Republic': 'Belarus',
+  'Georgian Soviet Socialist Republic': 'Georgia',
+  'Armenian Soviet Socialist Republic': 'Armenia',
+  'Uzbek Soviet Socialist Republic': 'Uzbekistan',
+  'Russian Socialist Federative Soviet Republic': 'Russia',
+  'Russian Soviet Federative Socialist Republic': 'Russia',
+  'Russian Empire': 'Russia',
+  'Rhodesia': 'Zimbabwe',
+  'Southern Rhodesia': 'Zimbabwe',
+  'South Yemen': 'Yemen',
+  'North Yemen': 'Yemen',
+  'Zaire': 'Democratic Republic of the Congo',
+  'Burma': 'Myanmar',
+  'Ceylon': 'Sri Lanka',
+  'Dahomey': 'Benin',
+  'Upper Volta': 'Burkina Faso',
+  'Kingdom of Italy': 'Italy',
+  'Kingdom of Egypt': 'Egypt',
+  'Kingdom of Afghanistan': 'Afghanistan',
+  'Kingdom of Iraq': 'Iraq',
+  'Kingdom of Greece': 'Greece',
+  'Kingdom of Romania': 'Romania',
+  'Kingdom of Hungary': 'Hungary',
+  'Kingdom of Yugoslavia': 'Yugoslavia',
+  'Federal Republic of Yugoslavia': 'Serbia',
+  'Serbia and Montenegro': 'Serbia',
+  'Kingdom of the Netherlands': 'Netherlands',
+  'Union of South Africa': 'South Africa',
+  'Dominion of Newfoundland': 'Canada',
+  'Newfoundland': 'Canada',
+  'British Raj': 'India',
+  'Dominion of India': 'India',
+  'Dominion of Pakistan': 'Pakistan',
+  'Mandatory Palestine': 'Israel',
+  'French Algeria': 'Algeria',
+  'Belgian Congo': 'Democratic Republic of the Congo',
+  'Republic of the Congo (Léopoldville)': 'Democratic Republic of the Congo',
+  'Tanganyika': 'Tanzania',
+  'Federation of Rhodesia and Nyasaland': 'Zimbabwe',
+  'Ottoman Empire': 'Turkey',
+  'Persia': 'Iran',
+  'Siam': 'Thailand',
+  'South Vietnam': 'Vietnam',
+  'North Vietnam': 'Vietnam',
+  'Khmer Republic': 'Cambodia',
+  'Kingdom of Laos': 'Laos',
+  'Czech Republic': 'Czechia',
+  'The Bahamas': 'Bahamas',
+}))
+// States that split up: only the crash site can say which country it is today.
+export const DEFUNCT_STATES = new Set(['Soviet Union', 'Czechoslovakia', 'Yugoslavia', 'Kingdom of Yugoslavia', 'Socialist Federal Republic of Yugoslavia', 'Austria-Hungary', 'United Arab Republic', 'British Mandate'])
+
+/** Today's name for a country (the date decides "Republic of China": China before 1950, Taiwan after). */
+export function modernCountry(name, date) {
+  if (!name) return name
+  if (name === 'Republic of China') return date && date < '1950' ? 'China' : 'Taiwan'
+  return COUNTRY_RENAMES.get(name) ?? name
 }
