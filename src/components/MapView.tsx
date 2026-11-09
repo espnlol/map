@@ -7,6 +7,7 @@ import { busyness, liveAtcUrl, loadAirports, type AirportInfo } from '../lib/air
 import { settings, type BaseMap } from '../lib/settings'
 import type { Hotspot } from '../lib/happening'
 import type { MilitaryPattern } from '../lib/patterns'
+import { STATIONS, mapLat, type Station } from '../lib/antarctica'
 import { TFR_KINDS, explainTfr, fetchTfrDetail, liveContext, quickCauses, type Tfr, type TfrDetail } from '../lib/tfr'
 
 /** Altitude → colour, low = orange, high = violet (same idea as most flight trackers). */
@@ -379,6 +380,33 @@ export default function MapView({ aircraft, selected, onSelect, center, radiusNm
     }
   }, [military])
 
+  // Antarctic research stations (names appear from zoom 4).
+  const stationLayer = useRef<L.LayerGroup | null>(null)
+  const stationNames = view >= 0 && (map.current?.getZoom() ?? 0) >= 4
+  useEffect(() => {
+    const m = map.current
+    if (!m) return
+    if (!stationLayer.current || !m.hasLayer(stationLayer.current)) stationLayer.current = L.layerGroup().addTo(m)
+    stationLayer.current.clearLayers()
+    if (!cfg.antarcticBases) return
+    const showNames = stationNames
+    for (const s of STATIONS) {
+      L.marker([mapLat(s.lat), s.lon], {
+        icon: L.divIcon({
+          className: 'station-icon',
+          html: `<span class="station-dot ${s.season === 'summer' ? 'summer' : ''}"></span>${showNames ? `<span class="station-name">${esc(s.name.replace(/ (Station|Base|Research Station|Research Base)$/, ''))}</span>` : ''}`,
+          iconSize: [12, 12],
+          iconAnchor: [6, 6],
+        }),
+        zIndexOffset: -100,
+      })
+        .bindTooltip(`${s.flag} ${esc(s.name)}`, { direction: 'top', offset: [0, -6] })
+        .bindPopup(stationPopup(s), { maxWidth: 280 })
+        .addTo(stationLayer.current)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cfg.antarcticBases, stationNames])
+
   // Restricted airspace (FAA TFRs).
   const tfrLayer = useRef<L.LayerGroup | null>(null)
   const tfrShapes = useRef(new Map<string, L.Polygon>())
@@ -572,6 +600,18 @@ function airportPopup(ap: AirportInfo, b: ReturnType<typeof busyness>) {
     ${runways ? `<div style="margin-top:6px"><b>Runways</b><br/>${runways}</div>` : ''}
     <button data-track="${ap.lat},${ap.lon}" style="margin-top:8px;width:100%;padding:6px;border-radius:6px;background:#0ea5e9;color:#020617;font-weight:600">Track planes here</button>
     ${liveAtcUrl(ap.ident, ap.iata) ? `<a href="${liveAtcUrl(ap.ident, ap.iata)}" target="_blank" rel="noreferrer" style="display:block;margin-top:6px;text-align:center;padding:6px;border-radius:6px;border:1px solid #334155;color:#7dd3fc;font-weight:600;text-decoration:none">🎧 Listen to ATC (LiveATC)</a>` : ''}
+  </div>`
+}
+
+function stationPopup(s: Station) {
+  return `<div style="font-size:12px;line-height:1.45;max-width:260px">
+    <div style="font-weight:700;font-size:14px">${s.flag} ${esc(s.name)}</div>
+    <div style="color:#64748b">${esc(s.country)} · ${s.season === 'year-round' ? 'Staffed year-round' : 'Summer only (about Nov–Feb)'}</div>
+    ${s.note ? `<div style="margin-top:6px">${esc(s.note)}</div>` : ''}
+    ${s.air ? `<div style="margin-top:6px"><b>Getting there by air:</b> ${esc(s.air)}</div>` : ''}
+    <div style="margin-top:6px;color:#64748b">Few ADS-B receivers reach Antarctica, so flights here often drop off the map.</div>
+    <button data-track="${s.lat},${s.lon}" style="margin-top:8px;width:100%;padding:6px;border-radius:6px;background:#0ea5e9;color:#020617;font-weight:600">Track planes here</button>
+    <a href="https://en.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(s.name + ' Antarctica')}" target="_blank" rel="noreferrer" style="display:block;margin-top:6px;text-align:center;padding:6px;border-radius:6px;border:1px solid #334155;color:#7dd3fc;font-weight:600;text-decoration:none">About this station ↗</a>
   </div>`
 }
 

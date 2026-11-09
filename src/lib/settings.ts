@@ -13,6 +13,7 @@ export interface Settings {
   tripZoom: boolean
   groundVehicles: boolean
   restrictedAreas: boolean
+  antarcticBases: boolean
   // units & time
   altUnit: 'ft' | 'm'
   speedUnit: 'kt' | 'mph' | 'kmh'
@@ -53,6 +54,7 @@ export const DEFAULT_SETTINGS: Settings = {
   tripZoom: true,
   groundVehicles: true,
   restrictedAreas: true,
+  antarcticBases: true,
   altUnit: 'ft',
   speedUnit: 'kt',
   distUnit: 'auto',

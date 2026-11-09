@@ -213,3 +213,32 @@ body {
 .service-medical {
   background: #2dd4bf;
 }
+
+/* Antarctic research stations */
+.station-icon {
+  overflow: visible;
+}
+.station-dot {
+  display: block;
+  width: 10px;
+  height: 10px;
+  margin: 1px;
+  border-radius: 2px;
+  background: #e0f2fe;
+  border: 2px solid #0284c7;
+  transform: rotate(45deg);
+}
+.station-dot.summer {
+  background: #0b1220;
+}
+.station-name {
+  position: absolute;
+  left: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  font: 600 10px ui-sans-serif, system-ui, sans-serif;
+  color: #bae6fd;
+  text-shadow: 0 0 3px #0b1220, 0 0 3px #0b1220;
+  pointer-events: none;
+}

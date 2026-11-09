@@ -156,6 +156,15 @@ details and a link to the FAA notice. 🔔 lists the ones near you plus any VIP 
 The shapes come from the FAA's TFR map service and list (tfr.faa.gov) through the relay, refreshed
 every 15 minutes. Turn it off in *Settings → Map* or the ⋯ menu. US only.
 
+## Antarctic research stations
+
+47 stations across Antarctica are marked with ice-blue diamonds (filled: staffed year-round; hollow:
+summer only). Tap one for who runs it, when it's staffed, how planes get in (Phoenix Airfield at
+McMurdo, Wilkins blue-ice runway, Teniente Marsh on King George Island, Union Glacier and more) and a
+Track planes here button. McMurdo and King George Island are in the location list. ADS-B coverage is
+thin down there, so flights often drop out. The South Pole station sits at the bottom edge of the map,
+since the map can't show the pole itself. Turn it off in *Settings → Map*.
+
 ## Plane profiles
 
 Open a plane and tap **Profile**, or tap *Profile* next to any Logbook entry. It shows the

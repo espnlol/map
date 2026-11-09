@@ -19,4 +19,6 @@ export const PRESETS: Center[] = [
   { label: 'Singapore (SIN)', lat: 1.3644, lon: 103.9915 },
   { label: 'Tokyo (HND)', lat: 35.5494, lon: 139.7798 },
   { label: 'Sydney (SYD)', lat: -33.9399, lon: 151.1753 },
+  { label: 'McMurdo, Antarctica', lat: -77.846, lon: 166.676 },
+  { label: 'King George Island, Antarctica', lat: -62.2, lon: -58.96 },
 ]
