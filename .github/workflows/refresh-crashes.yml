@@ -3,12 +3,21 @@
 #
 # GitHub only runs scheduled workflows from the repository's default branch,
 # so the weekly schedule lives there (.github/workflows/scheduled-refreshes.yml
-# on the default branch) and starts this one. You can also run it any time
-# from the Actions tab: "Refresh crash data" -> Run workflow.
+# on the default branch) and starts this one. It also runs when the importer
+# changes, and any time from the Actions tab: "Refresh crash data" -> Run workflow.
 name: Refresh crash data
 
 on:
   workflow_dispatch:
+  # Also rebuild whenever the importer itself changes. (This also lets GitHub
+  # register the workflow, so the scheduler on the default branch can start it.)
+  push:
+    branches: [claude/zen-maxwell-46802a]
+    paths:
+      - scripts/build-crashes.mjs
+      - scripts/crash-classify.mjs
+      - scripts/infobox.mjs
+      - .github/workflows/refresh-crashes.yml
 
 permissions:
   contents: write
