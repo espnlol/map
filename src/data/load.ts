@@ -1,5 +1,6 @@
 import type { Crash } from '../types'
 import { CRASHES as CURATED } from './crashes'
+import { NICKNAMES } from './nicknames'
 
 export interface Dataset {
   crashes: Crash[]
@@ -40,6 +41,10 @@ function merge(wiki: Crash, mine: Crash): Crash {
   }
 }
 
+function withNicknames(crashes: Crash[]): Crash[] {
+  return crashes.map((c) => (c.wiki && NICKNAMES[c.wiki] ? { ...c, nickname: NICKNAMES[c.wiki] } : c))
+}
+
 export async function loadCrashes(): Promise<Dataset> {
   const curated = CURATED.map((c) => ({ ...c, curated: true }))
   try {
@@ -55,9 +60,9 @@ export async function loadCrashes(): Promise<Dataset> {
       return merge(w, mine)
     })
     for (const c of curated) if (!used.has(c.id)) crashes.push(c)
-    return { crashes, updated: data.updated }
+    return { crashes: withNicknames(crashes), updated: data.updated }
   } catch (err) {
     console.warn('Could not load the Wikipedia crash data; showing the hand-written list only.', err)
-    return { crashes: curated, fallback: true }
+    return { crashes: withNicknames(curated), fallback: true }
   }
 }

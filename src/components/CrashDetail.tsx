@@ -72,7 +72,18 @@ export function CrashDetail({ crash: c, customLink, onCustomLink, onClose, onOpe
         >
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 6l12 12M18 6L6 18" /></svg>
         </button>
-        <div className="text-2xl font-bold tracking-tight text-white">{headline}</div>
+        {c.nickname ? (
+          <div className="flex items-center gap-2 text-2xl font-bold tracking-tight text-white">
+            <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden className="shrink-0 -translate-y-0.5">
+              <path d="M3 8l4.5 3.5L12 5l4.5 6.5L21 8l-2 10H5L3 8z" fill="#facc15" stroke="#a16207" strokeWidth="1" strokeLinejoin="round" />
+              <circle cx="3" cy="7.5" r="1.4" fill="#facc15" /><circle cx="12" cy="4.5" r="1.4" fill="#facc15" /><circle cx="21" cy="7.5" r="1.4" fill="#facc15" />
+              <rect x="5" y="18.5" width="14" height="2" rx="0.5" fill="#eab308" />
+            </svg>
+            {c.nickname}
+          </div>
+        ) : (
+          <div className="text-2xl font-bold tracking-tight text-white">{headline}</div>
+        )}
         <a href={articleUrl(c)} target="_blank" rel="noopener noreferrer" className="mt-1 block font-semibold text-cyan-400 hover:underline">
           {c.name}{c.flight && !c.name.includes(c.flight) ? ` — ${c.flight}` : ''}
         </a>

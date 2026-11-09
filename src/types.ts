@@ -26,6 +26,8 @@ export interface Crash {
   /** For hand-written entries: the id the same crash has in the Wikipedia data */
   wikiId?: string
   name: string
+  /** A popular nickname, shown with a crown as the crash's heading */
+  nickname?: string
   /** ISO date: YYYY-MM-DD, or YYYY-MM / YYYY when only that is known */
   date: string
   lat: number

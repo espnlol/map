@@ -29,7 +29,7 @@ function writePref(key: string, v: string) {
 }
 
 function matches(c: Crash, q: string) {
-  return [c.name, c.location, c.country, c.operator, c.aircraft, c.flight, c.registration, c.date].some((s) => s?.toLowerCase().includes(q))
+  return [c.name, c.nickname, c.location, c.country, c.operator, c.aircraft, c.flight, c.registration, c.date].some((s) => s?.toLowerCase().includes(q))
 }
 
 function Chip({ on, color, children, onClick }: { on: boolean; color?: string; children: React.ReactNode; onClick: () => void }) {
