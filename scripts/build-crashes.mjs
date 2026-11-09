@@ -165,9 +165,14 @@ async function main() {
   for (const [name, query] of Object.entries(LINKS)) links.push(...(await sparql(`links-${name}`, query)))
   console.log(`${core.length} core rows, ${links.length} link rows`)
 
+  // Wikidata returns rows in no particular order; sort them so items with
+  // several values (two coordinates, two locations) always pick the same one
+  // and weekly refreshes only change what really changed.
+  const stable = (rows) => rows.map((r) => [JSON.stringify(r), r]).sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)).map((x) => x[1])
+
   /** @type {Map<string, any>} */
   const byId = new Map()
-  for (const r of core) {
+  for (const r of stable(core)) {
     const id = qid(val(r.item))
     const e = byId.get(id) ?? { id, links: {} }
     e.title ??= val(r.title)
@@ -185,7 +190,7 @@ async function main() {
     byId.set(id, e)
   }
 
-  for (const r of links) {
+  for (const r of stable(links)) {
     const e = byId.get(qid(val(r.item)))
     if (!e) continue
     const id = qid(val(r.v))
@@ -224,7 +229,10 @@ async function main() {
     const L = (k) => (e.links[k] ?? []).filter((x) => x.label && !/^Q\d+$/.test(x.label))
     const box = e.title && wikitext[e.title] ? parseInfobox(wikitext[e.title]) : null
     if (box) withInfobox++
-    const location = L('location')[0]
+    // Of several locations, use one with coordinates, preferring a specific
+    // place (an airport, mountain, sea, ...) over a city or "runway".
+    const SPECIFIC = /airport|airfield|aerodrome|air base|airbase|mountain|mount |peak|volcano|lake|river|sea|ocean|bay|gulf|strait|channel|island/i
+    const location = [...L('location')].sort((a, b) => (+!!b.coord - +!!a.coord) || (+SPECIFIC.test(b.label) - +SPECIFIC.test(a.label)))[0]
     const coord = box?.coord ?? e.coord ?? location?.coord ?? null
     if (!e.date || !coord || !(e.title || e.label)) { skipped++; continue }
     const [lat, lng] = coord
