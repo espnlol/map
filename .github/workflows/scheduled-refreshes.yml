@@ -1,0 +1,25 @@
+# GitHub only runs scheduled workflows from a repository's default branch
+# (this one). The sites themselves live on other branches, so this file just
+# starts their refresh workflows on schedule.
+#
+#  - Black Box Atlas (claude/zen-maxwell-46802a): re-downloads the crash
+#    database from Wikipedia/Wikidata every Monday, then republishes
+#    https://espnlol.github.io/map/crashes/ if anything changed.
+name: Scheduled refreshes
+
+on:
+  schedule:
+    - cron: '23 4 * * 1' # 04:23 UTC every Monday
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+jobs:
+  black-box-atlas:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Start "Refresh crash data" on the Black Box Atlas branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run refresh-crashes.yml --repo "${{ github.repository }}" --ref claude/zen-maxwell-46802a
