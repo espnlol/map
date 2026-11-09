@@ -12,10 +12,17 @@ export interface AirportInfo {
   lon: number
   elevation: number | null
   large: boolean
+  /** Older or other names and codes people still use. */
+  aka?: { codes: string[]; name: string }
   runways: { lat1: number; lon1: number; lat2: number; lon2: number; lengthFt: number; name: string }[]
 }
 
 type Row = [string, string, string, string, string, number, number, number | null, 'L' | 'M', [number, number, number, number, number, string][]]
+
+/** Airports renamed in the database whose old codes are still in everyday use. */
+const ALIASES: Record<string, { codes: string[]; name: string }> = {
+  KDJT: { codes: ['PBI', 'KPBI'], name: 'Palm Beach International (PBI)' },
+}
 
 let loading: Promise<AirportInfo[]> | null = null
 
@@ -34,6 +41,7 @@ export function loadAirports(): Promise<AirportInfo[]> {
           lon: r[6],
           elevation: r[7],
           large: r[8] === 'L',
+          aka: ALIASES[r[0]],
           runways: r[9].map(([lat1, lon1, lat2, lon2, lengthFt, name]) => ({ lat1, lon1, lat2, lon2, lengthFt, name })),
         })),
       )

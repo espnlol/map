@@ -24,7 +24,7 @@ export default function MilWatchPanel({ airports, aircraft, onOpen, onOpenArriva
     const t = q.trim().toUpperCase()
     if (t.length < 2) return []
     return airports
-      .filter((a) => a.iata === t || a.ident === t || a.ident === `K${t}` || (t.length >= 3 && (a.city.toUpperCase().includes(t) || a.name.toUpperCase().includes(t))))
+      .filter((a) => a.iata === t || a.ident === t || a.ident === `K${t}` || !!a.aka?.codes.includes(t) || (t.length >= 3 && (a.city.toUpperCase().includes(t) || a.name.toUpperCase().includes(t))))
       .sort((a, b) => Number(b.iata === t || b.ident === t) - Number(a.iata === t || a.ident === t) || Number(b.large) - Number(a.large))
       .slice(0, 6)
   }, [q, airports])

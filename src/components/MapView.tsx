@@ -595,6 +595,7 @@ function airportPopup(ap: AirportInfo, b: ReturnType<typeof busyness>) {
     .join('<br/>')
   return `<div style="font-size:12px;line-height:1.45">
     <div style="font-weight:700;font-size:14px">${esc(ap.name)}</div>
+    ${ap.aka ? `<div style="color:#94a3b8">Formerly ${esc(ap.aka.name)}</div>` : ''}
     <div style="color:#64748b">${esc(codes)} · ${esc([ap.city, ap.country].filter(Boolean).join(', '))}${ap.elevation != null ? ` · ${ap.elevation.toLocaleString()} ft` : ''}</div>
     <div style="margin-top:6px"><b>Right now:</b> ${b.onGround} on the ground, ${b.arriving} arriving, ${b.departing} departing</div>
     ${runways ? `<div style="margin-top:6px"><b>Runways</b><br/>${runways}</div>` : ''}

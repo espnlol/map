@@ -19,10 +19,10 @@ export function matchAirports(query: string, airports: AirportInfo[], limit = 5)
   const scored: { a: AirportInfo; score: number }[] = []
   for (const a of airports) {
     let score = 0
-    if (a.iata === q || a.ident === q) score = 100
+    if (a.iata === q || a.ident === q || a.aka?.codes.includes(q)) score = 100
     else if (q.length === 3 && a.ident === `K${q}`) score = 95
     else if (q.length >= 3 && a.city.toUpperCase().startsWith(q)) score = 60
-    else if (q.length >= 4 && a.name.toUpperCase().includes(q)) score = 40
+    else if (q.length >= 4 && (a.name.toUpperCase().includes(q) || a.aka?.name.toUpperCase().includes(q))) score = 40
     else if (q.length >= 4 && a.city.toUpperCase().includes(q)) score = 30
     if (score) scored.push({ a, score: score + (a.large ? 5 : 0) })
   }
