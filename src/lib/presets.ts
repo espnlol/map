@@ -10,6 +10,7 @@ export const PRESETS: Center[] = [
   { label: 'San Francisco (SFO)', lat: 37.6213, lon: -122.379 },
   { label: 'Seattle (SEA)', lat: 47.4502, lon: -122.3088 },
   { label: 'Miami (MIA)', lat: 25.7959, lon: -80.287 },
+  { label: 'West Palm Beach (PBI)', lat: 26.6832, lon: -80.0956 },
   { label: 'Toronto (YYZ)', lat: 43.6777, lon: -79.6248 },
   { label: 'London (LHR)', lat: 51.47, lon: -0.4543 },
   { label: 'Paris (CDG)', lat: 49.0097, lon: 2.5479 },
