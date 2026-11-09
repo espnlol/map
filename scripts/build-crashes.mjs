@@ -74,9 +74,34 @@ const LINKS = {
   facts: linkQuery('("cause" wdt:P828) ("country" wdt:P17) ("class" wdt:P31)'),
 }
 
-// Articles Wikidata calls aviation accidents that would double-count crashes
-// already on the map.
-const EXCLUDE = new Set(['Collapse of the World Trade Center'])
+// Articles that aren't aircraft accidents (or would double-count one), found
+// by reviewing the data by hand. The rules in notAnAircraftAccident() catch
+// most others automatically.
+const EXCLUDE = new Set([
+  'Collapse of the World Trade Center', // the 9/11 flights are already on the map
+  'Hindawi affair', // bomb found before boarding
+  'Air India Flight 112 plot', // foiled plot
+  'Dymshits–Kuznetsov hijacking affair', // stopped before boarding
+  '1985 Narita International Airport bombing', // bag exploded in the terminal
+  'Slovak Police training explosives incident', // explosives left in luggage
+])
+
+const FIRST_YEAR = 1900
+
+/** Why an entry isn't an aircraft accident (ships, spacecraft, drones, ...), or null if it is one. */
+function notAnAircraftAccident(c) {
+  const name = c.name ?? ''
+  const kind = c.kind ?? ''
+  const text = `${name} | ${kind}`
+  if (c.wiki && EXCLUDE.has(c.wiki)) return 'excluded by hand'
+  if (+c.date.slice(0, 4) < FIRST_YEAR) return `before ${FIRST_YEAR}`
+  if ((/\b(naval|ship|ships|tanker|ferry|submarine|frigate)\b/i.test(name) || /^navigation accident$/i.test(c.summary ?? '')) && !c.aircraft) return 'a ship'
+  if (/space ?shuttle|spacecraft|launch failure|space disaster|rocket launch/i.test(text)) return 'a spacecraft'
+  if (/high-altitude object/i.test(text)) return 'an unmanned object'
+  if (/\bdrones?\b|\buav\b|unmanned/i.test(name) && !/attack|strike/i.test(name)) return 'a drone'
+  if (/\bplot\b/i.test(name) && !c.aircraft) return 'a plot'
+  return null
+}
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
@@ -487,12 +512,15 @@ SELECT ?op ?classLabel WHERE {
   }
   const byDate = new Map()
   for (const c of out) byDate.set(c.date, [...(byDate.get(c.date) ?? []), c])
+  const removed = []
   const deduped = out.filter((c) => {
-    if (c.wiki && EXCLUDE.has(c.wiki)) return false
+    const why = notAnAircraftAccident(c)
+    if (why) { removed.push(`${c.name} (${why})`); return false }
     if (c.wiki) return true
     return !(byDate.get(c.date) ?? []).some((o) => o !== c && o.wiki && km(o, c) < 100)
   })
-  console.log(`Dropped ${out.length - deduped.length} duplicates`)
+  console.log(`Left out ${removed.length} entries that aren't aircraft accidents:\n  ${removed.join('\n  ')}`)
+  console.log(`Dropped ${out.length - deduped.length - removed.length} duplicates`)
   out.length = 0
   out.push(...deduped)
 
