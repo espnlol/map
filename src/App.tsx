@@ -1,17 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { CRASHES } from './data/crashes'
+import { loadCrashes, type Dataset } from './data/load'
 import type { Category, Cause, Crash } from './types'
 import { CAUSE_COLORS, formatDate } from './styles'
 import { CrashMap, type BaseMap, type MarkerMode, type Projection } from './components/CrashMap'
 import { CrashDetail } from './components/CrashDetail'
-import { AboutModal, GetAppModal, StatsModal } from './components/Modals'
+import { AboutModal, GetAppModal } from './components/Modals'
+import { StatsModal, crashesIn, type GroupRef } from './components/Stats'
+import { deaths } from './stats'
 import { loadCustomLinks, saveCustomLinks } from './links'
 
 const ALL_CAUSES = Object.keys(CAUSE_COLORS) as Cause[]
 const ALL_CATEGORIES: Category[] = ['Commercial', 'Cargo', 'Military / State', 'General aviation']
-const YEARS = CRASHES.map((c) => +c.date.slice(0, 4))
-const MIN_YEAR = Math.min(...YEARS)
-const MAX_YEAR = Math.max(...YEARS)
+const LIST_PAGE = 150
 
 type Sort = 'newest' | 'oldest' | 'deadliest'
 type Modal = null | 'stats' | 'about' | 'app'
@@ -29,7 +29,7 @@ function writePref(key: string, v: string) {
 }
 
 function matches(c: Crash, q: string) {
-  return [c.name, c.location, c.country, c.operator, c.aircraft, c.flight ?? '', c.date].some((s) => s.toLowerCase().includes(q))
+  return [c.name, c.location, c.country, c.operator, c.aircraft, c.flight, c.registration, c.date].some((s) => s?.toLowerCase().includes(q))
 }
 
 function Chip({ on, color, children, onClick }: { on: boolean; color?: string; children: React.ReactNode; onClick: () => void }) {
@@ -91,8 +91,14 @@ export default function App() {
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [causes, setCauses] = useState<Set<Cause>>(new Set(ALL_CAUSES))
   const [categories, setCategories] = useState<Set<Category>>(new Set(ALL_CATEGORIES))
-  const [fromYear, setFromYear] = useState(MIN_YEAR)
-  const [toYear, setToYear] = useState(MAX_YEAR)
+  const [data, setData] = useState<Dataset | null>(null)
+  // null = no limit; the slider shows the data's own first/last year
+  const [fromYearRaw, setFromYear] = useState<number | null>(null)
+  const [toYearRaw, setToYear] = useState<number | null>(null)
+  const [groupFilter, setGroupFilter] = useState<GroupRef | null>(null)
+  const [statsGroup, setStatsGroup] = useState<GroupRef | null>(null)
+  const [listLimit, setListLimit] = useState(LIST_PAGE)
+  const [fitRequest, setFitRequest] = useState(0)
   const [minDeaths, setMinDeaths] = useState(0)
   const [sort, setSort] = useState<Sort>('newest')
   const [selectedId, setSelectedId] = useState<string | null>(() => location.hash.slice(1) || null)
@@ -104,6 +110,16 @@ export default function App() {
   const [layersOpen, setLayersOpen] = useState(false)
   const [customLinks, setCustomLinks] = useState<Record<string, string>>(loadCustomLinks)
   const searchRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => { loadCrashes().then(setData) }, [])
+  const all = useMemo(() => data?.crashes ?? [], [data])
+  const [MIN_YEAR, MAX_YEAR] = useMemo(() => {
+    if (!all.length) return [1900, new Date().getFullYear()]
+    const ys = all.map((c) => +c.date.slice(0, 4))
+    return [Math.min(...ys), Math.max(...ys)]
+  }, [all])
+  const fromYear = fromYearRaw ?? MIN_YEAR
+  const toYear = toYearRaw ?? MAX_YEAR
 
   useEffect(() => writePref('mode', mode), [mode])
   useEffect(() => writePref('projection', projection), [projection])
@@ -138,32 +154,39 @@ export default function App() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    const list = CRASHES.filter((c) => {
+    const base = groupFilter ? crashesIn(all, groupFilter) : all
+    const list = base.filter((c) => {
       const y = +c.date.slice(0, 4)
       if (y < fromYear || y > toYear) return false
       if (!causes.has(c.cause) || !categories.has(c.category)) return false
-      if (c.fatalities < minDeaths) return false
+      if (deaths(c) < minDeaths) return false
       return !q || matches(c, q)
     })
     list.sort((a, b) =>
-      sort === 'deadliest' ? b.fatalities - a.fatalities : sort === 'oldest' ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date),
+      sort === 'deadliest' ? deaths(b) - deaths(a) : sort === 'oldest' ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date),
     )
     return list
-  }, [query, causes, categories, fromYear, toYear, minDeaths, sort])
+  }, [all, groupFilter, query, causes, categories, fromYear, toYear, minDeaths, sort])
+  useEffect(() => setListLimit(LIST_PAGE), [filtered])
 
   const suggestions = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return q ? CRASHES.filter((c) => matches(c, q)).slice(0, 8) : []
-  }, [query])
+    if (!q) return []
+    // Name matches first, then anything else that mentions the search.
+    const byName = all.filter((c) => c.name.toLowerCase().includes(q))
+    const rest = byName.length >= 8 ? [] : all.filter((c) => !c.name.toLowerCase().includes(q) && matches(c, q))
+    return [...byName, ...rest].slice(0, 8)
+  }, [all, query])
 
   const activeFilters =
     (causes.size < ALL_CAUSES.length ? 1 : 0) +
     (categories.size < ALL_CATEGORIES.length ? 1 : 0) +
     (fromYear > MIN_YEAR || toYear < MAX_YEAR ? 1 : 0) +
-    (minDeaths > 0 ? 1 : 0)
+    (minDeaths > 0 ? 1 : 0) +
+    (groupFilter ? 1 : 0)
 
-  const selected = CRASHES.find((c) => c.id === selectedId) ?? null
-  const totalDeaths = filtered.reduce((n, c) => n + c.fatalities, 0)
+  const selected = useMemo(() => all.find((c) => c.id === selectedId) ?? null, [all, selectedId])
+  const totalDeaths = filtered.reduce((n, c) => n + deaths(c), 0)
   const panelOpen = !!selected || browseOpen
 
   function toggle<T>(set: Set<T>, v: T, update: (s: Set<T>) => void) {
@@ -188,9 +211,23 @@ export default function App() {
   function resetFilters() {
     setCauses(new Set(ALL_CAUSES))
     setCategories(new Set(ALL_CATEGORIES))
-    setFromYear(MIN_YEAR)
-    setToYear(MAX_YEAR)
+    setFromYear(null)
+    setToYear(null)
     setMinDeaths(0)
+    setGroupFilter(null)
+  }
+
+  function openStats(g: GroupRef | null = null) {
+    setStatsGroup(g)
+    setModal('stats')
+  }
+
+  function showGroupOnMap(g: GroupRef) {
+    setGroupFilter(g)
+    setModal(null)
+    setSelectedId(null)
+    setBrowseOpen(true)
+    setFitRequest((n) => n + 1)
   }
 
   const navBtn = 'flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-semibold text-slate-200 hover:bg-slate-800'
@@ -306,7 +343,7 @@ export default function App() {
 
         <nav className="ml-auto hidden items-center gap-1 md:flex">
           <button className={navBtn} onClick={() => { select(null); setBrowseOpen(!browseOpen || !!selected) }}>{Icon.list} Browse</button>
-          <button className={navBtn} onClick={() => setModal('stats')}>{Icon.stats} Statistics</button>
+          <button className={navBtn} onClick={() => openStats()}>{Icon.stats} Statistics</button>
           <button className={navBtn} onClick={() => setModal('about')}>{Icon.info} About</button>
           <button className={navBtn} onClick={() => select(filtered[Math.floor(Math.random() * filtered.length)]?.id ?? null)} disabled={!filtered.length}>
             {Icon.dice} Random
@@ -320,7 +357,7 @@ export default function App() {
       <div className="relative min-h-0 flex-1">
         {/* ── Map ── */}
         <div className={`absolute inset-0 ${panelOpen ? 'md:left-80' : ''}`}>
-          <CrashMap crashes={filtered} selected={selected} onSelect={select} mode={mode} projection={projection} baseMap={baseMap} />
+          <CrashMap crashes={filtered} selected={selected} onSelect={select} mode={mode} projection={projection} baseMap={baseMap} fitRequest={fitRequest} />
 
           {/* Bottom controls */}
           <div className="pointer-events-none absolute inset-x-0 top-3 flex justify-center px-3 md:bottom-6 md:top-auto">
@@ -380,6 +417,7 @@ export default function App() {
                   customLink={customLinks[selected.id]}
                   onCustomLink={(url) => setCustomLink(selected.id, url)}
                   onClose={() => select(null)}
+                  onOpenGroup={openStats}
                 />
               ) : (
                 <div>
@@ -388,8 +426,17 @@ export default function App() {
                       <h2 className="font-semibold text-white">Browse accidents</h2>
                       <button onClick={() => setBrowseOpen(false)} aria-label="Close" className="rounded-md p-1 text-slate-400 hover:bg-slate-800 hover:text-white">✕</button>
                     </div>
+                    {groupFilter && (
+                      <div className="mt-2 flex items-center gap-2 rounded-lg bg-blue-500/15 px-2.5 py-1.5 text-xs text-blue-200">
+                        <span className="min-w-0 flex-1 truncate">
+                          {groupFilter.kind === 'airline' ? 'Airline' : groupFilter.kind === 'aircraft' ? 'Aircraft' : 'Place'}: <b className="text-white">{groupFilter.name}</b>
+                        </span>
+                        <button onClick={() => openStats(groupFilter)} className="shrink-0 font-semibold hover:underline">Stats</button>
+                        <button onClick={() => setGroupFilter(null)} aria-label="Clear" className="shrink-0 hover:text-white">✕</button>
+                      </div>
+                    )}
                     <div className="mt-2 flex items-center justify-between text-xs text-slate-400">
-                      <span><b className="text-slate-200">{filtered.length}</b> accidents · <b className="text-slate-200">{totalDeaths.toLocaleString()}</b> deaths</span>
+                      <span><b className="text-slate-200">{filtered.length.toLocaleString()}</b> accidents · <b className="text-slate-200">{totalDeaths.toLocaleString()}</b> deaths</span>
                       <select value={sort} onChange={(e) => setSort(e.target.value as Sort)}
                         className="rounded-md border border-slate-700 bg-slate-900 px-1.5 py-1 text-slate-200">
                         <option value="newest">Newest</option>
@@ -399,7 +446,7 @@ export default function App() {
                     </div>
                   </div>
                   <ul>
-                    {filtered.map((c) => (
+                    {filtered.slice(0, listLimit).map((c) => (
                       <li key={c.id}>
                         <button onClick={() => select(c.id)} className="flex w-full gap-3 border-b border-slate-800/70 px-4 py-2.5 text-left hover:bg-slate-800/60">
                           <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: CAUSE_COLORS[c.cause] }} />
@@ -408,13 +455,20 @@ export default function App() {
                             <span className="block truncate text-xs text-slate-500">{formatDate(c.date)} · {c.country}</span>
                           </span>
                           <span className="shrink-0 text-right text-xs tabular-nums text-slate-300">
-                            {c.fatalities}
+                            {c.fatalities ?? '—'}
                             <span className="block text-[10px] text-slate-600">deaths</span>
                           </span>
                         </button>
                       </li>
                     ))}
-                    {!filtered.length && <li className="p-6 text-center text-sm text-slate-500">No accidents match. Try clearing the search or filters.</li>}
+                    {filtered.length > listLimit && (
+                      <li className="p-3">
+                        <button onClick={() => setListLimit(listLimit + LIST_PAGE * 2)} className="w-full rounded-lg border border-slate-700 py-2 text-xs text-slate-300 hover:bg-slate-800">
+                          Show more ({(filtered.length - listLimit).toLocaleString()} left)
+                        </button>
+                      </li>
+                    )}
+                    {!filtered.length && data && <li className="p-6 text-center text-sm text-slate-500">No accidents match. Try clearing the search or filters.</li>}
                   </ul>
                 </div>
               )}
@@ -427,7 +481,7 @@ export default function App() {
           <div className="absolute inset-x-0 bottom-9 z-20 flex justify-center gap-2 px-2 md:hidden">
             {[
               { label: 'Browse', icon: Icon.list, on: () => setBrowseOpen(true) },
-              { label: 'Stats', icon: Icon.stats, on: () => setModal('stats') },
+              { label: 'Stats', icon: Icon.stats, on: () => openStats() },
               { label: 'Random', icon: Icon.dice, on: () => select(filtered[Math.floor(Math.random() * filtered.length)]?.id ?? null) },
               { label: 'About', icon: Icon.info, on: () => setModal('about') },
             ].map((b) => (
@@ -439,8 +493,26 @@ export default function App() {
         )}
       </div>
 
-      {modal === 'stats' && <StatsModal crashes={filtered} total={CRASHES.length} onSelect={(id) => { setModal(null); select(id) }} onClose={() => setModal(null)} />}
-      {modal === 'about' && <AboutModal count={CRASHES.length} onClose={() => setModal(null)} />}
+      {modal === 'stats' && (
+        <StatsModal
+          crashes={filtered}
+          total={all.length}
+          initial={statsGroup}
+          onSelect={(id) => { setModal(null); select(id) }}
+          onShowOnMap={showGroupOnMap}
+          onClose={() => setModal(null)}
+        />
+      )}
+      {modal === 'about' && <AboutModal count={all.length} updated={data?.updated} onClose={() => setModal(null)} />}
+
+      {!data && (
+        <div className="pointer-events-none fixed inset-x-0 top-20 z-40 flex justify-center">
+          <div className="flex items-center gap-2 rounded-full border border-slate-700 bg-slate-950/90 px-4 py-2 text-sm text-slate-200 shadow-xl">
+            <span className="h-3 w-3 animate-spin rounded-full border-2 border-slate-500 border-t-white" />
+            Loading crashes from Wikipedia…
+          </div>
+        </div>
+      )}
       {modal === 'app' && <GetAppModal onClose={() => setModal(null)} />}
     </div>
   )

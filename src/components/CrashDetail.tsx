@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import type { Crash } from '../types'
 import { CAUSE_COLORS, formatDate } from '../styles'
-import { articleUrl, youtubeId, youtubeSearchUrl } from '../links'
+import { articleUrl, wikiSummary, youtubeId, youtubeSearchUrl, type WikiSummary } from '../links'
+import { aircraftFamily } from '../stats'
+import type { GroupRef } from './Stats'
 
-function Fact({ label, children }: { label: string; children: React.ReactNode }) {
+function Fact({ label, children, wide }: { label: string; children: React.ReactNode; wide?: boolean }) {
   return (
-    <div className="min-w-0">
+    <div className={`min-w-0 ${wide ? 'col-span-2' : ''}`}>
       <dt className="text-xs text-slate-400">{label}</dt>
       <dd className="mt-0.5 break-words text-sm font-semibold text-white">{children}</dd>
     </div>
@@ -16,25 +18,49 @@ function Section({ children, className = '' }: { children: React.ReactNode; clas
   return <div className={`border-b border-slate-800 px-4 py-4 ${className}`}>{children}</div>
 }
 
-export function CrashDetail({ crash: c, customLink, onCustomLink, onClose }: {
+const LinkBtn = ({ onClick, children }: { onClick: () => void; children: React.ReactNode }) => (
+  <button onClick={onClick} className="text-left text-cyan-300 hover:underline">{children}</button>
+)
+
+export function CrashDetail({ crash: c, customLink, onCustomLink, onClose, onOpenGroup }: {
   crash: Crash
   customLink?: string
   onCustomLink: (url: string | null) => void
   onClose: () => void
+  onOpenGroup: (g: GroupRef) => void
 }) {
   const [draft, setDraft] = useState('')
   const [editing, setEditing] = useState(false)
   const [sourcesOpen, setSourcesOpen] = useState(true)
-  useEffect(() => { setDraft(''); setEditing(false) }, [c.id])
+  const [wiki, setWiki] = useState<WikiSummary | null>(null)
+  useEffect(() => {
+    setDraft('')
+    setEditing(false)
+    setWiki(null)
+    let live = true
+    if (c.wiki) wikiSummary(c.wiki).then((w) => { if (live) setWiki(w) })
+    return () => { live = false }
+  }, [c.id, c.wiki])
 
   const videoUrl = customLink || c.video
   const videoId = videoUrl ? youtubeId(videoUrl) : null
   const draftValid = youtubeId(draft) !== null
   // Big heading like "4805": the flight number if there is one, else the year.
-  const headline = c.flight ? c.flight.split('/')[0].replace(/^[A-Z0-9]{2,3}\s+/, '').trim() : c.date.slice(0, 4)
+  const flightNo = c.flight?.split('/')[0].trim()
+  const headline = flightNo ? flightNo.replace(/^[A-Z]{2,3}\s*(?=\d)|^[A-Z]\d\s*(?=\d)|^\d[A-Z]\s*(?=\d)/, '') || flightNo : c.date.slice(0, 4)
+  const operators = c.operators ?? (c.operator ? [c.operator] : [])
+  const types = c.aircraftTypes ?? (c.aircraft ? [c.aircraft] : [])
+  const atSea = !!c.region
+  const longText = c.curated ? c.summary : wiki?.extract
+  const oneLiner = c.curated ? undefined : c.summary
 
   return (
     <div className="flex h-full flex-col">
+      {wiki?.image && (
+        <a href={articleUrl(c)} target="_blank" rel="noopener noreferrer" className="block bg-black">
+          <img src={wiki.image} alt="" className="max-h-44 w-full object-cover opacity-90" loading="lazy" />
+        </a>
+      )}
       <Section className="relative pr-12">
         <button
           onClick={onClose}
@@ -45,23 +71,46 @@ export function CrashDetail({ crash: c, customLink, onCustomLink, onClose }: {
         </button>
         <div className="text-2xl font-bold tracking-tight text-white">{headline}</div>
         <a href={articleUrl(c)} target="_blank" rel="noopener noreferrer" className="mt-1 block font-semibold text-cyan-400 hover:underline">
-          {c.name}{c.flight ? ` — ${c.flight}` : ''}
+          {c.name}{c.flight && !c.name.includes(c.flight) ? ` — ${c.flight}` : ''}
         </a>
-        <div className="mt-1 text-sm text-slate-300">{c.operator}</div>
-        <div className="mt-2 text-xs text-slate-400">{c.date.slice(0, 4)}</div>
+        {operators.length > 0 && (
+          <div className="mt-1 flex flex-wrap gap-x-1 text-sm text-slate-300">
+            {operators.map((o, i) => (
+              <span key={o}>
+                <LinkBtn onClick={() => onOpenGroup({ kind: 'airline', name: o })}>{o}</LinkBtn>{i < operators.length - 1 ? ' &' : ''}
+              </span>
+            ))}
+          </div>
+        )}
+        <div className="mt-2 text-xs text-slate-400">{c.date.slice(0, 4)}{c.kind ? ` · ${c.kind}` : ''}</div>
       </Section>
 
       <Section>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-4">
-          <Fact label="Date">{formatDate(c.date)}</Fact>
-          <Fact label="Incident country">{c.country}</Fact>
-          <Fact label="Aircraft">{c.aircraft}</Fact>
-          <Fact label="Operator">{c.operator}</Fact>
-          <Fact label="Flight phase">{c.phase}</Fact>
+          <Fact label="Date">{c.date.length === 10 ? formatDate(c.date) : c.date}</Fact>
+          <Fact label={atSea && c.country === c.region ? 'Ocean / sea' : 'Incident country'}>
+            <LinkBtn onClick={() => onOpenGroup({ kind: 'place', name: c.region ?? c.country })}>{c.region && c.region !== c.country ? `${c.country} (${c.region})` : c.country}</LinkBtn>
+          </Fact>
+          <Fact label="Aircraft">
+            {types.length ? types.map((t, i) => (
+              <span key={t}>
+                <LinkBtn onClick={() => onOpenGroup({ kind: 'aircraft', name: aircraftFamily(t) })}>{t}</LinkBtn>{i < types.length - 1 ? ', ' : ''}
+              </span>
+            )) : '—'}
+          </Fact>
+          <Fact label="Registration">{c.registration ?? '—'}</Fact>
+          <Fact label="Flight phase">{c.phase ?? '—'}</Fact>
           <Fact label="Flight type">{c.category}</Fact>
-          <Fact label="Fatalities"><span className="text-red-400">{c.fatalities.toLocaleString()}</span></Fact>
-          <Fact label="Survivors"><span className="text-emerald-400">{c.survivors ?? '—'}</span></Fact>
-          <div className="col-span-2"><Fact label="Location">{c.location}</Fact></div>
+          <Fact label="Fatalities"><span className="text-red-400">{c.fatalities?.toLocaleString() ?? '—'}</span></Fact>
+          <Fact label="Survivors"><span className="text-emerald-400">{c.survivors?.toLocaleString() ?? '—'}</span></Fact>
+          {c.aboard != null && <Fact label="Aboard">{c.aboard.toLocaleString()}</Fact>}
+          {c.injured != null && c.injured > 0 && <Fact label="Injured">{c.injured.toLocaleString()}</Fact>}
+          {(c.from || c.to) && (
+            <Fact label="Route" wide>
+              {c.from?.name ?? '?'} <span className="text-slate-500">→</span> {c.to?.name ?? '?'}
+            </Fact>
+          )}
+          {c.location && <Fact label="Crash site" wide>{c.location}</Fact>}
         </dl>
       </Section>
 
@@ -71,7 +120,9 @@ export function CrashDetail({ crash: c, customLink, onCustomLink, onClose }: {
           <span className="h-2.5 w-2.5 rounded-full" style={{ background: CAUSE_COLORS[c.cause] }} />
           {c.cause}
         </div>
-        <p className="mt-2 text-sm leading-relaxed text-slate-300">{c.summary}</p>
+        {oneLiner && <p className="mt-2 text-sm font-medium text-slate-200">{oneLiner}</p>}
+        {longText && <p className="mt-2 text-sm leading-relaxed text-slate-300">{longText}</p>}
+        {!c.curated && wiki?.extract && <p className="mt-2 text-[11px] text-slate-500">From Wikipedia (CC BY-SA).</p>}
       </Section>
 
       <Section>
@@ -120,6 +171,14 @@ export function CrashDetail({ crash: c, customLink, onCustomLink, onClose }: {
         >
           📰 Read the full article
         </a>
+        {operators.length > 0 && (
+          <button
+            onClick={() => onOpenGroup({ kind: 'airline', name: operators[0] })}
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-600 px-4 py-2.5 text-sm font-semibold text-slate-200 hover:bg-slate-800"
+          >
+            📊 {operators[0]} crash stats
+          </button>
+        )}
 
         <div className="rounded-lg border border-slate-700 p-3 text-xs text-slate-400">
           {customLink && !editing ? (

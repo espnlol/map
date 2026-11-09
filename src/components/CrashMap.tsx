@@ -104,24 +104,70 @@ function ensureLoaded(map: maplibregl.Map) {
   nudgers.set(map, timer)
 }
 
+/** Points along the great-circle path between two places, so routes curve like real flights. */
+function greatCircle(a: [number, number], b: [number, number], steps = 64): [number, number][] {
+  const rad = Math.PI / 180
+  const [lng1, lat1] = [a[0] * rad, a[1] * rad]
+  const [lng2, lat2] = [b[0] * rad, b[1] * rad]
+  const d = 2 * Math.asin(Math.sqrt(Math.sin((lat2 - lat1) / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin((lng2 - lng1) / 2) ** 2))
+  if (d < 1e-6) return [a, b]
+  const pts: [number, number][] = []
+  let prevLng = a[0]
+  for (let i = 0; i <= steps; i++) {
+    const f = i / steps
+    const A = Math.sin((1 - f) * d) / Math.sin(d)
+    const B = Math.sin(f * d) / Math.sin(d)
+    const x = A * Math.cos(lat1) * Math.cos(lng1) + B * Math.cos(lat2) * Math.cos(lng2)
+    const y = A * Math.cos(lat1) * Math.sin(lng1) + B * Math.cos(lat2) * Math.sin(lng2)
+    const z = A * Math.sin(lat1) + B * Math.sin(lat2)
+    let lng = Math.atan2(y, x) / rad
+    // keep the line continuous across the antimeridian
+    while (lng - prevLng > 180) lng -= 360
+    while (lng - prevLng < -180) lng += 360
+    prevLng = lng
+    pts.push([lng, Math.atan2(z, Math.sqrt(x * x + y * y)) / rad])
+  }
+  return pts
+}
+
+function routeGeoJSON(c: Crash | null): GeoJSON.FeatureCollection {
+  const features: GeoJSON.Feature[] = []
+  if (c) {
+    const site: [number, number] = [c.lng, c.lat]
+    const from = c.from?.lat != null && c.from.lng != null ? ([c.from.lng, c.from.lat] as [number, number]) : null
+    const to = c.to?.lat != null && c.to.lng != null ? ([c.to.lng, c.to.lat] as [number, number]) : null
+    if (from) {
+      features.push({ type: 'Feature', properties: { leg: 'flown' }, geometry: { type: 'LineString', coordinates: greatCircle(from, site) } })
+      features.push({ type: 'Feature', properties: { end: 'from', name: c.from!.name }, geometry: { type: 'Point', coordinates: from } })
+    }
+    if (to) {
+      features.push({ type: 'Feature', properties: { leg: 'planned' }, geometry: { type: 'LineString', coordinates: greatCircle(site, to) } })
+      features.push({ type: 'Feature', properties: { end: 'to', name: c.to!.name }, geometry: { type: 'Point', coordinates: to } })
+    }
+  }
+  return { type: 'FeatureCollection', features }
+}
+
 function toGeoJSON(crashes: Crash[]): GeoJSON.FeatureCollection {
   return {
     type: 'FeatureCollection',
     features: crashes.map((c) => ({
       type: 'Feature',
       geometry: { type: 'Point', coordinates: [c.lng, c.lat] },
-      properties: { id: c.id, name: c.name, year: c.date.slice(0, 4), fatalities: c.fatalities, color: CAUSE_COLORS[c.cause], rot: heading(c.id) },
+      properties: { id: c.id, name: c.name, year: c.date.slice(0, 4), fatalities: c.fatalities ?? 0, color: CAUSE_COLORS[c.cause], rot: heading(c.id) },
     })),
   }
 }
 
-export function CrashMap({ crashes, selected, onSelect, mode, projection, baseMap }: {
+export function CrashMap({ crashes, selected, onSelect, mode, projection, baseMap, fitRequest }: {
   crashes: Crash[]
   selected: Crash | null
   onSelect: (id: string | null) => void
   mode: MarkerMode
   projection: Projection
   baseMap: BaseMap
+  /** Bump this number to zoom the map out/in to fit every crash being shown */
+  fitRequest?: number
 }) {
   const container = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
@@ -155,6 +201,7 @@ export function CrashMap({ crashes, selected, onSelect, mode, projection, baseMa
       shownRef.current = crashesRef.current
       map.addSource('crashes', { type: 'geojson', data: toGeoJSON(crashesRef.current) })
       map.addSource('selected', { type: 'geojson', data: toGeoJSON([]) })
+      map.addSource('route', { type: 'geojson', data: routeGeoJSON(null) })
 
       map.addLayer({
         id: 'heat',
@@ -200,6 +247,33 @@ export function CrashMap({ crashes, selected, onSelect, mode, projection, baseMa
         },
         paint: { 'icon-color': ['get', 'color'], 'icon-halo-color': '#0b1324', 'icon-halo-width': 1.5 },
       })
+      // Route of the selected flight: flown leg, then the leg it never finished.
+      map.addLayer({
+        id: 'route-planned',
+        type: 'line',
+        source: 'route',
+        filter: ['==', ['get', 'leg'], 'planned'],
+        paint: { 'line-color': '#f87171', 'line-width': 2, 'line-opacity': 0.55, 'line-dasharray': [1.5, 2] },
+      })
+      map.addLayer({
+        id: 'route-flown',
+        type: 'line',
+        source: 'route',
+        filter: ['==', ['get', 'leg'], 'flown'],
+        paint: { 'line-color': '#facc15', 'line-width': 2.5, 'line-opacity': 0.9, 'line-dasharray': [3, 1.5] },
+      })
+      map.addLayer({
+        id: 'route-airports',
+        type: 'circle',
+        source: 'route',
+        filter: ['has', 'end'],
+        paint: {
+          'circle-radius': 5,
+          'circle-color': ['match', ['get', 'end'], 'from', '#facc15', '#f87171'],
+          'circle-stroke-color': '#0b1324',
+          'circle-stroke-width': 2,
+        },
+      })
       map.addLayer({
         id: 'selected-burst',
         type: 'symbol',
@@ -219,6 +293,16 @@ export function CrashMap({ crashes, selected, onSelect, mode, projection, baseMa
       })
 
       const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 14, className: 'crash-tip' })
+      map.on('mouseenter', 'route-airports', (e) => {
+        const f = e.features?.[0]
+        if (!f) return
+        const p = f.properties as { end: string; name: string }
+        popup
+          .setLngLat((f.geometry as GeoJSON.Point).coordinates as [number, number])
+          .setHTML(`<b>${p.end === 'from' ? 'Departed' : 'Was flying to'}</b><br>${p.name.replace(/</g, '&lt;')}`)
+          .addTo(map)
+      })
+      map.on('mouseleave', 'route-airports', () => popup.remove())
       for (const layer of ['planes', 'plane-halo']) {
         map.on('mouseenter', layer, (e) => {
           map.getCanvas().style.cursor = 'pointer'
@@ -256,6 +340,7 @@ export function CrashMap({ crashes, selected, onSelect, mode, projection, baseMa
     if (!ready) return
     const map = mapRef.current!
     ;(map.getSource('selected') as GeoJSONSource).setData(toGeoJSON(selected ? [selected] : []))
+    ;(map.getSource('route') as GeoJSONSource).setData(routeGeoJSON(selected))
     if (selected) {
       // Leave room for the side panel on wide screens and the bottom sheet on phones.
       const wide = map.getContainer().clientWidth >= 768
@@ -267,6 +352,20 @@ export function CrashMap({ crashes, selected, onSelect, mode, projection, baseMa
       })
     }
   }, [selected, ready])
+
+  useEffect(() => {
+    if (!ready || !fitRequest || !crashesRef.current.length) return
+    const list = crashesRef.current
+    const bounds = new maplibregl.LngLatBounds()
+    for (const c of list) bounds.extend([c.lng, c.lat])
+    const map = mapRef.current!
+    const wide = map.getContainer().clientWidth >= 768
+    map.fitBounds(bounds, {
+      padding: wide ? 80 : { top: 80, left: 30, right: 30, bottom: map.getContainer().clientHeight * 0.5 },
+      maxZoom: 7,
+      duration: 1200,
+    })
+  }, [fitRequest, ready])
 
   useEffect(() => {
     if (!ready) return

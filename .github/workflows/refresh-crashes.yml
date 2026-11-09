@@ -1,0 +1,53 @@
+# Rebuilds public/data/crashes.json from Wikidata/Wikipedia, commits it if
+# anything changed, then republishes the website.
+#
+# GitHub only runs scheduled workflows from the repository's default branch,
+# so the weekly schedule lives there (.github/workflows/scheduled-refreshes.yml
+# on the default branch) and starts this one. You can also run it any time
+# from the Actions tab: "Refresh crash data" -> Run workflow.
+name: Refresh crash data
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: refresh-crashes
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/zen-maxwell-46802a
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Download every aviation accident from Wikidata
+        run: node scripts/build-crashes.mjs
+
+      - name: Commit if anything changed, then republish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # The file records the date it was built; ignore that line when comparing.
+          if git diff --quiet -I '"updated"' -- public/data/crashes.json; then
+            echo "Crash data unchanged."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898699+github-actions[bot]@users.noreply.github.com"
+          git add public/data/crashes.json
+          git commit -m "Refresh crash data from Wikipedia ($(date -u +%Y-%m-%d))"
+          git push origin HEAD:claude/zen-maxwell-46802a
+          # pushes made by a workflow don't trigger other workflows, so start the publish one directly
+          gh workflow run pages.yml --ref claude/zen-maxwell-46802a

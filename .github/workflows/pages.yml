@@ -13,7 +13,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: pages
+  group: pages-crashes
   cancel-in-progress: false
 
 jobs:

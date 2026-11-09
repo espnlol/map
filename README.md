@@ -21,24 +21,60 @@ to a YouTube video and a written article about it.**
   a "Sources" list. Paste any YouTube link to **pin a video** to a crash: the
   Watch button then goes straight to it and it plays in the panel (saved in
   your browser).
-- **Browse** list (sort newest, oldest or deadliest), **Statistics** (by cause,
-  decade, phase, country, deadliest), **About**, **Random** and **Get App**.
+- **Statistics**: an overview (top airlines, aircraft, countries, oceans and
+  seas, decades, causes), a page for **every airline**, aircraft family and
+  country/sea (crashes, deaths, survivors, deadliest, causes, aircraft, a full
+  list and "show these on the map"), and **Top 5s**: deadliest crashes, sole
+  survivors, everyone-walked-away, great escapes, unluckiest months and
+  weekdays, Friday the 13th, holiday crashes, farthest north/south and more.
+- **Route lines**: the flown leg and the unfinished leg to the destination.
+- **Browse** list (sort newest, oldest or deadliest), **About**, **Random** and
+  **Get App**.
 - **Shareable links**: the selected crash goes in the URL (e.g. `#tenerife-1977`).
 
-## Data
+## Data: Wikipedia, refreshed weekly
 
-`src/data/crashes.ts` holds 80 hand-written entries for well-documented
-accidents from 1937 to 2025. Positions are approximate (a few km), and MH370's
-marker shows the search area, since the wreck was never found. To make a
-crash's YouTube button go straight to a specific video for everyone, add
-`video: 'https://www.youtube.com/watch?v=…'` to its entry.
+`public/data/crashes.json` holds every aviation accident that has an English
+Wikipedia article and a known location (about 2,000). `scripts/build-crashes.mjs`
+builds it:
+
+1. **Wikidata** (Wikipedia's structured-data twin) lists every aviation
+   accident with its date, coordinates, deaths, survivors, operator, aircraft,
+   country, cause and route airports.
+2. Each crash's **Wikipedia article infobox** adds the summary line, crash
+   site, exact coordinates, aircraft type, operator, tail number, flight number,
+   origin/destination and casualty counts. Wikipedia's values win over
+   Wikidata's.
+3. The cause (mechanical, weather, human error, ...) and phase of flight are
+   sorted automatically from the summary line; crashes over water get their
+   ocean or sea from the crash-site text.
+
+The 80 hand-written entries in `src/data/crashes.ts` sit on top: they keep
+their longer summaries and reviewed causes, while dates, numbers, aircraft and
+routes come from Wikipedia. To make a crash's YouTube button go straight to a
+video for everyone, add `video: 'https://www.youtube.com/watch?v=…'` to its
+hand-written entry.
+
+### Automatic refresh
+
+- `.github/workflows/refresh-crashes.yml` (this branch) rebuilds the data,
+  commits it if anything changed, and republishes the site. Run it any time
+  from **Actions → Refresh crash data → Run workflow**.
+- GitHub only runs *scheduled* workflows from the repository's default branch,
+  so `.github/workflows/scheduled-refreshes.yml` lives on the default branch and
+  starts the refresh every Monday at 04:23 UTC.
+
+To rebuild locally: `node scripts/build-crashes.mjs` (add `--cache some/folder`
+to keep the raw downloads while experimenting). Wikidata's query service is
+rate-limited, so the script waits a minute between its queries.
 
 ## Online version (GitHub Pages)
 
 Every push to this branch builds Black Box Atlas and publishes it into the
 `crashes/` folder of the `gh-pages` branch (`.github/workflows/pages.yml`).
 It's live at **https://espnlol.github.io/map/crashes/**, next to SkyWatch at
-`/map/`. The workflow only replaces `crashes/` and leaves SkyWatch's files alone.
+`/map/`. Each site's publish step only replaces its own files: this one only
+touches `crashes/`, and SkyWatch's leaves `crashes/` alone.
 To publish again without a code change, go to **Actions → Publish Black Box
 Atlas website → Run workflow**.
 

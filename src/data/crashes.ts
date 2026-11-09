@@ -61,7 +61,7 @@ export const CRASHES: Crash[] = [
     operator: 'Malaysia Airlines', aircraft: 'Boeing 777-200ER', flight: 'MH 17',
     fatalities: 298, survivors: 0, category: 'Commercial', cause: 'Shootdown', phase: 'Cruise',
     summary: 'Shot down by a Buk surface-to-air missile over eastern Ukraine while flying from Amsterdam to Kuala Lumpur.',
-    wiki: 'Malaysia Airlines Flight 17',
+    wiki: 'Malaysia Airlines Flight 17 shootdown',
   },
   {
     id: 'ir655-1988', country: 'Iran (at sea)', name: 'Iran Air Flight 655', date: '1988-07-03',
@@ -293,7 +293,7 @@ export const CRASHES: Crash[] = [
     operator: 'Bashkirian Airlines & DHL', aircraft: 'Tupolev Tu-154M & Boeing 757-23APF', flight: 'BTC 2937 / DHL 611',
     fatalities: 71, survivors: 0, category: 'Commercial', cause: 'Collision', phase: 'Cruise',
     summary: "A lone air traffic controller told the Tu-154 to descend, contradicting its TCAS. Both jets descended into each other. Many of the victims were children.",
-    wiki: 'Überlingen mid-air collision',
+    wiki: '2002 Überlingen mid-air collision',
   },
   {
     id: 'gol1907-2006', country: 'Brazil', name: 'Gol Transportes Aéreos Flight 1907', date: '2006-09-29',
@@ -325,7 +325,7 @@ export const CRASHES: Crash[] = [
     operator: 'Private', aircraft: 'Piper PA-32R Saratoga',
     fatalities: 3, survivors: 0, category: 'General aviation', cause: 'Human error', phase: 'Approach',
     summary: 'Flying at night over water in haze, the pilot most likely suffered spatial disorientation. JFK Jr., his wife Carolyn Bessette-Kennedy and her sister Lauren Bessette were killed.',
-    wiki: 'Death of John F. Kennedy Jr.',
+    wiki: "1999 Martha's Vineyard plane crash",
   },
   {
     id: 'calabasas-2020', country: 'United States', name: 'Calabasas helicopter crash (Kobe Bryant)', date: '2020-01-26',
@@ -349,7 +349,7 @@ export const CRASHES: Crash[] = [
     operator: 'Polish Air Force', aircraft: 'Tupolev Tu-154M',
     fatalities: 96, survivors: 0, category: 'Military / State', cause: 'Human error', phase: 'Approach',
     summary: "The crew descended below minimums in thick fog. Polish President Lech Kaczyński and much of the country's political and military leadership were killed.",
-    wiki: '2010 Polish Air Force Tu-154 crash',
+    wiki: 'Smolensk air disaster',
   },
   {
     id: 'andes-1972', country: 'Argentina', name: 'Uruguayan Air Force Flight 571 (Andes)', date: '1972-10-13',
@@ -405,7 +405,7 @@ export const CRASHES: Crash[] = [
     operator: 'Scandinavian Airlines & private', aircraft: 'McDonnell Douglas MD-87 & Cessna Citation CJ2', flight: 'SK 686',
     fatalities: 118, survivors: 0, category: 'Commercial', cause: 'Collision', phase: 'Takeoff',
     summary: 'In fog, a business jet took a wrong taxiway onto the active runway and was hit by the departing SAS airliner, which then crashed into a baggage building.',
-    wiki: 'Linate Airport disaster',
+    wiki: '2001 Linate Airport runway collision',
   },
   {
     id: 'us427-1994', country: 'United States', name: 'USAir Flight 427', date: '1994-09-08',
@@ -437,7 +437,7 @@ export const CRASHES: Crash[] = [
     operator: 'Air New Zealand', aircraft: 'McDonnell Douglas DC-10-30', flight: 'TE 901',
     fatalities: 257, survivors: 0, category: 'Commercial', cause: 'Human error', phase: 'Cruise',
     summary: "A sightseeing flight's navigation coordinates had been changed without telling the crew. In whiteout conditions the jet flew straight into the volcano.",
-    wiki: 'Air New Zealand Flight 901',
+    wiki: 'Mount Erebus disaster',
   },
   {
     id: 'elal1862-1992', country: 'Netherlands', name: 'El Al Flight 1862 (Bijlmer)', date: '1992-10-04',
@@ -565,7 +565,7 @@ export const CRASHES: Crash[] = [
     operator: 'Avianca', aircraft: 'Boeing 707-321B', flight: 'AV 52',
     fatalities: 73, survivors: 85, category: 'Commercial', cause: 'Human error', phase: 'Approach',
     summary: 'After long holding delays near JFK, the crew never clearly declared a fuel emergency. All four engines flamed out.',
-    wiki: 'Avianca Flight 52',
+    wiki: 'Avianca Flight 052',
   },
   {
     id: 'af90-1982', country: 'United States', name: 'Air Florida Flight 90', date: '1982-01-13',
@@ -621,7 +621,7 @@ export const CRASHES: Crash[] = [
     operator: 'Arrow Air (US military charter)', aircraft: 'Douglas DC-8-63CF', flight: 'MLT 1285',
     fatalities: 256, survivors: 0, category: 'Military / State', cause: 'Unknown', phase: 'Takeoff',
     summary: "Carrying US soldiers home for Christmas, the jet stalled after takeoff from Gander. Canada's investigation board split over whether wing icing or an on-board fire was the cause.",
-    wiki: 'Arrow Air Flight 1285',
+    wiki: 'Arrow Air Flight 1285R',
   },
   {
     id: 'lokomotiv-2011', country: 'Russia', name: 'Lokomotiv Yaroslavl plane crash', date: '2011-09-07',
