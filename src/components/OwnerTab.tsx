@@ -7,6 +7,7 @@ import { loadAirports, type AirportInfo } from '../lib/airports'
 import { distanceNm } from '../lib/geo'
 import { fmtClock } from '../lib/format'
 import { fmtDist } from '../lib/format'
+import { myLabels, labelKey, setMyLabel, type MyLabel } from '../lib/myLabels'
 
 const BASIS_LABEL = {
   callsign: 'From the callsign',
@@ -137,6 +138,8 @@ export default function OwnerTab({ a, demo }: { a: Aircraft; demo: boolean }) {
         )}
       </section>
 
+      <LabelPicker a={a} />
+
       <section className="rounded-lg bg-slate-800/60 p-3">
         <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">This plane today</div>
         {legs === undefined ? (
@@ -204,5 +207,52 @@ export default function OwnerTab({ a, demo }: { a: Aircraft; demo: boolean }) {
         show who the pilot is; that isn't broadcast.
       </p>
     </div>
+  )
+}
+
+const LABEL_CHOICES: { value: MyLabel; text: string; color: string }[] = [
+  { value: 'news', text: 'News', color: '#e879f9' },
+  { value: 'police', text: 'Police', color: '#60a5fa' },
+  { value: 'medical', text: 'Medical', color: '#2dd4bf' },
+  { value: 'none', text: 'None', color: '#94a3b8' },
+]
+
+/** Fix a missing or wrong News / Police / Medical tag yourself. */
+function LabelPicker({ a }: { a: Aircraft }) {
+  const all = myLabels.use()
+  const mine = all[labelKey(a.hex, a.registration)] ?? all[labelKey(a.hex)]
+  const auto = a.special.find((s) => s.tag === 'news' || s.tag === 'police' || s.tag === 'medical')
+  return (
+    <section className="rounded-lg bg-slate-800/60 p-3">
+      <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Label this aircraft</div>
+      <p className="mt-0.5 text-xs text-slate-400">
+        {mine
+          ? mine === 'none'
+            ? 'You set this to no label.'
+            : `You labelled it ${mine === 'news' ? 'TV news' : mine}.`
+          : auto
+            ? `SkyWatch thinks it's ${auto.tag === 'news' ? 'TV news' : auto.tag}. Wrong? Pick the right one.`
+            : 'SkyWatch has no label for it. Know what it is? Pick one.'}
+      </p>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {LABEL_CHOICES.map((c) => (
+          <button
+            key={c.value}
+            onClick={() => setMyLabel(a.hex, a.registration, mine === c.value ? null : c.value)}
+            aria-pressed={mine === c.value}
+            className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${mine === c.value ? 'text-slate-950' : 'bg-slate-900/60 text-slate-200 ring-slate-700'}`}
+            style={mine === c.value ? { background: c.color, boxShadow: 'none' } : undefined}
+          >
+            {c.text}
+          </button>
+        ))}
+        {mine && (
+          <button onClick={() => setMyLabel(a.hex, a.registration, null)} className="px-2 py-1 text-xs text-slate-400 underline">
+            Let SkyWatch decide
+          </button>
+        )}
+      </div>
+      {mine && <p className="mt-1.5 text-[11px] text-slate-500">Shows on the map within a few seconds and syncs to your profile.</p>}
+    </section>
   )
 }

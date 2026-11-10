@@ -1,6 +1,7 @@
 import type { RawAircraft } from '../types'
 import { cachedOwner } from './owner'
 import { inferCategory } from './aircraftTypes'
+import { myLabelFor } from './myLabels'
 
 /**
  * "Special" groups that ADS-B doesn't broadcast directly. They're worked out
@@ -111,6 +112,11 @@ const SPORTS_OPERATOR_WORDS = [
   'FOOTBALL', 'BASEBALL', 'BASKETBALL', 'HOCKEY', 'SOCCER', 'RACING', 'NASCAR', 'NFL', 'NBA', 'NHL', 'MLB',
 ]
 
+// Helicopters known to fly for TV news, by tail number.
+const KNOWN_NEWS: Record<string, string> = {
+  N29S: 'Bell 206 photographed in WPTV NewsChannel 5 (West Palm Beach) colors',
+}
+
 // Owners that mean police.
 const POLICE_OWNER_WORDS: [RegExp, string][] = [
   [/\bPOLICE\b/, 'a police department'],
@@ -142,6 +148,8 @@ const MEDICAL_OWNER_WORDS: [RegExp, string][] = [
 // station's parent company or to a company that flies them for the station.
 const NEWS_OWNER_WORDS: [RegExp, string][] = [
   [/\bTELEVISION\b/, 'a TV station or network'],
+  // Station call letters in your areas (South Florida, New York, Los Angeles)
+  [/\b(WPTV|WPBF|WPEC|WFLX|WPLG|WSVN|WTVJ|WFOR|WLTV|WSCV|WBFS|WINK|WBBH|WFTX|WFTS|WFLA|WTSP|WTVT|WFTV|WESH|WKMG|WOFL|WABC|WNBC|WCBS|WNYW|WPIX|WWOR|WXTV|WNJU|WLNY|KABC|KNBC|KCBS|KCAL|KTLA|KTTV|KMEX|KVEA)\b/, 'a local TV station'],
   [/\bBROADCAST(ING|ERS?)?\b/, 'a broadcaster'],
   [/\b[KW][A-Z]{2,3}[- ]?TV\b/, 'a TV station'],
   [/\bTV\b/, 'a TV company'],
@@ -230,8 +238,8 @@ export function detectSpecial(r: RawAircraft, callsign: string): SpecialMatch[] 
   if (sport) out.push({ tag: 'sports', reason: sport })
 
   // --- TV news -------------------------------------------------------------
-  let news: string | null = null
-  if (op && !mil && !police && !medical) {
+  let news: string | null = KNOWN_NEWS[reg] ?? null
+  if (!news && op && !mil && !police && !medical) {
     const hit = NEWS_OWNER_WORDS.find(([re]) => re.test(op))
     if (hit) news = `Owned by ${titleCase(op)} (${hit[1]})`
   }
@@ -240,6 +248,13 @@ export function detectSpecial(r: RawAircraft, callsign: string): SpecialMatch[] 
   if (!news && heli && /^(NEWS|CHOPPER)\d{1,2}$/.test(callsign)) news = `Callsign ${callsign}`
   if (news) out.push({ tag: 'news', reason: heli ? news : `${news}. A station plane, not a helicopter` })
 
+  // --- Your own label wins ----------------------------------------------
+  const mine = myLabelFor(r.hex, r.r)
+  if (mine) {
+    const kept = out.filter((m) => m.tag !== 'news' && m.tag !== 'police' && m.tag !== 'medical')
+    if (mine !== 'none') kept.push({ tag: mine, reason: 'You labelled this aircraft' })
+    return kept
+  }
   return out
 }
 

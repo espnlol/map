@@ -9,6 +9,7 @@ import { logbook, logbookRemoved, planeKey, type LogEntry } from './logbook'
 import { teams, teamsRemoved, teamHistory, type Team, type PlaneHistory } from './teams'
 import { emergencyLog, type EmergencyRecord } from './emergencyLog'
 import { mergeSightings, sightings, type PlaneRecord } from './sightings'
+import { myLabels, type MyLabel } from './myLabels'
 import { settings, settingsChangedAt, type Settings } from './settings'
 import { milWatch, type WatchedAirport } from './milwatch'
 
@@ -32,6 +33,7 @@ interface SyncedData {
   settings?: Settings
   settingsAt?: number
   milAirports?: WatchedAirport[]
+  myLabels?: Record<string, MyLabel>
   sightings?: Record<string, PlaneRecord>
   updatedAt?: number
 }
@@ -153,6 +155,8 @@ export function mergeData(local: SyncedData, remote: SyncedData): SyncedData {
     teamHistory: hist,
     emergencies: [...em.values()].sort((a, b) => b.startedAt - a.startedAt).slice(0, 200),
     sightings: mergeSightings(remote.sightings, local.sightings),
+    // your labels: this device's choices win
+    myLabels: { ...remote.myLabels, ...local.myLabels },
   }
 }
 
@@ -167,6 +171,7 @@ const localData = (): SyncedData => ({
   settingsAt: settingsChangedAt.get(),
   milAirports: milWatch.get().airports,
   sightings: sightings.get(),
+  myLabels: myLabels.get(),
 })
 
 let applying = false
@@ -187,6 +192,7 @@ export async function syncNow() {
     teamHistory.set(merged.teamHistory!)
     emergencyLog.set(merged.emergencies!)
     sightings.set(merged.sightings!)
+    myLabels.set(merged.myLabels!)
     if (merged.milAirports) milWatch.set((w) => ({ ...w, airports: merged.milAirports! }))
     if (merged.settings && merged.settingsAt && merged.settingsAt > settingsChangedAt.get()) settings.replace(merged.settings, merged.settingsAt)
     applying = false
@@ -210,7 +216,7 @@ const schedule = () => {
   timer = setTimeout(syncNow, 4000)
 }
 export function startAutoSync() {
-  const unsubs = [logbook, logbookRemoved, teams, teamsRemoved, emergencyLog, settingsChangedAt, milWatch, sightings].map((s) => s.subscribe(schedule))
+  const unsubs = [logbook, logbookRemoved, teams, teamsRemoved, emergencyLog, settingsChangedAt, milWatch, sightings, myLabels].map((s) => s.subscribe(schedule))
   const onVisible = () => !document.hidden && account.get().token && syncNow()
   document.addEventListener('visibilitychange', onVisible)
   if (account.get().token) syncNow()
