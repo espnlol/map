@@ -9,7 +9,7 @@ import { logbook, logbookRemoved, planeKey, type LogEntry } from './logbook'
 import { teams, teamsRemoved, teamHistory, type Team, type PlaneHistory } from './teams'
 import { emergencyLog, type EmergencyRecord } from './emergencyLog'
 import { mergeSightings, sightings, type PlaneRecord } from './sightings'
-import { myLabels, type MyLabel } from './myLabels'
+import { myLabels } from './myLabels'
 import { settings, settingsChangedAt, type Settings } from './settings'
 import { milWatch, type WatchedAirport } from './milwatch'
 
@@ -33,7 +33,7 @@ interface SyncedData {
   settings?: Settings
   settingsAt?: number
   milAirports?: WatchedAirport[]
-  myLabels?: Record<string, MyLabel>
+  myLabels?: ReturnType<typeof myLabels.get>
   sightings?: Record<string, PlaneRecord>
   updatedAt?: number
 }

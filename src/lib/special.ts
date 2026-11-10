@@ -250,11 +250,11 @@ export function detectSpecial(r: RawAircraft, callsign: string): SpecialMatch[] 
 
   // --- Your own label wins ----------------------------------------------
   const mine = myLabelFor(r.hex, r.r)
-  if (mine) {
-    const kept = out.filter((m) => m.tag !== 'news' && m.tag !== 'police' && m.tag !== 'medical')
-    if (mine !== 'none') kept.push({ tag: mine, reason: 'You labelled this aircraft' })
-    return kept
-  }
+  if (mine?.groups)
+    return mine.groups.map((tag) => {
+      const auto = out.find((m) => m.tag === tag)
+      return { tag, reason: auto ? `${auto.reason} (you confirmed it)` : 'You labelled this aircraft' }
+    })
   return out
 }
 

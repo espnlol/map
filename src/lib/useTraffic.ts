@@ -7,6 +7,7 @@ import { DemoTraffic } from './demo'
 import { detectEmergency } from './emergency'
 import { distanceNm } from './geo'
 import { detectSpecial } from './special'
+import { myLabelFor } from './myLabels'
 import { recordEmergencies } from './emergencyLog'
 import { pollMs } from './settings'
 
@@ -118,16 +119,20 @@ export function useTraffic(center: Center, radiusNm: number, mode: Mode): Traffi
         // Planes that don't send a type code: use the registry's, once it has been looked up.
         const reg = !r.t ? cachedOwner(r.hex) : undefined
         if (!r.t && reg === undefined && mode === 'live') lookupQueue.add(r.hex)
-        const typeCode = r.t || reg?.typeCode || undefined
+        // Your own corrections (type, category) beat the feed.
+        const mine = myLabelFor(r.hex, r.r)
+        const typeCode = mine?.typeCode || r.t || reg?.typeCode || undefined
+        const rawCategory = r.category && r.category !== 'A0' ? r.category : ''
+        const category = mine?.category || (mine?.typeCode ? inferCategory(mine.typeCode) || rawCategory : rawCategory || inferCategory(typeCode))
 
         const a: Aircraft = {
           hex: r.hex,
           callsign: label,
           registration: r.r || reg?.registration,
           typeCode,
-          model: modelName(typeCode, r.desc) ?? reg?.type,
+          model: mine?.typeCode ? modelName(mine.typeCode) : modelName(typeCode, r.desc) ?? reg?.type,
           operator: r.ownOp,
-          category: r.category && r.category !== 'A0' ? r.category : inferCategory(typeCode),
+          category,
           lat: r.lat,
           lon: r.lon,
           altitude,
@@ -143,7 +148,7 @@ export function useTraffic(center: Center, radiusNm: number, mode: Mode): Traffi
           touchdown: null,
           route,
           trail: prev ? prev.trail : [],
-          special: detectSpecial(r, callsign),
+          special: detectSpecial({ ...r, t: typeCode, category }, callsign),
         }
 
         const last = a.trail[a.trail.length - 1]

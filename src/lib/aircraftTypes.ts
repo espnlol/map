@@ -77,6 +77,24 @@ function describeClass(cls?: string): string | undefined {
   return n === '1' ? `Single-engine ${eng} plane` : `${COUNT[n] ?? `${n}-engine`} ${eng} plane`
 }
 
+/** Types matching a search (code or name), for picking the right type by hand. */
+export function searchTypes(query: string, limit = 8): { code: string; name: string }[] {
+  const q = query.trim().toUpperCase()
+  if (q.length < 2) return []
+  const out: { code: string; name: string; score: number }[] = []
+  const seen = new Set<string>()
+  for (const code of new Set([...Object.keys(TYPES), ...Object.keys(DB)])) {
+    const name = modelName(code) ?? code
+    const n = name.toUpperCase()
+    const score = code === q ? 100 : code.startsWith(q) ? 80 : n.includes(q) ? 60 - n.indexOf(q) / 10 : n.replace(/[^A-Z0-9]/g, '').includes(q.replace(/[^A-Z0-9]/g, '')) ? 40 : 0
+    if (score && !seen.has(code)) {
+      seen.add(code)
+      out.push({ code, name, score })
+    }
+  }
+  return out.sort((a, b) => b.score - a.score || a.name.length - b.name.length).slice(0, limit)
+}
+
 export function modelName(typeCode?: string, desc?: string): string | undefined {
   if (desc && desc.trim()) return titleCase(desc.trim())
   if (!typeCode) return undefined

@@ -210,6 +210,11 @@ Sightings are saved to your profile like the logbook.
     news helicopters), a "TV" tail number (N7TV) or a NEWS/CHOPPER callsign. Helicopters the feed
     doesn't name an owner for are looked up in the public registry automatically.
   Every match shows the reason it matched on the aircraft's detail panel.
+- **Fix the labels** (Owner tab): set who flies an aircraft (any mix of Military / Gov, Police,
+  Medical, Sports, News), its size / kind (Light through Heavy, Helicopter, Glider, Balloon, Drone,
+  Ground…) and its exact type (search the full ICAO type list, e.g. "747" or "Black Hawk"). Your
+  choices beat SkyWatch's guesses everywhere (map, filters, rare spotter, records) and sync to your
+  profile.
 - Search by callsign, registration, type, model or airport code
 - "Emergencies only" and "Hide on ground" toggles
 - Sort by emergencies first, callsign, altitude or speed

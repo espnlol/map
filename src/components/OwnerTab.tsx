@@ -7,7 +7,10 @@ import { loadAirports, type AirportInfo } from '../lib/airports'
 import { distanceNm } from '../lib/geo'
 import { fmtClock } from '../lib/format'
 import { fmtDist } from '../lib/format'
-import { myLabels, labelKey, setMyLabel, type MyLabel } from '../lib/myLabels'
+import { myLabels, myLabelFrom, setMyLabel, clearMyLabel } from '../lib/myLabels'
+import { SPECIAL_GROUPS, type SpecialTag } from '../lib/special'
+import { CATEGORIES, categoryInfo } from '../lib/categories'
+import { searchTypes } from '../lib/aircraftTypes'
 
 const BASIS_LABEL = {
   callsign: 'From the callsign',
@@ -210,49 +213,120 @@ export default function OwnerTab({ a, demo }: { a: Aircraft; demo: boolean }) {
   )
 }
 
-const LABEL_CHOICES: { value: MyLabel; text: string; color: string }[] = [
-  { value: 'news', text: 'News', color: '#e879f9' },
-  { value: 'police', text: 'Police', color: '#60a5fa' },
-  { value: 'medical', text: 'Medical', color: '#2dd4bf' },
-  { value: 'none', text: 'None', color: '#94a3b8' },
-]
-
-/** Fix a missing or wrong News / Police / Medical tag yourself. */
+/** Fix any of SkyWatch's guesses: groups, size category and exact type. */
 function LabelPicker({ a }: { a: Aircraft }) {
-  const all = myLabels.use()
-  const mine = all[labelKey(a.hex, a.registration)] ?? all[labelKey(a.hex)]
-  const auto = a.special.find((s) => s.tag === 'news' || s.tag === 'police' || s.tag === 'medical')
+  const mine = myLabelFrom(myLabels.use(), a.hex, a.registration)
+  const [typeQuery, setTypeQuery] = useState('')
+  const [saved, setSaved] = useState(false)
+  useEffect(() => {
+    if (!saved) return
+    const t = setTimeout(() => setSaved(false), 2500)
+    return () => clearTimeout(t)
+  }, [saved])
+  const set = (patch: Parameters<typeof setMyLabel>[2]) => (setMyLabel(a.hex, a.registration, patch), setSaved(true))
+
+  const groupsNow = a.special.map((s) => s.tag)
+  const toggleGroup = (tag: SpecialTag) => {
+    const base = mine?.groups ?? groupsNow
+    set({ groups: base.includes(tag) ? base.filter((t) => t !== tag) : [...base, tag] })
+  }
+  const matches = searchTypes(typeQuery, 6)
+  const cat = categoryInfo(a.category)
+  const chip = (on: boolean) => `rounded-full px-3 py-1 text-xs font-semibold ring-1 ${on ? 'text-slate-950 ring-transparent' : 'bg-slate-900/60 text-slate-200 ring-slate-700'}`
+  const yours = <span className="ml-1 rounded bg-amber-400/20 px-1 text-[9px] font-bold uppercase text-amber-200">yours</span>
+
   return (
     <section className="rounded-lg bg-slate-800/60 p-3">
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Label this aircraft</div>
-      <p className="mt-0.5 text-xs text-slate-400">
-        {mine
-          ? mine === 'none'
-            ? 'You set this to no label.'
-            : `You labelled it ${mine === 'news' ? 'TV news' : mine}.`
-          : auto
-            ? `SkyWatch thinks it's ${auto.tag === 'news' ? 'TV news' : auto.tag}. Wrong? Pick the right one.`
-            : 'SkyWatch has no label for it. Know what it is? Pick one.'}
-      </p>
-      <div className="mt-2 flex flex-wrap gap-1.5">
-        {LABEL_CHOICES.map((c) => (
-          <button
-            key={c.value}
-            onClick={() => setMyLabel(a.hex, a.registration, mine === c.value ? null : c.value)}
-            aria-pressed={mine === c.value}
-            className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${mine === c.value ? 'text-slate-950' : 'bg-slate-900/60 text-slate-200 ring-slate-700'}`}
-            style={mine === c.value ? { background: c.color, boxShadow: 'none' } : undefined}
-          >
-            {c.text}
-          </button>
-        ))}
+      <div className="flex items-center justify-between">
+        <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Fix the labels</div>
         {mine && (
-          <button onClick={() => setMyLabel(a.hex, a.registration, null)} className="px-2 py-1 text-xs text-slate-400 underline">
-            Let SkyWatch decide
+          <button onClick={() => (clearMyLabel(a.hex, a.registration), setSaved(true))} className="text-[11px] text-slate-400 underline">
+            Undo all my changes
           </button>
         )}
       </div>
-      {mine && <p className="mt-1.5 text-[11px] text-slate-500">Shows on the map within a few seconds and syncs to your profile.</p>}
+      <p className="mt-0.5 text-xs text-slate-400">Something wrong or missing? Your choices beat SkyWatch's guesses and sync to your profile.</p>
+
+      <div className="mt-2.5 text-[11px] font-semibold text-slate-300">
+        Who flies it{mine?.groups && yours}
+      </div>
+      <div className="mt-1 flex flex-wrap gap-1.5">
+        {SPECIAL_GROUPS.map((g) => {
+          const on = (mine?.groups ?? groupsNow).includes(g.tag)
+          return (
+            <button key={g.tag} onClick={() => toggleGroup(g.tag)} aria-pressed={on} className={chip(on)} style={on ? { background: g.color } : undefined}>
+              {g.label}
+            </button>
+          )
+        })}
+        {mine?.groups && (
+          <button onClick={() => set({ groups: undefined })} className="px-1 text-[11px] text-slate-400 underline">
+            automatic
+          </button>
+        )}
+      </div>
+
+      <div className="mt-3 text-[11px] font-semibold text-slate-300">
+        Size / kind{mine?.category && yours}
+      </div>
+      <div className="mt-1 flex flex-wrap gap-1.5">
+        {CATEGORIES.filter((c) => c.code !== '?').map((c) => {
+          const on = cat.code === c.code
+          return (
+            <button
+              key={c.code}
+              onClick={() => set({ category: mine?.category === c.code ? undefined : c.code })}
+              aria-pressed={on}
+              title={c.description}
+              className={chip(on)}
+              style={on ? { background: c.color } : undefined}
+            >
+              {c.short}
+            </button>
+          )
+        })}
+        {mine?.category && (
+          <button onClick={() => set({ category: undefined })} className="px-1 text-[11px] text-slate-400 underline">
+            automatic
+          </button>
+        )}
+      </div>
+
+      <div className="mt-3 text-[11px] font-semibold text-slate-300">
+        Aircraft type{mine?.typeCode && yours}
+      </div>
+      <div className="mt-0.5 text-xs text-slate-400">
+        Now: <span className="text-slate-200">{a.model ?? 'unknown'}</span>
+        {a.typeCode && <span className="font-mono text-slate-500"> ({a.typeCode})</span>}
+        {mine?.typeCode && (
+          <button onClick={() => set({ typeCode: undefined })} className="ml-2 text-[11px] text-slate-400 underline">
+            automatic
+          </button>
+        )}
+      </div>
+      <input
+        id="fix-type"
+        value={typeQuery}
+        onChange={(e) => setTypeQuery(e.target.value)}
+        placeholder="Search a type: 747, Black Hawk, C172…"
+        className="mt-1.5 w-full rounded-md bg-slate-900/70 px-2.5 py-1.5 text-base text-slate-100 ring-1 ring-slate-700 placeholder:text-slate-500 md:text-sm"
+      />
+      {matches.length > 0 && (
+        <ul className="mt-1 divide-y divide-slate-800 rounded-md bg-slate-900/70 ring-1 ring-slate-700">
+          {matches.map((m) => (
+            <li key={m.code}>
+              <button
+                onClick={() => (set({ typeCode: m.code }), setTypeQuery(''))}
+                className="flex w-full items-baseline gap-2 px-2.5 py-1.5 text-left text-sm hover:bg-slate-800"
+              >
+                <span className="w-12 shrink-0 font-mono text-xs text-slate-400">{m.code}</span>
+                <span className="text-slate-100">{m.name}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {saved && <p className="mt-2 text-[11px] text-emerald-300">Saved. The map updates within a few seconds.</p>}
     </section>
   )
 }
