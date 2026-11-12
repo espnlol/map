@@ -26,7 +26,7 @@ const upstream: Record<string, string> = {
   airplanesliveglobe: 'https://globe.airplanes.live',
   planespotters: 'https://api.planespotters.net',
   hexdb: 'https://hexdb.io',
-  airportdata: 'https://www.airport-data.com',
+  airportdata: 'https://airport-data.com',
   faa: 'https://nasstatus.faa.gov',
   tfr: 'https://tfr.faa.gov',
 }
@@ -38,7 +38,7 @@ const proxy = Object.fromEntries(
     {
       target,
       changeOrigin: true,
-      headers: { Referer: `${target}/` },
+      headers: { Referer: `${target}/`, 'User-Agent': 'SkyWatch/1.0 (+https://espnlol.github.io/map/)' },
       rewrite: (p: string) => p.slice(`/proxy/${name}`.length),
     },
   ]),

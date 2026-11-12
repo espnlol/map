@@ -69,8 +69,11 @@ async function airportData(hex: string, reg?: string): Promise<Photo[]> {
     const j = await getJson<R>(`${base}/api/ac_thumb.json?${q}&n=6`)
     for (const p of j?.data ?? []) {
       if (!p.image || out.some((o) => o.thumb === p.image)) continue
+      // The API only gives a ~150px thumbnail; the full photo (about 1500px wide)
+      // is image.airport-data.com/aircraft/<photo id>.jpg.
+      const id = p.link?.match(/(\d{6,})/)?.[1] ?? p.image.match(/(\d{6,})\.jpg/)?.[1]
       out.push({
-        src: p.image.replace('/small/', '/'), // full size lives one folder up
+        src: id ? `https://image.airport-data.com/aircraft/${id}.jpg` : p.image,
         fallback: p.image,
         thumb: p.image,
         link: p.link,

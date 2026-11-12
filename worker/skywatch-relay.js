@@ -17,7 +17,7 @@ const UPSTREAMS = {
   airplanesliveglobe: 'https://globe.airplanes.live',
   planespotters: 'https://api.planespotters.net',
   hexdb: 'https://hexdb.io',
-  airportdata: 'https://www.airport-data.com',
+  airportdata: 'https://airport-data.com',
   faa: 'https://nasstatus.faa.gov',
   tfr: 'https://tfr.faa.gov',
 }
@@ -45,8 +45,9 @@ const ALLOWED_PATHS = {
 const SLOW_PATHS = /^\/v2\/(type|reg|callsign|hex|mil|sqk)\b/
 
 const APP_URL = 'https://espnlol.github.io/map/'
-const RELAY_VERSION = '2026-11-09'
-const UA = 'SkyWatch relay (personal flight tracker)'
+const RELAY_VERSION = '2026-11-12'
+// Planespotters (and others) require a contact URL in the User-Agent.
+const UA = 'SkyWatch/1.0 (+https://espnlol.github.io/map/)'
 
 export default {
   async fetch(request, env, ctx) {

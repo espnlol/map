@@ -19,7 +19,7 @@ export const UPSTREAMS = {
   airplanesliveglobe: 'https://globe.airplanes.live',
   planespotters: 'https://api.planespotters.net',
   hexdb: 'https://hexdb.io',
-  airportdata: 'https://www.airport-data.com',
+  airportdata: 'https://airport-data.com',
   faa: 'https://nasstatus.faa.gov',
   tfr: 'https://tfr.faa.gov',
 } as const
