@@ -41,7 +41,8 @@ import { distanceNm } from './lib/geo'
 import { useTraffic, type Mode } from './lib/useTraffic'
 import { PRESETS } from './lib/presets'
 import { categoryKey } from './lib/categories'
-import { fmtClock } from './lib/format'
+import { fmtClock, fmtAlt } from './lib/format'
+import { inboundTo } from './lib/inbound'
 import { fmtDist, fmtDistRound } from './lib/format'
 import type { Aircraft, Center } from './types'
 
@@ -84,6 +85,8 @@ export default function App() {
   const [pathLoading, setPathLoading] = useState(false)
 
   const traffic = useTraffic(center, radius, mode)
+  // "Show planes heading here": the airport (ident) whose arrivals we're showing.
+  const [inboundId, setInboundId] = useState<string | null>(null)
   const emergencies = traffic.aircraft.filter((a) => a.emergency)
 
   const visible = useMemo(() => {
@@ -142,6 +145,7 @@ export default function App() {
 
   const changeCenter = (c: Center) => {
     setSelected(null)
+    setInboundId(null)
     setCenter(c)
   }
 
@@ -242,6 +246,22 @@ export default function App() {
 
   // ---- airports, for "where is this" labels and the circling detector ----
   const [airportList, setAirportList] = useState<AirportInfo[]>([])
+  const inboundAp = inboundId ? airportList.find((a) => a.ident === inboundId) ?? null : null
+  const inboundList = useMemo(() => (inboundAp ? inboundTo(inboundAp, traffic.aircraft) : []), [inboundAp, traffic.aircraft])
+  const showInbound = (ident: string) => {
+    const ap = airportList.find((a) => a.ident === ident)
+    if (!ap) return
+    setSelected(null)
+    setInboundId(ident)
+    setTab('flights')
+    // Track the area around the airport, wide enough to catch planes still a way out.
+    if (distanceNm(center.lat, center.lon, ap.lat, ap.lon) > radius * 0.5 || radius < 150) {
+      setCenter({ lat: ap.lat, lon: ap.lon, label: `${ap.iata || ap.ident} arrivals` })
+      setRadius((r) => Math.max(r, 150))
+    }
+    if (isMobile) setSheet('half')
+  }
+  const shown = useMemo(() => (inboundAp ? inboundList.map((x) => x.a) : visible), [inboundAp, inboundList, visible])
   useEffect(() => {
     loadAirports().then(setAirportList)
   }, [])
@@ -493,7 +513,58 @@ export default function App() {
         ))}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {tab === 'flights' && (
+        {tab === 'flights' && inboundAp && (
+          <div>
+            <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-slate-800 bg-slate-900 px-4 py-2.5">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-bold">🛬 Heading to {inboundAp.iata || inboundAp.ident}</div>
+                <div className="truncate text-[11px] text-slate-400">
+                  {inboundList.length === 1 ? '1 plane' : `${inboundList.length} planes`} · {inboundAp.name}
+                </div>
+              </div>
+              <button onClick={() => setInboundId(null)} className="rounded-md px-2 py-1 text-sm font-semibold text-sky-300 hover:bg-slate-800">
+                Done
+              </button>
+            </div>
+            {inboundList.length === 0 ? (
+              <p className="px-4 py-6 text-center text-sm text-slate-500">
+                No planes heading here right now{traffic.aircraft.length ? '' : ' (still loading)'}. Planes show up when their route says they're landing here, or when
+                they're low, descending and lined up with the field.
+              </p>
+            ) : (
+              <ul className="divide-y divide-slate-800">
+                {inboundList.map(({ a, distNm, etaMin, why }) => (
+                  <li key={a.hex}>
+                    <button onClick={() => setSelected(a.hex)} className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-slate-800/60">
+                      <div className="w-14 shrink-0 text-center">
+                        <div className="text-base font-bold tabular-nums text-sky-200">{etaMin != null ? Math.max(1, Math.round(etaMin)) : '—'}</div>
+                        <div className="text-[10px] text-slate-500">{etaMin != null ? 'min' : 'arriving'}</div>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-mono text-sm font-semibold">{a.callsign}</span>
+                          {why === 'approach' && <span className="rounded bg-slate-700 px-1 text-[10px] text-slate-300">on approach</span>}
+                        </div>
+                        <div className="truncate text-xs text-slate-400">
+                          {a.model ?? a.typeCode ?? 'Unknown type'}
+                          {a.route?.origin && ` · from ${a.route.origin.iata || a.route.origin.icao}`}
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-right text-xs tabular-nums">
+                        <div className="text-slate-200">{fmtAlt(a.altitude, false)}</div>
+                        <div className="text-slate-500">{fmtDist(distNm)} out</div>
+                      </div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="px-4 py-2 text-[11px] text-slate-500">
+              Solid line: where it has flown. Dashed: straight in to the airport (the real approach curves to line up with the runway). Times assume its current speed.
+            </p>
+          </div>
+        )}
+        {tab === 'flights' && !inboundAp && (
           <>
             {isMobile && (
               <div className="flex items-center gap-2 border-b border-slate-800 px-3 py-2">
@@ -881,7 +952,9 @@ export default function App() {
         {/* Map: full screen on phones, right-hand side on bigger screens */}
         <main className="absolute inset-0 isolate md:static md:order-2 md:flex-1">
           <MapView
-            aircraft={visible}
+            aircraft={shown}
+            inbound={inboundAp ? { ap: inboundAp, list: inboundList } : null}
+            onShowInbound={showInbound}
             selected={selected}
             onSelect={setSelected}
             center={center}

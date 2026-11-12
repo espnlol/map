@@ -7,6 +7,7 @@ import { busyness, liveAtcUrl, loadAirports, type AirportInfo } from '../lib/air
 import { settings, type BaseMap } from '../lib/settings'
 import type { Hotspot } from '../lib/happening'
 import type { MilitaryPattern } from '../lib/patterns'
+import type { Inbound } from '../lib/inbound'
 import { STATIONS, mapLat, type Station } from '../lib/antarctica'
 import { TFR_KINDS, explainTfr, fetchTfrDetail, liveContext, quickCauses, type Tfr, type TfrDetail } from '../lib/tfr'
 
@@ -65,6 +66,9 @@ interface Props {
   onAirportFocused: () => void
   /** FAA restricted airspace to outline. */
   tfrs: Tfr[]
+  /** Planes heading to one airport, with their paths in. */
+  inbound: { ap: AirportInfo; list: Inbound[] } | null
+  onShowInbound: (ident: string) => void
   /** A TFR (NOTAM number) to zoom to and open. */
   focusTfr: string | null
   onTfrFocused: () => void
@@ -105,7 +109,7 @@ function iconFor(a: Aircraft, selected: boolean, label: boolean) {
   })
 }
 
-export default function MapView({ aircraft, selected, onSelect, center, radiusNm, onSearchHere, showTrails, showAirports, path, highlight, onClearHighlight, bottomInset, hotspots, military, focusAirport, onAirportFocused, tfrs, focusTfr, onTfrFocused }: Props) {
+export default function MapView({ aircraft, selected, onSelect, center, radiusNm, onSearchHere, showTrails, showAirports, path, highlight, onClearHighlight, bottomInset, hotspots, military, focusAirport, onAirportFocused, inbound, onShowInbound, tfrs, focusTfr, onTfrFocused }: Props) {
   const cfg = settings.use()
   const [zoom, setZoom] = useState(8)
   const showLabels = cfg.labels && zoom >= 9
@@ -120,6 +124,8 @@ export default function MapView({ aircraft, selected, onSelect, center, radiusNm
   const airportLayer = useRef<L.LayerGroup | null>(null)
   const highlightLayer = useRef<L.LayerGroup | null>(null)
   const insetRef = useRef(bottomInset)
+  const inboundRef = useRef(onShowInbound)
+  inboundRef.current = onShowInbound
   insetRef.current = bottomInset
   const airportMarkers = useRef(new Map<string, L.CircleMarker>())
   const runwayLayer = useRef<L.LayerGroup | null>(null)
@@ -176,6 +182,12 @@ export default function MapView({ aircraft, selected, onSelect, center, radiusNm
     hotspotLayer.current = L.layerGroup().addTo(m)
     m.on('moveend zoomend', () => setView((v) => v + 1))
     m.on('popupopen', (e) => {
+      const inb = e.popup.getElement()?.querySelector<HTMLButtonElement>('[data-inbound]')
+      if (inb)
+        inb.onclick = () => {
+          m.closePopup()
+          inboundRef.current(inb.dataset.inbound!)
+        }
       const btn = e.popup.getElement()?.querySelector<HTMLButtonElement>('[data-track]')
       if (btn)
         btn.onclick = () => {
@@ -379,6 +391,48 @@ export default function MapView({ aircraft, selected, onSelect, center, radiusNm
       }).addTo(milLayer.current)
     }
   }, [military])
+
+  // Planes heading to one airport: their trail so far and a dashed line in to the field.
+  const inboundLayer = useRef<L.LayerGroup | null>(null)
+  const inboundFitted = useRef<string | null>(null)
+  useEffect(() => {
+    const m = map.current
+    if (!m) return
+    if (!inboundLayer.current || !m.hasLayer(inboundLayer.current)) inboundLayer.current = L.layerGroup().addTo(m)
+    const layer = inboundLayer.current
+    layer.clearLayers()
+    if (!inbound) {
+      inboundFitted.current = null
+      return
+    }
+    const { ap, list } = inbound
+    L.circleMarker([ap.lat, ap.lon], { radius: 9, color: '#38bdf8', weight: 3, fillColor: '#0b1220', fillOpacity: 1, renderer: renderer.current })
+      .bindTooltip(`🛬 ${esc(ap.iata || ap.ident)}: ${list.length} heading here`, { permanent: true, direction: 'right', offset: [10, 0], className: 'inbound-label' })
+      .addTo(layer)
+    for (const { a, etaMin, why } of list) {
+      // where it's been (while SkyWatch was watching)
+      if (a.trail.length > 1) drawAltitudePath(a.trail.map(([la, lo, al]) => [la, lo, al] as [number, number, number | null]), layer, renderer.current, 3)
+      // where it's going
+      L.polyline(
+        [
+          [a.lat, a.lon],
+          [ap.lat, ap.lon],
+        ],
+        { color: altColor(a.altitude), weight: 2, dashArray: '6 6', opacity: 0.9, renderer: renderer.current },
+      )
+        .bindTooltip(`${esc(a.callsign)} · ${etaMin != null ? `~${Math.max(1, Math.round(etaMin))} min` : 'arriving'}${why === 'approach' ? ' (on approach)' : ''}`, { sticky: true })
+        .addTo(layer)
+    }
+    // Frame the airport and its arrivals once per airport (after the first planes show up).
+    if (inboundFitted.current !== ap.ident && list.length) {
+      inboundFitted.current = ap.ident
+      const b = L.latLngBounds([[ap.lat, ap.lon], ...list.map(({ a }) => [a.lat, a.lon] as [number, number])])
+      m.fitBounds(b.pad(0.1), { paddingTopLeft: [40, 70], paddingBottomRight: [40, 40 + insetRef.current], maxZoom: 10 })
+    } else if (inboundFitted.current === null && !list.length) {
+      inboundFitted.current = `${ap.ident}?`
+      m.setView([ap.lat, ap.lon], 8)
+    }
+  }, [inbound])
 
   // Antarctic research stations (names appear from zoom 4).
   const stationLayer = useRef<L.LayerGroup | null>(null)
@@ -599,7 +653,8 @@ function airportPopup(ap: AirportInfo, b: ReturnType<typeof busyness>) {
     <div style="color:#64748b">${esc(codes)} · ${esc([ap.city, ap.country].filter(Boolean).join(', '))}${ap.elevation != null ? ` · ${ap.elevation.toLocaleString()} ft` : ''}</div>
     <div style="margin-top:6px"><b>Right now:</b> ${b.onGround} on the ground, ${b.arriving} arriving, ${b.departing} departing</div>
     ${runways ? `<div style="margin-top:6px"><b>Runways</b><br/>${runways}</div>` : ''}
-    <button data-track="${ap.lat},${ap.lon}" style="margin-top:8px;width:100%;padding:6px;border-radius:6px;background:#0ea5e9;color:#020617;font-weight:600">Track planes here</button>
+    <button data-inbound="${esc(ap.ident)}" style="margin-top:8px;width:100%;padding:6px;border-radius:6px;background:#0ea5e9;color:#020617;font-weight:600">🛬 Show planes heading here</button>
+    <button data-track="${ap.lat},${ap.lon}" style="margin-top:6px;width:100%;padding:6px;border-radius:6px;border:1px solid #334155;color:#7dd3fc;font-weight:600">Track planes here</button>
     ${liveAtcUrl(ap.ident, ap.iata) ? `<a href="${liveAtcUrl(ap.ident, ap.iata)}" target="_blank" rel="noreferrer" style="display:block;margin-top:6px;text-align:center;padding:6px;border-radius:6px;border:1px solid #334155;color:#7dd3fc;font-weight:600;text-decoration:none">🎧 Listen to ATC (LiveATC)</a>` : ''}
   </div>`
 }

@@ -156,6 +156,15 @@ details and a link to the FAA notice. 🔔 lists the ones near you plus any VIP 
 The shapes come from the FAA's TFR map service and list (tfr.faa.gov) through the relay, refreshed
 every 15 minutes. Turn it off in *Settings → Map* or the ⋯ menu. US only.
 
+## Planes heading to an airport
+
+Tap an airport, then **🛬 Show planes heading here**. The map shows only the planes landing there:
+their trail so far (colored by altitude) and a dashed line straight in to the field. The side panel
+lists them by minutes out, with type, origin, altitude and distance. A plane counts when its route
+says it's landing there, or when it's low, descending and pointed at the field (marked "on
+approach"). SkyWatch widens the tracked area to at least 150 nm around the airport so planes further
+out show up. Tap **Done** to see everything again.
+
 ## Antarctic research stations
 
 47 stations across Antarctica are marked with ice-blue diamonds (filled: staffed year-round; hollow:
