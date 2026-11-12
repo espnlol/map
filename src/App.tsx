@@ -254,11 +254,10 @@ export default function App() {
     setSelected(null)
     setInboundId(ident)
     setTab('flights')
-    // Track the area around the airport, wide enough to catch planes still a way out.
-    if (distanceNm(center.lat, center.lon, ap.lat, ap.lon) > radius * 0.5 || radius < 150) {
-      setCenter({ lat: ap.lat, lon: ap.lon, label: `${ap.iata || ap.ident} arrivals` })
-      setRadius((r) => Math.max(r, 150))
-    }
+    // Track 250 nm around the airport: the widest the free feed answers in one request
+    // (about 30–40 minutes out for a jet). Everything else is hidden while this is on.
+    setCenter({ lat: ap.lat, lon: ap.lon, label: `${ap.iata || ap.ident} arrivals` })
+    setRadius(250)
     if (isMobile) setSheet('half')
   }
   const shown = useMemo(() => (inboundAp ? inboundList.map((x) => x.a) : visible), [inboundAp, inboundList, visible])
@@ -560,7 +559,8 @@ export default function App() {
               </ul>
             )}
             <p className="px-4 py-2 text-[11px] text-slate-500">
-              Solid line: where it has flown. Dashed: straight in to the airport (the real approach curves to line up with the runway). Times assume its current speed.
+              Showing arrivals within 250 nm (about 30–40 minutes out for a jet), the furthest the free flight feed reaches in one look. Solid line: where it has
+              flown. Dashed: straight in to the airport. Times assume its current speed.
             </p>
           </div>
         )}

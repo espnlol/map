@@ -162,8 +162,8 @@ Tap an airport, then **🛬 Show planes heading here**. The map shows only the p
 their trail so far (colored by altitude) and a dashed line straight in to the field. The side panel
 lists them by minutes out, with type, origin, altitude and distance. A plane counts when its route
 says it's landing there, or when it's low, descending and pointed at the field (marked "on
-approach"). SkyWatch widens the tracked area to at least 150 nm around the airport so planes further
-out show up. Tap **Done** to see everything again.
+approach"). SkyWatch tracks 250 nm around the airport (the most the free feed answers in one request)
+and hides every other plane. Tap **Done** to see everything again.
 
 ## Antarctic research stations
 
