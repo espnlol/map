@@ -66,6 +66,7 @@ async function airportData(hex: string, reg?: string): Promise<Photo[]> {
   const out: Photo[] = []
   for (const q of [`m=${hex.toUpperCase()}`, reg ? `r=${encodeURIComponent(reg)}` : null]) {
     if (!q) continue
+    if (q.startsWith('r=') && out.length) break // found by transponder code; a tail-number search can bring in its previous holder
     const j = await getJson<R>(`${base}/api/ac_thumb.json?${q}&n=6`)
     for (const p of j?.data ?? []) {
       if (!p.image || out.some((o) => o.thumb === p.image)) continue
@@ -100,7 +101,21 @@ function regPattern(reg: string): RegExp {
   return new RegExp(`(^|[^A-Z0-9])${chars.join('[-_ ]?')}($|[^A-Z0-9])`)
 }
 
-async function commons(reg?: string): Promise<Photo[]> {
+/**
+ * Words a photo's title/description should contain if it shows this type, e.g.
+ * "Bell 407" → bell, 407. Tail numbers get reused (N506MC was a 747 before it
+ * was a Bell 407), so a matching tail number alone isn't enough.
+ */
+function typeWords(model?: string): string[] {
+  if (!model) return []
+  const words = model.toLowerCase().replace(/[()]/g, ' ').split(/[\s/-]+/).filter(Boolean)
+  const maker = words[0]
+  const nums = words.filter((w) => /\d/.test(w) && w.length >= 2).map((w) => w.replace(/[^a-z0-9]/g, ''))
+  const generic = new Set(['aircraft', 'airplane', 'helicopter', 'jet', 'plane', 'single', 'twin', 'engine'])
+  return [...new Set([maker && !generic.has(maker) ? maker : '', ...nums].filter(Boolean))]
+}
+
+async function commons(reg?: string, model?: string): Promise<Photo[]> {
   // Very short registrations match too many unrelated files.
   if (!reg || normReg(reg).length < 4) return []
   const params = new URLSearchParams({
@@ -125,7 +140,12 @@ async function commons(reg?: string): Promise<Photo[]> {
       // The file must also look like an aviation photo (title, description or categories).
       const meta = p.imageinfo?.[0]?.extmetadata
       const about = `${p.title} ${stripHtml(meta?.ImageDescription?.value)} ${stripHtml(meta?.Categories?.value)} ${stripHtml(meta?.ObjectName?.value)}`
-      return AVIATION.test(about)
+      if (!AVIATION.test(about)) return false
+      // When we know the type, the photo has to be of that type too.
+      const want = typeWords(model)
+      if (!want.length) return true
+      const text = about.toLowerCase()
+      return want.some((w) => new RegExp(`(^|[^a-z0-9])${w}([^a-z0-9]|$)`).test(text))
     })
     .slice(0, 6)
     .map((p) => {
@@ -195,7 +215,7 @@ export function findPhotos(hexRaw: string, registration?: string, model?: string
   let p = cache.get(key)
   if (!p) {
     p = (async () => {
-      const lists = await Promise.all([planespotters(hex, registration), airportData(hex, registration), commons(registration)])
+      const lists = await Promise.all([planespotters(hex, registration), airportData(hex, registration), commons(registration, model)])
       // Measure the real sizes, drop broken ones, and show the sharpest first.
       const exact = (await Promise.all(lists.flat().slice(0, 12).map(measure)))
         .filter((x): x is Photo => !!x)
